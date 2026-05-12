@@ -23,73 +23,157 @@ const SSRPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [activePassenger, setActivePassenger] = useState(0);
+
   const navigate = useNavigate();
 
   /* ---------------- Utils ---------------- */
+
   const getPrice = (val) => Number(val || 0);
 
+  const normalizeArray = (value) => {
+    if (!value) return [];
+
+    if (Array.isArray(value)) {
+      return value.flat(Infinity).filter(Boolean);
+    }
+
+    if (typeof value === "object") {
+      return Object.values(value).flat(Infinity).filter(Boolean);
+    }
+
+    return [];
+  };
+
+  const getSeatKey = (seat) => {
+    return `${seat?.Code || ""}-${seat?.Origin || ""}-${
+      seat?.Destination || ""
+    }`;
+  };
+
+  const getMealKey = (meal) => {
+    return `${meal?.Code || ""}-${meal?.Origin || ""}-${
+      meal?.Destination || ""
+    }`;
+  };
+
+  const isValidResultIndex =
+    resultIndex !== undefined && resultIndex !== null && resultIndex !== "";
+
   /* ---------------- Session Guard ---------------- */
+
   useEffect(() => {
-    if (!traceId || !resultIndex) {
+    if (!traceId || !isValidResultIndex) {
       navigate("/");
     }
-  }, [traceId, resultIndex, navigate]);
+  }, [traceId, isValidResultIndex, navigate]);
 
   /* ---------------- Seat Click ---------------- */
+
   const handleSeatClick = (seat) => {
-    // assign seat to next unassigned passenger
-    let updatedSeats = [...selectedSeats];
-
-    // find passenger without seat
-    for (let i = 0; i < passengerCount; i++) {
-      const alreadyAssigned = updatedSeats.find((s) => s.PassengerIndex === i);
-
-      if (!alreadyAssigned) {
-        updatedSeats.push({
-          ...seat,
-          PassengerIndex: i, // 🔥 IMPORTANT
-        });
-        setSelectedSeats(updatedSeats);
-        return;
-      }
+    if (!passengerCount) {
+      alert("Passenger count missing. Please restart booking.");
+      return;
     }
 
-    alert("All passengers already have seats");
+    const seatKey = getSeatKey(seat);
+
+    const alreadyTakenByOtherPassenger = selectedSeats.find(
+      (s) => getSeatKey(s) === seatKey && s.PassengerIndex !== activePassenger,
+    );
+
+    if (alreadyTakenByOtherPassenger) {
+      alert(
+        `Seat ${seat.Code} is already selected for Passenger ${
+          alreadyTakenByOtherPassenger.PassengerIndex + 1
+        }`,
+      );
+      return;
+    }
+
+    let updatedSeats = [...selectedSeats];
+
+    const alreadySelectedByActivePassenger = updatedSeats.find(
+      (s) => getSeatKey(s) === seatKey && s.PassengerIndex === activePassenger,
+    );
+
+    if (alreadySelectedByActivePassenger) {
+      updatedSeats = updatedSeats.filter(
+        (s) =>
+          !(getSeatKey(s) === seatKey && s.PassengerIndex === activePassenger),
+      );
+
+      setSelectedSeats(updatedSeats);
+      return;
+    }
+
+    updatedSeats = updatedSeats.filter(
+      (s) => s.PassengerIndex !== activePassenger,
+    );
+
+    updatedSeats.push({
+      ...seat,
+      PassengerIndex: activePassenger,
+    });
+
+    setSelectedSeats(updatedSeats);
   };
 
   /* ---------------- Meal Click ---------------- */
+
   const handleMealSelect = (meal) => {
-    let updated = [...selectedMeals];
-
-    for (let i = 0; i < passengerCount; i++) {
-      const exists = updated.find((m) => m.PassengerIndex === i);
-
-      if (!exists) {
-        updated.push({
-          ...meal,
-          PassengerIndex: i,
-        });
-        setSelectedMeals(updated);
-        return;
-      }
+    if (!passengerCount) {
+      alert("Passenger count missing. Please restart booking.");
+      return;
     }
 
-    alert("All passengers already have meals");
+    const mealKey = getMealKey(meal);
+
+    let updatedMeals = [...selectedMeals];
+
+    const alreadySelectedByActivePassenger = updatedMeals.find(
+      (m) => getMealKey(m) === mealKey && m.PassengerIndex === activePassenger,
+    );
+
+    // ✅ Click same meal again = remove meal
+    if (alreadySelectedByActivePassenger) {
+      updatedMeals = updatedMeals.filter(
+        (m) =>
+          !(getMealKey(m) === mealKey && m.PassengerIndex === activePassenger),
+      );
+
+      setSelectedMeals(updatedMeals);
+      return;
+    }
+
+    // ✅ One meal per passenger
+    updatedMeals = updatedMeals.filter(
+      (m) => m.PassengerIndex !== activePassenger,
+    );
+
+    updatedMeals.push({
+      ...meal,
+      PassengerIndex: activePassenger,
+      Quantity: meal.Quantity || 1,
+    });
+
+    setSelectedMeals(updatedMeals);
   };
 
   /* ---------------- Baggage Click ---------------- */
+
   const handleBaggageSelect = (bag) => {
     if (bag.Code === "NO_BAGGAGE") {
       setSelectedBaggage([]);
       return;
     }
 
-    let updated = [];
+    const updated = [];
 
     for (let i = 0; i < passengerCount; i++) {
       updated.push({
         ...bag,
-        PassengerIndex: i, // 🔥 CRITICAL
+        PassengerIndex: i,
       });
     }
 
@@ -97,65 +181,131 @@ const SSRPage = () => {
   };
 
   /* ---------------- Seat Renderer ---------------- */
-  const renderSeat = (seat) => {
+
+  const renderSeat = (seat, seatIndex) => {
     const unavailable = seat.AvailablityType === 0;
-    const isSelected = selectedSeats.some((s) => s.Code === seat.Code);
     const price = getPrice(seat.Price);
+
+    const selectedSeat = selectedSeats.find(
+      (s) => getSeatKey(s) === getSeatKey(seat),
+    );
+
+    const isSelectedByActivePassenger =
+      selectedSeat?.PassengerIndex === activePassenger;
+
+    const isSelectedByOtherPassenger =
+      selectedSeat && selectedSeat.PassengerIndex !== activePassenger;
 
     return (
       <button
-        key={seat.Code}
+        key={`${getSeatKey(seat)}-${seatIndex}`}
         disabled={unavailable}
         onClick={() => handleSeatClick(seat)}
-        className={`w-12 h-12 rounded-md text-[10px] flex flex-col justify-center items-center border
-        ${
-          unavailable
-            ? "bg-gray-300 text-gray-500"
-            : isSelected
-              ? "bg-green-600 text-white"
-              : price > 0
-                ? "bg-yellow-400"
-                : "bg-white hover:bg-gray-100"
-        }`}
+        className={`w-12 h-12 rounded-md text-[10px] flex flex-col justify-center items-center border transition
+          ${
+            unavailable
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : isSelectedByActivePassenger
+                ? "bg-green-600 text-white border-green-700"
+                : isSelectedByOtherPassenger
+                  ? "bg-red-500 text-white border-red-600"
+                  : price > 0
+                    ? "bg-yellow-400 hover:bg-yellow-500 border-yellow-500"
+                    : "bg-white hover:bg-gray-100"
+          }`}
       >
         <span>{seat.Code}</span>
+
+        {isSelectedByOtherPassenger && selectedSeat && (
+          <span className="text-[8px]">P{selectedSeat.PassengerIndex + 1}</span>
+        )}
+
         {price > 0 && <span className="text-[9px]">₹{price}</span>}
       </button>
     );
   };
 
   /* ---------------- Fetch SSR ---------------- */
+
   const fetchSSR = async () => {
     try {
       setLoading(true);
+      setError(null);
+
+      console.log("SSR PAYLOAD 👉", {
+        TraceId: traceId,
+        ResultIndex: resultIndex,
+      });
 
       const res = await privateApi.post("/api/airlines/ssr/", {
         TraceId: traceId,
         ResultIndex: resultIndex,
       });
 
-      const response = res?.data?.Response;
+      console.log("SSR RAW RESPONSE 👉", res.data);
 
-      setMeals(response?.MealDynamic?.flat() || []);
-      setBaggage(response?.Baggage?.flat() || []);
-      const allSeats =
-        response?.SeatDynamic?.flatMap((seg) =>
-          seg.SegmentSeat?.flatMap((s) => s.RowSeats || []),
+      const ssrResponse =
+        res?.data?.Response?.Response ||
+        res?.data?.Response ||
+        res?.data?.data?.Response ||
+        res?.data?.data ||
+        res?.data;
+
+      console.log("SSR FINAL RESPONSE 👉", ssrResponse);
+
+      if (ssrResponse?.Error?.ErrorCode && ssrResponse.Error.ErrorCode !== 0) {
+        throw new Error(ssrResponse.Error.ErrorMessage || "SSR API error");
+      }
+
+      const mealList = [
+        ...normalizeArray(ssrResponse?.MealDynamic),
+        ...normalizeArray(ssrResponse?.Meal),
+        ...normalizeArray(ssrResponse?.Meals),
+      ];
+
+      const baggageList = [
+        ...normalizeArray(ssrResponse?.Baggage),
+        ...normalizeArray(ssrResponse?.BaggageDynamic),
+      ];
+
+      const seatDynamic = normalizeArray(ssrResponse?.SeatDynamic);
+
+      const allSeatRows =
+        seatDynamic.flatMap((seg) =>
+          normalizeArray(seg?.SegmentSeat).flatMap((segmentSeat) =>
+            normalizeArray(segmentSeat?.RowSeats),
+          ),
         ) || [];
 
-      setSeatRows(allSeats.map((row) => row.Seats || []));
+      console.log("MEALS LIST 👉", mealList);
+      console.log("BAGGAGE LIST 👉", baggageList);
+      console.log("SEAT ROWS 👉", allSeatRows);
+
+      setMeals(mealList);
+      setBaggage(baggageList);
+      setSeatRows(allSeatRows.map((row) => row.Seats || []));
     } catch (err) {
-      setError("Failed to load SSR data");
+      console.log("SSR AXIOS ERROR 👉", err);
+      console.log("SSR ERROR RESPONSE 👉", err.response?.data);
+
+      const apiMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.response?.data?.Response?.Error?.ErrorMessage ||
+        err.message ||
+        "Failed to load SSR data";
+
+      setError(apiMessage);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (traceId && resultIndex) fetchSSR();
+    if (traceId && isValidResultIndex) {
+      fetchSSR();
+    }
   }, [traceId, resultIndex]);
-
-  /* ---------------- Price ---------------- */
 
   /* ---------------- Price ---------------- */
 
@@ -164,8 +314,6 @@ const SSRPage = () => {
   const flightFare = Number(pricing?.TBOFare || 0);
   const convenienceFee = Number(pricing?.ConvenienceFee || 0);
 
-  // SSR totals
-  // SSR totals
   const seatsTotal = selectedSeats.reduce((t, s) => t + getPrice(s.Price), 0);
   const mealsTotal = selectedMeals.reduce((t, m) => t + getPrice(m.Price), 0);
   const baggageTotal = selectedBaggage.reduce(
@@ -173,10 +321,11 @@ const SSRPage = () => {
     0,
   );
 
-  // ✅ FINAL TOTAL (API + SSR)
   const finalTotal =
     flightFare + seatsTotal + mealsTotal + baggageTotal + convenienceFee;
+
   /* ---------------- Derived ---------------- */
+
   const paidBaggage = baggage.filter((b) => getPrice(b.Price) > 0);
 
   const noBaggageOption = {
@@ -184,47 +333,162 @@ const SSRPage = () => {
     Price: 0,
   };
 
+  const activePassengerSeat = selectedSeats.find(
+    (s) => s.PassengerIndex === activePassenger,
+  );
+
+  const activePassengerMeal = selectedMeals.find(
+    (m) => m.PassengerIndex === activePassenger,
+  );
+
   /* ---------------- UI ---------------- */
 
-  if (loading)
+  if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
         Loading...
       </div>
     );
-  if (error)
+  }
+
+  if (error) {
     return (
-      <div className="h-screen flex items-center justify-center text-red-600">
-        {error}
+      <div className="h-screen flex flex-col items-center justify-center text-red-600 px-4 text-center">
+        <p className="font-semibold">{error}</p>
+
+        <button
+          onClick={() => navigate("/")}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+        >
+          Go Back
+        </button>
       </div>
     );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-20">
       <h2 className="text-xl font-bold mb-8">Select Add-ons</h2>
 
-      {/* Meals */}
-      <div className="mb-10">
-        <h3 className="font-semibold mb-3">Meals</h3>
+      {/* Passenger Selector */}
+      <div className="mb-8 p-4 border rounded bg-white shadow-sm">
+        <h3 className="font-semibold mb-3">Select Passenger</h3>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {meals.map((meal) => {
-            const isSelected = selectedMeals.some((m) => m.Code === meal.Code);
+        <div className="flex gap-2 flex-wrap">
+          {Array.from({ length: passengerCount || 0 }).map((_, index) => {
+            const hasSeat = selectedSeats.some(
+              (s) => s.PassengerIndex === index,
+            );
+
+            const hasMeal = selectedMeals.some(
+              (m) => m.PassengerIndex === index,
+            );
 
             return (
               <button
-                key={meal.Code}
-                onClick={() => handleMealSelect(meal)}
-                className={`p-3 border rounded ${
-                  isSelected ? "bg-blue-600 text-white" : ""
+                key={index}
+                onClick={() => setActivePassenger(index)}
+                className={`px-4 py-2 rounded border text-sm transition ${
+                  activePassenger === index
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : hasSeat || hasMeal
+                      ? "bg-green-100 border-green-500 text-green-700"
+                      : "bg-white"
                 }`}
               >
-                {meal.AirlineDescription || meal.Code}
-                {getPrice(meal.Price) > 0 && <div>₹{meal.Price}</div>}
+                Passenger {index + 1}
+                {hasSeat ? " Seat✓" : ""}
+                {hasMeal ? " Meal✓" : ""}
               </button>
             );
           })}
         </div>
+      </div>
+
+      {/* Meals */}
+      <div className="mb-10">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+          <div>
+            <h3 className="font-semibold">Meals</h3>
+            <p className="text-sm text-gray-500">
+              Meal selection for Passenger {activePassenger + 1}
+            </p>
+          </div>
+
+          {activePassengerMeal && (
+            <button
+              onClick={() => {
+                const updatedMeals = selectedMeals.filter(
+                  (m) => m.PassengerIndex !== activePassenger,
+                );
+                setSelectedMeals(updatedMeals);
+              }}
+              className="px-4 py-2 rounded bg-red-600 text-white text-sm"
+            >
+              Remove Meal
+            </button>
+          )}
+        </div>
+
+        {activePassengerMeal && (
+          <div className="mb-4 p-3 border rounded bg-blue-50 text-sm">
+            Selected Meal:{" "}
+            <span className="font-semibold">
+              {activePassengerMeal.AirlineDescription ||
+                activePassengerMeal.Description ||
+                activePassengerMeal.Code ||
+                "Meal"}
+            </span>{" "}
+            - ₹{getPrice(activePassengerMeal.Price)}
+          </div>
+        )}
+
+        {meals.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {meals.map((meal, index) => {
+              const isSelected = selectedMeals.some(
+                (m) =>
+                  getMealKey(m) === getMealKey(meal) &&
+                  m.PassengerIndex === activePassenger,
+              );
+
+              return (
+                <button
+                  key={`${meal.Code || meal.AirlineDescription || "meal"}-${index}`}
+                  onClick={() => handleMealSelect(meal)}
+                  className={`p-3 border rounded text-left transition ${
+                    isSelected
+                      ? "bg-blue-600 text-white border-blue-700"
+                      : "bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="font-medium text-sm">
+                    {meal.AirlineDescription ||
+                      meal.Description ||
+                      meal.Code ||
+                      "Meal"}
+                  </div>
+
+                  {meal.Code && (
+                    <div className="text-xs opacity-80 mt-1">
+                      Code: {meal.Code}
+                    </div>
+                  )}
+
+                  {getPrice(meal.Price) > 0 && (
+                    <div className="mt-2 font-semibold">
+                      ₹{getPrice(meal.Price)}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-gray-500 border rounded p-4 bg-gray-50">
+            No meals available for this flight.
+          </div>
+        )}
       </div>
 
       {/* Baggage */}
@@ -232,40 +496,38 @@ const SSRPage = () => {
         <h3 className="font-semibold mb-3">Baggage</h3>
 
         {paidBaggage.length > 0 ? (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* NO BAGGAGE */}
-              <button
-                onClick={() => handleBaggageSelect(noBaggageOption)}
-                className={`p-3 border rounded ${
-                  selectedBaggage.length === 0 ? "bg-gray-800 text-white" : ""
-                }`}
-              >
-                No Extra Baggage
-                <div>₹0</div>
-              </button>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button
+              onClick={() => handleBaggageSelect(noBaggageOption)}
+              className={`p-3 border rounded ${
+                selectedBaggage.length === 0
+                  ? "bg-gray-800 text-white"
+                  : "bg-white"
+              }`}
+            >
+              No Extra Baggage
+              <div>₹0</div>
+            </button>
 
-              {/* Paid */}
-              {paidBaggage.map((bag) => {
-                const isSelected = selectedBaggage.some(
-                  (b) => b.Code === bag.Code,
-                );
+            {paidBaggage.map((bag, index) => {
+              const isSelected = selectedBaggage.some(
+                (b) => b.Code === bag.Code,
+              );
 
-                return (
-                  <button
-                    key={bag.Code}
-                    onClick={() => handleBaggageSelect(bag)}
-                    className={`p-3 border rounded ${
-                      isSelected ? "bg-purple-600 text-white" : ""
-                    }`}
-                  >
-                    {bag.Weight} KG
-                    <div>₹{getPrice(bag.Price)}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </>
+              return (
+                <button
+                  key={`${bag.Code}-${index}`}
+                  onClick={() => handleBaggageSelect(bag)}
+                  className={`p-3 border rounded ${
+                    isSelected ? "bg-purple-600 text-white" : "bg-white"
+                  }`}
+                >
+                  {bag.Weight} KG
+                  <div>₹{getPrice(bag.Price)}</div>
+                </button>
+              );
+            })}
+          </div>
         ) : (
           <div className="text-gray-500">No additional baggage available.</div>
         )}
@@ -273,15 +535,66 @@ const SSRPage = () => {
 
       {/* Seats */}
       <div className="mb-10">
-        <h3>
-          Seats ({selectedSeats.length}/{passengerCount})
-        </h3>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <div>
+            <h3 className="font-semibold">
+              Seats ({selectedSeats.length}/{passengerCount})
+            </h3>
 
-        {seatRows.map((row, i) => (
-          <div key={i} className="flex gap-2 justify-center mb-2">
-            {row.map(renderSeat)}
+            <p className="text-sm text-gray-500 mt-1">
+              Seat selection for Passenger {activePassenger + 1}
+            </p>
           </div>
-        ))}
+        </div>
+
+        <div className="mb-4 p-3 border rounded bg-gray-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">
+              Passenger {activePassenger + 1}
+            </p>
+
+            <p className="text-sm text-gray-600">
+              {activePassengerSeat
+                ? `Selected Seat: ${activePassengerSeat.Code} - ₹${getPrice(
+                    activePassengerSeat.Price,
+                  )}`
+                : "No seat selected"}
+            </p>
+          </div>
+
+          {activePassengerSeat && (
+            <button
+              onClick={() => {
+                const updatedSeats = selectedSeats.filter(
+                  (s) => s.PassengerIndex !== activePassenger,
+                );
+                setSelectedSeats(updatedSeats);
+              }}
+              className="px-4 py-2 rounded bg-red-600 text-white text-sm"
+            >
+              Remove Seat
+            </button>
+          )}
+        </div>
+
+        <div className="overflow-x-auto">
+          <div className="min-w-max space-y-2">
+            {seatRows.length > 0 ? (
+              seatRows.map((row, rowIndex) => (
+                <div
+                  key={rowIndex}
+                  className="flex gap-2 justify-center items-center"
+                >
+                  {row.map((seat, seatIndex) => renderSeat(seat, seatIndex))}
+                </div>
+              ))
+            ) : (
+              <div className="text-gray-500 border rounded p-4 bg-gray-50">
+                No seats available for this flight.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Price */}
@@ -320,11 +633,6 @@ const SSRPage = () => {
             <span>₹{convenienceFee}</span>
           </div>
 
-          {/* <div className="flex justify-between">
-            <span>GST (18%)</span>
-            <span>₹{gst}</span>
-          </div> */}
-
           <hr />
 
           <div className="flex justify-between font-bold text-lg">
@@ -333,18 +641,16 @@ const SSRPage = () => {
           </div>
         </div>
       </div>
-      {/* Continue */}
+
       {/* Continue */}
       <div className="flex justify-end">
         <button
           onClick={() => {
-            // ✅ guard for missing passengerCount
             if (!passengerCount) {
               alert("Passenger count missing. Please restart booking.");
               return;
             }
 
-            // ✅ validation instead of disabled
             if (selectedSeats.length !== passengerCount) {
               alert(`Please select ${passengerCount} seats`);
               return;
@@ -361,12 +667,11 @@ const SSRPage = () => {
               },
             });
           }}
-          className={`px-6 py-3 rounded text-white transition
-      ${
-        selectedSeats.length === passengerCount
-          ? "bg-blue-600 hover:bg-blue-700"
-          : "bg-gray-400 cursor-not-allowed"
-      }`}
+          className={`px-6 py-3 rounded text-white transition ${
+            selectedSeats.length === passengerCount
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-gray-400 cursor-not-allowed"
+          }`}
         >
           Continue
         </button>

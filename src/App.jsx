@@ -30,6 +30,8 @@ import HotelBooking from "./modules/hotels/pages/HotelBooking";
 import HotelBookingSuccess from "./modules/hotels/pages/BookingSuccess";
 import HotelBookingDetails from "./modules/hotels/pages/HotelBookingDetails";
 import FlightBookingDetails from "./modules/flights/pages/FlightBookingDetails";
+import Blogs from "./Pages/Blogs";
+import BlogDetails from "./Pages/BlogDetails";
 
 const App = () => {
   return (
@@ -40,7 +42,7 @@ const App = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/packages" element={<PackageSection limit={8} />} />
-        <Route path="/packages/:id" element={<PackageDetails />} />
+        <Route path="/packages/:slug" element={<PackageDetails />} />
         <Route
           path="/package_booking_success/:bookingId"
           element={<PackageBookingSuccess />}
@@ -48,6 +50,8 @@ const App = () => {
         <Route path="/bookings" element={<MyBookings />} />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/blogs" element={<Blogs />} />
+        <Route path="/blogs/:slug" element={<BlogDetails />} />
         <Route path="/flights" element={<FlightsResults />} />
         <Route path="/hotels" element={<HotelResults />} />
         <Route path="/hotels/:id" element={<HotelDetails />} />

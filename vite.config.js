@@ -6,6 +6,6 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    allowedHosts: ["successfully-archive-payroll-dogs.trycloudflare.com"],
+    allowedHosts: ["theaters-page-stranger-regulated.trycloudflare.com"],
   },
 });

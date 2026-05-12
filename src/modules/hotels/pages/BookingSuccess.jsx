@@ -1,7 +1,7 @@
 "use client";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { cancelHotelBooking } from "../../../services/cancelHotelBooking";
+import { sendHotelChangeRequest } from "../../../services/sendHotelChangeRequest";
 
 const HotelBookingSuccess = () => {
   const navigate = useNavigate();
@@ -60,7 +60,6 @@ const HotelBookingSuccess = () => {
   /* ================= CANCEL ================= */
   const handleChangeRequest = async () => {
     const remarks = window.prompt("Enter change request reason");
-
     if (!remarks) return;
 
     try {
@@ -70,10 +69,15 @@ const HotelBookingSuccess = () => {
 
       const res = await sendHotelChangeRequest(booking.BookingId, remarks);
 
-      if (res?.success || res?.Status === 1 || res?.message) {
-        setChangeMsg(res?.message || "Change request sent successfully");
+      if (res?.success) {
+        // 🔥 Proper message
+        setChangeMsg(
+          `${res.message} (Request ID: ${res.data?.ChangeRequestId})`,
+        );
       } else {
-        setChangeError(res?.Error?.ErrorMessage || "Change request failed");
+        setChangeError(
+          res?.message || res?.Error?.ErrorMessage || "Change request failed",
+        );
       }
     } catch (err) {
       setChangeError(
@@ -208,7 +212,17 @@ const HotelBookingSuccess = () => {
         </div>
       )}
 
-      {cancelError && <div className="mt-6 text-red-400">{cancelError}</div>}
+      {changeMsg && (
+        <div className="mt-6 bg-green-500/10 border border-green-500/30 p-4 rounded-xl text-green-400">
+          {changeMsg}
+        </div>
+      )}
+
+      {changeError && (
+        <div className="mt-6 bg-red-500/10 border border-red-500/30 p-4 rounded-xl text-red-400">
+          {changeError}
+        </div>
+      )}
     </div>
   );
 };

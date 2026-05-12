@@ -44,18 +44,19 @@ const HotelBooking = () => {
 
   const [guestList, setGuestList] = useState(
     Array.from({ length: totalGuests }, (_, i) => {
-      const isChild = i >= (guests?.adults || totalGuests);
+      const adultsCount = guests?.adults || totalGuests;
+      const isChild = i >= adultsCount;
 
       return {
         Title: "Mr",
         FirstName: "",
-        MiddleName: "", // ✅ important
+        MiddleName: "",
         LastName: "",
         Email: "",
         Phoneno: "",
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
-        Age: isChild ? 10 : 30,
+        Age: "", // ✅ user will enter age
       };
     }),
   );
@@ -69,28 +70,54 @@ const HotelBooking = () => {
   };
 
   const validateGuests = () => {
-    for (let g of guestList) {
-      if (!g.FirstName.trim() || !g.LastName.trim())
-        return "All guest names required";
+    for (let i = 0; i < guestList.length; i++) {
+      const g = guestList[i];
+
+      if (!g.FirstName.trim() || !g.LastName.trim()) {
+        return `Guest ${i + 1}: First name and last name are required`;
+      }
+
+      if (!g.Age) {
+        return `Guest ${i + 1}: Age is required`;
+      }
+
+      const age = Number(g.Age);
+
+      if (Number.isNaN(age) || age <= 0) {
+        return `Guest ${i + 1}: Enter valid age`;
+      }
+
+      if (g.PaxType === 1 && age < 12) {
+        return `Guest ${i + 1}: Adult age must be 12 or above`;
+      }
+
+      if (g.PaxType === 2 && age >= 12) {
+        return `Guest ${i + 1}: Child age must be below 12`;
+      }
 
       if (g.LeadPassenger) {
         if (!g.Email.includes("@")) return "Valid email required";
-        if (!/^[0-9]{10}$/.test(g.Phoneno))
+
+        if (!/^[0-9]{10}$/.test(g.Phoneno)) {
           return "Valid 10-digit phone required";
+        }
       }
 
       if (
         validation?.PaxNameMinLength &&
         g.FirstName.length < validation.PaxNameMinLength
-      )
+      ) {
         return "Name too short";
+      }
 
       if (
         validation?.PaxNameMaxLength &&
         g.FirstName.length > validation.PaxNameMaxLength
-      )
+      ) {
         return "Name too long";
+      }
     }
+
     return null;
   };
 
@@ -106,13 +133,13 @@ const HotelBooking = () => {
       const cleanedGuests = guestList.map((g, i) => ({
         Title: g.Title,
         FirstName: g.FirstName,
-        MiddleName: "", // required
+        MiddleName: "",
         LastName: g.LastName,
-        Email: i === 0 ? g.Email : undefined, // only lead
+        Email: i === 0 ? g.Email : undefined,
         Phoneno: i === 0 ? g.Phoneno : undefined,
         PaxType: g.PaxType,
-        LeadPassenger: i === 0, // only first
-        Age: g.Age,
+        LeadPassenger: i === 0,
+        Age: Number(g.Age), // ✅ important
       }));
 
       // ✅ SAFE ROOM STRUCTURE
@@ -133,7 +160,10 @@ const HotelBooking = () => {
 
       console.log("FINAL PAYLOAD:", JSON.stringify(finalPayload, null, 2));
 
-      const res = await privateApi.post("/api/hotels/hotels/book/", finalPayload);
+      const res = await privateApi.post(
+        "/api/hotels/hotels/book/",
+        finalPayload,
+      );
 
       console.log("BOOK RESPONSE:", res.data);
 
@@ -208,6 +238,25 @@ const HotelBooking = () => {
                     updateGuest(index, "LastName", e.target.value)
                   }
                 />
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">
+                    {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
+                  </label>
+
+                  <input
+                    type="number"
+                    min={guest.PaxType === 1 ? 12 : 1}
+                    max={guest.PaxType === 1 ? 120 : 11}
+                    placeholder={
+                      guest.PaxType === 1
+                        ? "Enter adult age"
+                        : "Enter child age"
+                    }
+                    className="input"
+                    value={guest.Age}
+                    onChange={(e) => updateGuest(index, "Age", e.target.value)}
+                  />
+                </div>
 
                 {guest.LeadPassenger && (
                   <>

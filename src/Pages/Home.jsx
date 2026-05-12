@@ -7,6 +7,7 @@ import TestimonialsSection from "./TestimonialsSection";
 import CTASection from "../components/Home/CTASection";
 import AboutUs from "../components/Home/AboutUs";
 import PackageSection from "../modules/packages/PackageSection";
+import BlogSection from "../components/Home/BlogSection";
 
 const Home = () => {
   return (
@@ -17,6 +18,7 @@ const Home = () => {
       <PackageSection limit={4} />
       <CTASection />
       <AboutUs />
+      <BlogSection />
       <WhyChooseUs />
       <TestimonialsSection />
     </div>

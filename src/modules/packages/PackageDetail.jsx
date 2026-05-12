@@ -7,8 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import { useAuthStore } from "../../store/authStore";
 
-const fetchPackage = async (id) => {
-  const res = await publicApi.get(`/api/package/packages/${id}/`);
+const fetchPackage = async (slug) => {
+  const res = await publicApi.get(`/api/package/packages/${slug}/`);
   return res.data?.data || res.data;
 };
 
@@ -34,7 +34,7 @@ const PackageDetails = () => {
   const handleBookClick = () => {
     if (!token) {
       navigate("/login", {
-        state: { redirectTo: `/package/${id}`, openBooking: true },
+        state: { redirectTo: `/package/${slug}`, openBooking: true },
       });
       return;
     }
@@ -51,17 +51,17 @@ const PackageDetails = () => {
     }));
   };
 
-  const { id } = useParams();
   const navigate = useNavigate();
+  const { slug } = useParams();
 
   const {
     data: pkg = null,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["package", id],
-    queryFn: () => fetchPackage(id),
-    enabled: !!id,
+    queryKey: ["package", slug],
+    queryFn: () => fetchPackage(slug),
+    enabled: !!slug,
   });
 
   //Package Booking

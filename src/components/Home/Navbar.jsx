@@ -75,6 +75,9 @@ const Navbar = () => {
           <Link to="/contact" className={linkClass("/contact")}>
             Contact
           </Link>
+          <Link to="/blogs" className={linkClass("/blogs")}>
+            Blogs
+          </Link>
         </ul>
 
         {/* Desktop Auth */}
@@ -159,6 +162,12 @@ const Navbar = () => {
             className="text-left hover:text-[#E6B35C]"
           >
             Flights
+          </button>
+          <button
+            onClick={() => navigate("/blogs")}
+            className="text-left hover:text-[#E6B35C]"
+          >
+            Blogs
           </button>
 
           <button
