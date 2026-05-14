@@ -6,11 +6,13 @@ export const useHotelStore = create((set) => ({
   /* ===================== */
   search: {
     city: "",
+    cityName: "",
     checkIn: "",
     checkOut: "",
     guests: {
-      adults: 2,
+      adults: 1,
       children: 0,
+      rooms: 1, // ✅ ADDED
       childAges: [],
     },
   },
@@ -44,7 +46,7 @@ export const useHotelStore = create((set) => ({
   /* ===================== */
   /* 👥 BOOKING GUEST LIST */
   /* ===================== */
-  guestDetails: [], // 🔥 actual passenger data
+  guestDetails: [],
 
   /* ===================== */
   /* ⏳ GLOBAL STATE */
@@ -124,7 +126,7 @@ export const useHotelStore = create((set) => ({
       bookingData: data,
     })),
 
-  // 👥 Save Guest Details (Booking Form)
+  // 👥 Save Guest Details
   setGuestDetails: (guests) =>
     set(() => ({
       guestDetails: guests,

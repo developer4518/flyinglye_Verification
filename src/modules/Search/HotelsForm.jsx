@@ -31,8 +31,9 @@ const HotelsForm = () => {
   });
 
   const [guests, setGuests] = useState({
-    adults: 2,
+    adults: 1,
     children: 0,
+    rooms: 1,
   });
 
   /* ================= CLICK OUTSIDE ================= */
@@ -70,6 +71,7 @@ const HotelsForm = () => {
       updated[type] = Math.max(0, prev[type] + value);
 
       if (updated.adults < 1) updated.adults = 1;
+      if (updated.rooms < 1) updated.rooms = 1;
 
       return updated;
     });
@@ -106,7 +108,7 @@ const HotelsForm = () => {
           checkout: formData.checkOut,
           adults: guests.adults,
           children: guests.children,
-          rooms: 1,
+          rooms: guests.rooms,
         },
       });
 
@@ -225,7 +227,8 @@ const HotelsForm = () => {
             onClick={() => setGuestOpen(!guestOpen)}
             className="w-full h-11 px-3 rounded-xl text-sm bg-(--bg-secondary) border border-(--border-soft) text-left"
           >
-            {totalGuests} Guest{totalGuests > 1 && "s"}
+            {totalGuests} Guest{totalGuests > 1 && "s"} · {guests.rooms} Room
+            {guests.rooms > 1 && "s"}
           </button>
 
           {guestOpen && (
@@ -267,6 +270,31 @@ const HotelsForm = () => {
                   <button
                     type="button"
                     onClick={() => updateGuests("children", 1)}
+                    className="w-8 h-8 rounded-lg border"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* ROOMS */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Rooms</span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateGuests("rooms", -1)}
+                    className="w-8 h-8 rounded-lg border"
+                  >
+                    -
+                  </button>
+
+                  <span>{guests.rooms}</span>
+
+                  <button
+                    type="button"
+                    onClick={() => updateGuests("rooms", 1)}
                     className="w-8 h-8 rounded-lg border"
                   >
                     +
