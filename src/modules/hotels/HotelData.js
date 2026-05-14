@@ -1009,5 +1009,6 @@ export const cityData = {
     { code: "150396", name: "Yuksom, Sikkim" },
     { code: "150387", name: "ZARIBAGO, Jammu and Kashmir" },
     { code: "150248", name: "Zirakpur, Punjab" },
+    { code: "115936", name: "Dubai" },
   ],
 };
