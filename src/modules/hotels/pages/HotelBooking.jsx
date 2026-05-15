@@ -1,8 +1,14 @@
 "use client";
+
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { privateApi } from "../../../services/api";
 import { useHotelStore } from "../../../store/hotelStore";
+
+const toTBODate = (date) => {
+  if (!date) return "";
+  return `${date}T00:00:00`;
+};
 
 const HotelBooking = () => {
   const { setGuestDetails } = useHotelStore();
@@ -12,7 +18,7 @@ const HotelBooking = () => {
   const state = location.state || {};
   const payload = state?.payload || state;
 
-  const { hotel, preBook, checkIn, checkOut, guests } = payload;
+  const { hotel, preBook, checkIn, checkOut, guests, search } = payload;
 
   if (!preBook) {
     return (
@@ -36,6 +42,54 @@ const HotelBooking = () => {
   const total = preBook?.total_amount || 0;
   const convenienceFee = preBook?.convenience_fee || 0;
 
+  /*
+    ✅ IMPORTANT:
+    GuestNationality should come from hotel search.
+    If you added nationality in HotelsForm, it should be available in search.nationality.
+  */
+  const guestNationality =
+    search?.nationality ||
+    payload?.nationality ||
+    payload?.GuestNationality ||
+    "IN";
+
+  /*
+    ✅ International detection.
+    This depends on your API response.
+    We are checking multiple possible fields safely.
+  */
+  const hotelCountryCode =
+    hotel?.country_code ||
+    hotel?.CountryCode ||
+    hotel?.countryCode ||
+    hotel?.country ||
+    hotel?.Country ||
+    "";
+
+  const hotelCountryName =
+    hotel?.country_name ||
+    hotel?.CountryName ||
+    hotel?.countryName ||
+    hotel?.address?.country ||
+    "";
+
+  const isInternationalHotel = useMemo(() => {
+    const code = String(hotelCountryCode || "").toUpperCase();
+    const name = String(hotelCountryName || "").toLowerCase();
+
+    if (code && code !== "IN" && code !== "INDIA") return true;
+    if (name && !name.includes("india")) return true;
+
+    /*
+      Fallback:
+      If hotel country is missing but selected nationality is not IN,
+      still ask for passport documents.
+    */
+    if (!code && !name && guestNationality !== "IN") return true;
+
+    return false;
+  }, [hotelCountryCode, hotelCountryName, guestNationality]);
+
   /* ================= GUEST STATE ================= */
   const totalGuests =
     typeof guests === "number"
@@ -56,7 +110,17 @@ const HotelBooking = () => {
         Phoneno: "",
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
-        Age: "", // ✅ user will enter age
+        Age: "",
+
+        // ✅ International hotel documents
+        PassportNo: "",
+        PassportIssueDate: "",
+        PassportExpDate: "",
+
+        // ✅ Your sample payload uses PAN.
+        // If your backend supports AadhaarNo, you can also send AadhaarNo.
+        PAN: "",
+        AadhaarNo: "",
       };
     }),
   );
@@ -116,6 +180,44 @@ const HotelBooking = () => {
       ) {
         return "Name too long";
       }
+
+      /*
+        ✅ Documents required only for international hotel
+      */
+      if (isInternationalHotel) {
+        if (!g.PassportNo.trim()) {
+          return `Guest ${i + 1}: Passport number is required`;
+        }
+
+        if (!g.PassportIssueDate) {
+          return `Guest ${i + 1}: Passport issue date is required`;
+        }
+
+        if (!g.PassportExpDate) {
+          return `Guest ${i + 1}: Passport expiry date is required`;
+        }
+
+        if (g.PassportExpDate <= g.PassportIssueDate) {
+          return `Guest ${i + 1}: Passport expiry date must be after issue date`;
+        }
+
+        /*
+          Your sample payload has PAN.
+          If you strictly want Aadhaar, use AadhaarNo instead of PAN,
+          but backend/TBO must support that field.
+        */
+        if (!g.PAN.trim() && !g.AadhaarNo.trim()) {
+          return `Guest ${i + 1}: Aadhaar/PAN number is required`;
+        }
+
+        if (g.AadhaarNo && !/^[0-9]{12}$/.test(g.AadhaarNo)) {
+          return `Guest ${i + 1}: Aadhaar must be 12 digits`;
+        }
+
+        if (g.PAN && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
+          return `Guest ${i + 1}: Enter valid PAN number`;
+        }
+      }
     }
 
     return null;
@@ -129,20 +231,49 @@ const HotelBooking = () => {
     try {
       setLoading(true);
 
-      // ✅ CLEAN GUESTS (CRITICAL FIX)
-      const cleanedGuests = guestList.map((g, i) => ({
-        Title: g.Title,
-        FirstName: g.FirstName,
-        MiddleName: "",
-        LastName: g.LastName,
-        Email: i === 0 ? g.Email : undefined,
-        Phoneno: i === 0 ? g.Phoneno : undefined,
-        PaxType: g.PaxType,
-        LeadPassenger: i === 0,
-        Age: Number(g.Age), // ✅ important
-      }));
+      const cleanedGuests = guestList.map((g, i) => {
+        const baseGuest = {
+          Title: g.Title,
+          FirstName: g.FirstName.trim(),
+          MiddleName: "",
+          LastName: g.LastName.trim(),
+          Email: i === 0 ? g.Email : undefined,
+          Phoneno: i === 0 ? g.Phoneno : undefined,
+          PaxType: g.PaxType,
+          LeadPassenger: i === 0,
+          Age: Number(g.Age),
+        };
 
-      // ✅ SAFE ROOM STRUCTURE
+        /*
+          ✅ Add document fields only for international hotel.
+          Sample API payload supports:
+          PassportNo,
+          PassportIssueDate,
+          PassportExpDate,
+          PAN
+        */
+        if (isInternationalHotel) {
+          baseGuest.PassportNo = g.PassportNo.trim();
+          baseGuest.PassportIssueDate = toTBODate(g.PassportIssueDate);
+          baseGuest.PassportExpDate = toTBODate(g.PassportExpDate);
+
+          /*
+            ✅ If PAN entered, send PAN.
+            ✅ If Aadhaar entered and your backend accepts AadhaarNo, send AadhaarNo.
+            NOTE: Your shown payload has PAN, not AadhaarNo.
+          */
+          if (g.PAN.trim()) {
+            baseGuest.PAN = g.PAN.trim().toUpperCase();
+          }
+
+          if (g.AadhaarNo.trim()) {
+            baseGuest.AadhaarNo = g.AadhaarNo.trim();
+          }
+        }
+
+        return baseGuest;
+      });
+
       const HotelRoomsDetails = [
         {
           HotelPassenger: cleanedGuests,
@@ -152,9 +283,12 @@ const HotelBooking = () => {
       const finalPayload = {
         BookingCode: bookingCode,
         IsVoucherBooking: true,
-        GuestNationality: "IN",
+
+        // ✅ not hardcoded now
+        GuestNationality: guestNationality,
+
         RequestedBookingMode: 5,
-        NetAmount: net, // ❌ never round
+        NetAmount: net,
         HotelRoomsDetails,
       };
 
@@ -167,7 +301,6 @@ const HotelBooking = () => {
 
       console.log("BOOK RESPONSE:", res.data);
 
-      // ✅ Save booking
       localStorage.setItem(
         "hotelBookingData",
         JSON.stringify({
@@ -177,13 +310,13 @@ const HotelBooking = () => {
           checkIn,
           checkOut,
           bookingResponse: res.data,
+          isInternationalHotel,
+          guestNationality,
         }),
       );
 
-      // ✅ Zustand
       setGuestDetails(cleanedGuests);
 
-      // ✅ Navigate
       navigate("/hotel-booking-success", {
         state: { booking: res.data },
       });
@@ -202,14 +335,28 @@ const HotelBooking = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800">
             <h2 className="text-2xl font-bold text-yellow-400">
-              {hotel?.hotel_name}
+              {hotel?.hotel_name || hotel?.HotelName || "Hotel Booking"}
             </h2>
+
             <p className="text-gray-400 text-sm mt-2">
               📅 {checkIn} → {checkOut}
             </p>
+
             <p className="text-gray-400 text-sm mt-1">
               🛏 {roomData?.Name?.[0] || "Standard Room"}
             </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="text-xs px-3 py-1 rounded-full bg-yellow-400/10 text-yellow-300 border border-yellow-400/20">
+                Guest Nationality: {guestNationality}
+              </span>
+
+              {isInternationalHotel && (
+                <span className="text-xs px-3 py-1 rounded-full bg-red-400/10 text-red-300 border border-red-400/20">
+                  International Hotel: Passport Required
+                </span>
+              )}
+            </div>
           </div>
 
           {guestList.map((guest, index) => (
@@ -222,6 +369,17 @@ const HotelBooking = () => {
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <select
+                  className="input"
+                  value={guest.Title}
+                  onChange={(e) => updateGuest(index, "Title", e.target.value)}
+                >
+                  <option value="Mr">Mr</option>
+                  <option value="Ms">Ms</option>
+                  <option value="Mrs">Mrs</option>
+                  <option value="Master">Master</option>
+                </select>
+
                 <input
                   placeholder="First Name"
                   className="input"
@@ -230,6 +388,7 @@ const HotelBooking = () => {
                     updateGuest(index, "FirstName", e.target.value)
                   }
                 />
+
                 <input
                   placeholder="Last Name"
                   className="input"
@@ -238,6 +397,7 @@ const HotelBooking = () => {
                     updateGuest(index, "LastName", e.target.value)
                   }
                 />
+
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">
                     {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
@@ -268,6 +428,7 @@ const HotelBooking = () => {
                         updateGuest(index, "Email", e.target.value)
                       }
                     />
+
                     <input
                       placeholder="Phone"
                       className="input"
@@ -277,6 +438,94 @@ const HotelBooking = () => {
                       }
                     />
                   </>
+                )}
+
+                {/* ✅ INTERNATIONAL DOCUMENT SECTION */}
+                {isInternationalHotel && (
+                  <div className="sm:col-span-2 mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4">
+                    <h4 className="text-yellow-300 font-semibold mb-3">
+                      Passport & ID Details
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <input
+                        placeholder="Passport Number"
+                        className="input"
+                        value={guest.PassportNo}
+                        onChange={(e) =>
+                          updateGuest(index, "PassportNo", e.target.value)
+                        }
+                      />
+
+                      <input
+                        placeholder="PAN Number"
+                        className="input uppercase"
+                        value={guest.PAN}
+                        onChange={(e) =>
+                          updateGuest(
+                            index,
+                            "PAN",
+                            e.target.value.toUpperCase(),
+                          )
+                        }
+                      />
+
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Passport Issue Date
+                        </label>
+                        <input
+                          type="date"
+                          className="input"
+                          value={guest.PassportIssueDate}
+                          onChange={(e) =>
+                            updateGuest(
+                              index,
+                              "PassportIssueDate",
+                              e.target.value,
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Passport Expiry Date
+                        </label>
+                        <input
+                          type="date"
+                          className="input"
+                          value={guest.PassportExpDate}
+                          onChange={(e) =>
+                            updateGuest(
+                              index,
+                              "PassportExpDate",
+                              e.target.value,
+                            )
+                          }
+                        />
+                      </div>
+
+                      <input
+                        placeholder="Aadhaar Number Optional"
+                        maxLength={12}
+                        className="input sm:col-span-2"
+                        value={guest.AadhaarNo}
+                        onChange={(e) =>
+                          updateGuest(
+                            index,
+                            "AadhaarNo",
+                            e.target.value.replace(/\D/g, ""),
+                          )
+                        }
+                      />
+                    </div>
+
+                    <p className="text-xs text-gray-400 mt-3">
+                      Note: Your sample booking payload uses PAN. AadhaarNo will
+                      work only if your backend accepts this field.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -292,8 +541,9 @@ const HotelBooking = () => {
               <span>Net</span>
               <span>₹ {Math.round(net)}</span>
             </div>
+
             <div className="flex justify-between">
-              <span>convenience Fees</span>
+              <span>Convenience Fees</span>
               <span>₹ {Math.round(convenienceFee)}</span>
             </div>
 
@@ -308,7 +558,7 @@ const HotelBooking = () => {
           <button
             onClick={handleBookHotel}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black"
+            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Processing..." : "Proceed to Payment"}
           </button>
@@ -322,6 +572,16 @@ const HotelBooking = () => {
           padding: 12px;
           border-radius: 10px;
           width: 100%;
+          color: white;
+          outline: none;
+        }
+
+        .input:focus {
+          border-color: #facc15;
+        }
+
+        .input::placeholder {
+          color: #777;
         }
       `}</style>
     </div>

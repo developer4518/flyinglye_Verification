@@ -23,7 +23,7 @@ const PrebookLoader = () => {
       navigate("/");
     }
   }, [hotel, room, navigate]);
-
+;
   useEffect(() => {
     if (hasRun) return;
     setHasRun(true);
