@@ -661,11 +661,6 @@ const HotelBooking = () => {
                         />
                       </div>
                     </div>
-
-                    <p className="text-xs text-gray-400 mt-3">
-                      If backend/TBO does not accept AadhaarNo, store Aadhaar
-                      internally and forward only passport + PAN to supplier.
-                    </p>
                   </div>
                 )}
               </div>
