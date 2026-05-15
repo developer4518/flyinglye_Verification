@@ -1,12 +1,15 @@
 "use client";
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { publicApi } from "../../services/api";
 import { cityData } from "../hotels/HotelData";
+import { countryData } from "../hotels/CountryData";
 import { useHotelStore } from "../../store/hotelStore";
 
 const HotelsForm = () => {
   const navigate = useNavigate();
+
   const { setHotels, setSearch, setLoading, setError, resetFlow } =
     useHotelStore();
 
@@ -18,14 +21,20 @@ const HotelsForm = () => {
   const [cityInput, setCityInput] = useState("");
   const [citySuggestions, setCitySuggestions] = useState([]);
 
+  const [nationalityInput, setNationalityInput] = useState("India");
+  const [nationalitySuggestions, setNationalitySuggestions] = useState([]);
+
   const [guestOpen, setGuestOpen] = useState(false);
 
-  const cityRef = useRef();
-  const guestRef = useRef();
+  const cityRef = useRef(null);
+  const nationalityRef = useRef(null);
+  const guestRef = useRef(null);
 
   const [formData, setFormData] = useState({
     city: "",
     cityName: "",
+    nationality: "IN",
+    nationalityName: "India",
     checkIn: "",
     checkOut: "",
   });
@@ -41,6 +50,13 @@ const HotelsForm = () => {
     const handleClick = (e) => {
       if (cityRef.current && !cityRef.current.contains(e.target)) {
         setCitySuggestions([]);
+      }
+
+      if (
+        nationalityRef.current &&
+        !nationalityRef.current.contains(e.target)
+      ) {
+        setNationalitySuggestions([]);
       }
 
       if (guestRef.current && !guestRef.current.contains(e.target)) {
@@ -61,6 +77,19 @@ const HotelsForm = () => {
     return cityData.cities
       .filter((c) => c.name.toLowerCase().includes(q))
       .slice(0, 8);
+  };
+
+  /* ================= SEARCH NATIONALITY ================= */
+  const searchNationalities = (query) => {
+    if (!query) return [];
+
+    const q = query.toLowerCase();
+
+    return countryData.CountryList.filter(
+      (country) =>
+        country.Name.toLowerCase().includes(q) ||
+        country.Code.toLowerCase().includes(q),
+    ).slice(0, 8);
   };
 
   /* ================= GUEST UPDATE ================= */
@@ -88,6 +117,10 @@ const HotelsForm = () => {
       return setErrorMsg("Please select a city");
     }
 
+    if (!formData.nationality) {
+      return setErrorMsg("Please select nationality");
+    }
+
     if (!formData.checkIn || !formData.checkOut) {
       return setErrorMsg("Select dates");
     }
@@ -109,6 +142,12 @@ const HotelsForm = () => {
           adults: guests.adults,
           children: guests.children,
           rooms: guests.rooms,
+
+          // ✅ nationality selected by user
+          nationality: formData.nationality,
+
+          // ✅ optional fallback if backend expects this name
+          GuestNationality: formData.nationality,
         },
       });
 
@@ -123,14 +162,21 @@ const HotelsForm = () => {
         return;
       }
 
-      setSearch({ ...formData, guests });
-      setHotels(hotelsData);
+      setSearch({
+        ...formData,
+        guests,
+      });
 
+      setHotels(hotelsData);
       navigate("/hotels");
     } catch (err) {
       console.error(err);
       setError("API Error");
-      setErrorMsg("Something went wrong");
+      setErrorMsg(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Something went wrong",
+      );
     } finally {
       setLocalLoading(false);
       setLoading(false);
@@ -151,7 +197,7 @@ const HotelsForm = () => {
         className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-end"
       >
         {/* ================= CITY ================= */}
-        <div className="relative md:col-span-5 w-full" ref={cityRef}>
+        <div className="relative md:col-span-3 w-full" ref={cityRef}>
           <label className="text-xs text-(--text-muted)">City</label>
 
           <input
@@ -161,6 +207,11 @@ const HotelsForm = () => {
             onChange={(e) => {
               const value = e.target.value;
               setCityInput(value);
+              setFormData((prev) => ({
+                ...prev,
+                city: "",
+                cityName: "",
+              }));
               setCitySuggestions(searchCities(value));
             }}
             className="w-full h-11 px-3 rounded-xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main)"
@@ -189,6 +240,53 @@ const HotelsForm = () => {
           )}
         </div>
 
+        {/* ================= NATIONALITY ================= */}
+        <div className="relative md:col-span-3 w-full" ref={nationalityRef}>
+          <label className="text-xs text-(--text-muted)">Nationality</label>
+
+          <input
+            type="text"
+            placeholder="Search nationality"
+            value={nationalityInput}
+            onChange={(e) => {
+              const value = e.target.value;
+              setNationalityInput(value);
+              setFormData((prev) => ({
+                ...prev,
+                nationality: "",
+                nationalityName: "",
+              }));
+              setNationalitySuggestions(searchNationalities(value));
+            }}
+            className="w-full h-11 px-3 rounded-xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main)"
+          />
+
+          {nationalitySuggestions.length > 0 && (
+            <div className="absolute top-full left-0 mt-2 w-full bg-(--bg-card) border border-(--border-soft) rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto">
+              {nationalitySuggestions.map((country) => (
+                <div
+                  key={country.Code}
+                  onClick={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      nationality: country.Code,
+                      nationalityName: country.Name,
+                    }));
+                    setNationalityInput(country.Name);
+                    setNationalitySuggestions([]);
+                  }}
+                  className="p-3 hover:bg-(--bg-secondary) cursor-pointer text-sm flex items-center justify-between"
+                >
+                  <span>{country.Name}</span>
+                  <span className="text-xs text-(--text-muted)">
+                    {country.Code}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* ================= DATES ================= */}
         <div className="grid grid-cols-2 gap-3 md:col-span-4 w-full">
           <div>
@@ -198,7 +296,10 @@ const HotelsForm = () => {
               min={today}
               value={formData.checkIn}
               onChange={(e) =>
-                setFormData({ ...formData, checkIn: e.target.value })
+                setFormData({
+                  ...formData,
+                  checkIn: e.target.value,
+                })
               }
               className="w-full h-11 px-3 rounded-xl text-sm bg-(--bg-secondary) border border-(--border-soft)"
             />
@@ -211,7 +312,10 @@ const HotelsForm = () => {
               min={formData.checkIn || today}
               value={formData.checkOut}
               onChange={(e) =>
-                setFormData({ ...formData, checkOut: e.target.value })
+                setFormData({
+                  ...formData,
+                  checkOut: e.target.value,
+                })
               }
               className="w-full h-11 px-3 rounded-xl text-sm bg-(--bg-secondary) border border-(--border-soft)"
             />
@@ -219,7 +323,7 @@ const HotelsForm = () => {
         </div>
 
         {/* ================= GUESTS ================= */}
-        <div className="relative md:col-span-3 w-full" ref={guestRef}>
+        <div className="relative md:col-span-2 w-full" ref={guestRef}>
           <label className="text-xs text-(--text-muted)">Guests</label>
 
           <button
@@ -232,10 +336,11 @@ const HotelsForm = () => {
           </button>
 
           {guestOpen && (
-            <div className="absolute top-full left-0 mt-2 w-full bg-(--bg-card) border border-(--border-soft) rounded-xl shadow-xl p-4 z-50 space-y-4">
+            <div className="absolute top-full right-0 mt-2 w-72 bg-(--bg-card) border border-(--border-soft) rounded-xl shadow-xl p-4 z-50 space-y-4">
               {/* ADULTS */}
               <div className="flex justify-between items-center">
                 <span className="text-sm">Adults</span>
+
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -244,7 +349,9 @@ const HotelsForm = () => {
                   >
                     -
                   </button>
+
                   <span>{guests.adults}</span>
+
                   <button
                     type="button"
                     onClick={() => updateGuests("adults", 1)}
@@ -258,6 +365,7 @@ const HotelsForm = () => {
               {/* CHILDREN */}
               <div className="flex justify-between items-center">
                 <span className="text-sm">Children</span>
+
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -266,7 +374,9 @@ const HotelsForm = () => {
                   >
                     -
                   </button>
+
                   <span>{guests.children}</span>
+
                   <button
                     type="button"
                     onClick={() => updateGuests("children", 1)}
@@ -318,7 +428,7 @@ const HotelsForm = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full md:w-auto px-8 py-3 rounded-xl font-semibold text-black bg-linear-to-r from-start to-end hover:scale-[1.02] active:scale-95 transition"
+            className="w-full md:w-auto px-8 py-3 rounded-xl font-semibold text-black bg-linear-to-r from-start to-end hover:scale-[1.02] active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Searching Hotels..." : "Search Hotels"}
           </button>
