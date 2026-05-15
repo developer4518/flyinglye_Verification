@@ -10,6 +10,21 @@ const toTBODate = (date) => {
   return `${date}T00:00:00`;
 };
 
+const normalizeText = (value) => {
+  if (!value) return "";
+
+  try {
+    if (typeof value === "string") return value.toLowerCase();
+    return JSON.stringify(value).toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+const getSafeValue = (...values) => {
+  return values.find((v) => v !== undefined && v !== null && v !== "") || "";
+};
+
 const HotelBooking = () => {
   const { setGuestDetails } = useHotelStore();
   const location = useLocation();
@@ -42,11 +57,6 @@ const HotelBooking = () => {
   const total = preBook?.total_amount || 0;
   const convenienceFee = preBook?.convenience_fee || 0;
 
-  /*
-    ✅ Guest nationality means user's nationality.
-    Example:
-    Indian user booking Dubai hotel => GuestNationality = "IN"
-  */
   const guestNationality =
     search?.nationality ||
     search?.GuestNationality ||
@@ -55,56 +65,54 @@ const HotelBooking = () => {
     "IN";
 
   /*
-    ✅ Destination country means hotel country.
-    International hotel should be based on destination, not nationality.
-    Example:
-    GuestNationality = IN + Hotel Dubai/UAE => International = true
+    ✅ IMPORTANT FIX:
+    We check hotel, search, payload, preBook, and preBook.raw.
+    So if Dubai/UAE is inside any nested API response, it will still detect international.
   */
-  const hotelCountryCode =
-    hotel?.country_code ||
-    hotel?.CountryCode ||
-    hotel?.countryCode ||
-    hotel?.Country_Code ||
-    hotel?.CountryCodeIso ||
-    "";
+  const hotelCountryCode = getSafeValue(
+    hotel?.country_code,
+    hotel?.CountryCode,
+    hotel?.countryCode,
+    hotel?.Country_Code,
+    hotel?.CountryCodeIso,
+    hotel?.CountryCodeISO,
+    hotel?.HotelInfo?.CountryCode,
+    hotel?.HotelInfo?.Country_Code,
+    preBook?.raw?.HotelResult?.[0]?.CountryCode,
+    preBook?.raw?.HotelResult?.[0]?.countryCode,
+    preBook?.raw?.HotelResult?.[0]?.Country_Code,
+    preBook?.raw?.HotelResult?.[0]?.CountryCodeIso,
+    preBook?.raw?.HotelResult?.[0]?.HotelInfo?.CountryCode,
+    preBook?.raw?.HotelResult?.[0]?.HotelInfo?.Country_Code,
+  );
 
-  const hotelCountryName =
-    hotel?.country_name ||
-    hotel?.CountryName ||
-    hotel?.countryName ||
-    hotel?.Country ||
-    hotel?.country ||
-    hotel?.address?.country ||
-    hotel?.Address?.country ||
-    "";
-
-  const destinationText = [
-    hotel?.CountryName,
+  const hotelCountryName = getSafeValue(
     hotel?.country_name,
+    hotel?.CountryName,
     hotel?.countryName,
     hotel?.Country,
     hotel?.country,
-    hotel?.CityName,
-    hotel?.city_name,
-    hotel?.cityName,
-    hotel?.City,
-    hotel?.city,
-    hotel?.Address,
-    hotel?.address,
-    hotel?.hotel_address,
-    hotel?.HotelAddress,
-    hotel?.location,
-    hotel?.Location,
-    hotel?.hotel_name,
-    hotel?.HotelName,
-    search?.cityName,
-    search?.city,
-    payload?.cityName,
-    payload?.city,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+    hotel?.address?.country,
+    hotel?.Address?.country,
+    hotel?.HotelInfo?.CountryName,
+    preBook?.raw?.HotelResult?.[0]?.CountryName,
+    preBook?.raw?.HotelResult?.[0]?.countryName,
+    preBook?.raw?.HotelResult?.[0]?.Country,
+    preBook?.raw?.HotelResult?.[0]?.HotelInfo?.CountryName,
+  );
+
+  const destinationText = useMemo(() => {
+    return [
+      normalizeText(hotel),
+      normalizeText(search),
+      normalizeText(payload),
+      normalizeText(preBook),
+      normalizeText(preBook?.raw),
+      normalizeText(preBook?.raw?.HotelResult?.[0]),
+      normalizeText(preBook?.raw?.HotelResult?.[0]?.HotelInfo),
+      normalizeText(preBook?.raw?.HotelResult?.[0]?.Rooms),
+    ].join(" ");
+  }, [hotel, search, payload, preBook]);
 
   const isInternationalHotel = useMemo(() => {
     const code = String(hotelCountryCode || "")
@@ -114,27 +122,48 @@ const HotelBooking = () => {
       .trim()
       .toLowerCase();
 
-    /*
-      ✅ Best case: country code exists
-      IN / INDIA = domestic
-      AE / UAE / TH / SG etc. = international
-    */
     if (code) {
-      return code !== "IN" && code !== "INDIA";
+      return !["IN", "IND", "INDIA"].includes(code);
     }
 
-    /*
-      ✅ Second case: country name exists
-    */
     if (name) {
       return !name.includes("india");
     }
 
-    /*
-      ✅ Fallback by destination/city text.
-      This handles cases where API does not return country code clearly,
-      but city/search text contains Dubai, UAE, Thailand, etc.
-    */
+    const internationalKeywords = [
+      "dubai",
+      "abu dhabi",
+      "sharjah",
+      "ajman",
+      "ras al khaimah",
+      "fujairah",
+      "united arab emirates",
+      "uae",
+      '"ae"',
+      " ae ",
+      "thailand",
+      "bangkok",
+      "phuket",
+      "pattaya",
+      "krabi",
+      "singapore",
+      "maldives",
+      "bali",
+      "indonesia",
+      "malaysia",
+      "kuala lumpur",
+      "vietnam",
+      "sri lanka",
+      "australia",
+      "united kingdom",
+      "usa",
+      "united states",
+      "france",
+      "germany",
+      "italy",
+      "switzerland",
+    ];
+
     const indianKeywords = [
       "india",
       "delhi",
@@ -169,47 +198,6 @@ const HotelBooking = () => {
       "varanasi",
     ];
 
-    const internationalKeywords = [
-      "dubai",
-      "abu dhabi",
-      "sharjah",
-      "ajman",
-      "ras al khaimah",
-      "fujairah",
-      "united arab emirates",
-      "uae",
-      "ae",
-      "thailand",
-      "bangkok",
-      "phuket",
-      "pattaya",
-      "krabi",
-      "singapore",
-      "maldives",
-      "bali",
-      "indonesia",
-      "malaysia",
-      "kuala lumpur",
-      "langkawi",
-      "vietnam",
-      "hanoi",
-      "ho chi minh",
-      "sri lanka",
-      "colombo",
-      "nepal",
-      "bhutan",
-      "australia",
-      "united kingdom",
-      "usa",
-      "united states",
-      "europe",
-      "france",
-      "paris",
-      "germany",
-      "italy",
-      "switzerland",
-    ];
-
     if (internationalKeywords.some((word) => destinationText.includes(word))) {
       return true;
     }
@@ -218,15 +206,21 @@ const HotelBooking = () => {
       return false;
     }
 
-    /*
-      ✅ Safe fallback:
-      If destination is unknown, keep document section hidden.
-      But for Dubai/UAE this will become true from keywords above.
-    */
     return false;
   }, [hotelCountryCode, hotelCountryName, destinationText]);
 
-  /* ================= GUEST STATE ================= */
+  console.log("HOTEL BOOKING DEBUG:", {
+    guestNationality,
+    hotelCountryCode,
+    hotelCountryName,
+    destinationText,
+    isInternationalHotel,
+    hotel,
+    search,
+    payload,
+    preBook,
+  });
+
   const totalGuests =
     typeof guests === "number"
       ? guests
@@ -248,7 +242,6 @@ const HotelBooking = () => {
         LeadPassenger: i === 0,
         Age: "",
 
-        // ✅ International destination documents
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -316,11 +309,6 @@ const HotelBooking = () => {
         return `Guest ${i + 1}: Name too long`;
       }
 
-      /*
-        ✅ Required when destination is international.
-        Example:
-        Indian user booking Dubai hotel => required.
-      */
       if (isInternationalHotel) {
         if (!g.PassportNo.trim()) {
           return `Guest ${i + 1}: Passport number is required`;
@@ -338,11 +326,6 @@ const HotelBooking = () => {
           return `Guest ${i + 1}: Passport expiry date must be after issue date`;
         }
 
-        /*
-          ✅ User asked Aadhaar + Passport.
-          ✅ Your previous sample payload also had PAN.
-          So this allows Aadhaar OR PAN.
-        */
         if (!g.AadhaarNo.trim() && !g.PAN.trim()) {
           return `Guest ${i + 1}: Aadhaar or PAN number is required`;
         }
@@ -360,7 +343,6 @@ const HotelBooking = () => {
     return null;
   };
 
-  /* ================= BOOK HOTEL ================= */
   const handleBookHotel = async () => {
     const error = validateGuests();
     if (error) return alert(error);
@@ -381,9 +363,6 @@ const HotelBooking = () => {
           Age: Number(g.Age),
         };
 
-        /*
-          ✅ Add documents only if hotel destination is international.
-        */
         if (isInternationalHotel) {
           baseGuest.PassportNo = g.PassportNo.trim().toUpperCase();
           baseGuest.PassportIssueDate = toTBODate(g.PassportIssueDate);
@@ -393,10 +372,6 @@ const HotelBooking = () => {
             baseGuest.PAN = g.PAN.trim().toUpperCase();
           }
 
-          /*
-            ✅ AadhaarNo will be sent.
-            Make sure backend forwards it only if your hotel supplier accepts it.
-          */
           if (g.AadhaarNo.trim()) {
             baseGuest.AadhaarNo = g.AadhaarNo.trim();
           }
@@ -414,10 +389,7 @@ const HotelBooking = () => {
       const finalPayload = {
         BookingCode: bookingCode,
         IsVoucherBooking: true,
-
-        // ✅ Guest nationality remains Indian if user selected India.
         GuestNationality: guestNationality,
-
         RequestedBookingMode: 5,
         NetAmount: net,
         HotelRoomsDetails,
@@ -466,7 +438,6 @@ const HotelBooking = () => {
   return (
     <div className="min-h-screen bg-[#0B0B0F] text-white px-4 md:px-10 py-24">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800">
             <h2 className="text-2xl font-bold text-yellow-400">
@@ -584,7 +555,6 @@ const HotelBooking = () => {
                   </>
                 )}
 
-                {/* ✅ INTERNATIONAL DOCUMENT SECTION */}
                 {isInternationalHotel && (
                   <div className="sm:col-span-2 mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4">
                     <h4 className="text-yellow-300 font-semibold mb-2">
@@ -592,7 +562,7 @@ const HotelBooking = () => {
                     </h4>
 
                     <p className="text-xs text-gray-400 mb-4">
-                      Required because this hotel is outside India. Example:
+                      Required because this hotel destination is outside India.
                       Indian user booking Dubai hotel needs passport and ID
                       details.
                     </p>
@@ -676,9 +646,8 @@ const HotelBooking = () => {
                     </div>
 
                     <p className="text-xs text-gray-400 mt-3">
-                      Note: If backend/TBO does not accept AadhaarNo, keep
-                      Aadhaar for your internal record and forward only PAN +
-                      passport to supplier.
+                      If backend/TBO does not accept AadhaarNo, store Aadhaar
+                      internally and forward only passport + PAN to supplier.
                     </p>
                   </div>
                 )}
@@ -687,7 +656,6 @@ const HotelBooking = () => {
           ))}
         </div>
 
-        {/* RIGHT */}
         <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800 h-fit sticky top-24">
           <h3 className="text-yellow-300 mb-4 text-lg">Price Summary</h3>
 
