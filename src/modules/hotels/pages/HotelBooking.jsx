@@ -25,6 +25,28 @@ const getSafeValue = (...values) => {
   return values.find((v) => v !== undefined && v !== null && v !== "") || "";
 };
 
+const nationalityOptions = [
+  { Code: "IN", Name: "India" },
+  { Code: "AE", Name: "United Arab Emirates" },
+  { Code: "US", Name: "United States" },
+  { Code: "GB", Name: "United Kingdom" },
+  { Code: "SG", Name: "Singapore" },
+  { Code: "TH", Name: "Thailand" },
+  { Code: "MY", Name: "Malaysia" },
+  { Code: "MV", Name: "Maldives" },
+  { Code: "ID", Name: "Indonesia" },
+  { Code: "AU", Name: "Australia" },
+  { Code: "CA", Name: "Canada" },
+  { Code: "FR", Name: "France" },
+  { Code: "DE", Name: "Germany" },
+  { Code: "IT", Name: "Italy" },
+  { Code: "CH", Name: "Switzerland" },
+  { Code: "LK", Name: "Sri Lanka" },
+  { Code: "NP", Name: "Nepal" },
+  { Code: "BT", Name: "Bhutan" },
+  { Code: "VN", Name: "Vietnam" },
+];
+
 const HotelBooking = () => {
   const { setGuestDetails } = useHotelStore();
   const location = useLocation();
@@ -57,18 +79,17 @@ const HotelBooking = () => {
   const total = preBook?.total_amount || 0;
   const convenienceFee = preBook?.convenience_fee || 0;
 
-  const guestNationality =
+  const defaultGuestNationality =
     search?.nationality ||
     search?.GuestNationality ||
     payload?.nationality ||
     payload?.GuestNationality ||
     "IN";
 
-  /*
-    ✅ IMPORTANT FIX:
-    We check hotel, search, payload, preBook, and preBook.raw.
-    So if Dubai/UAE is inside any nested API response, it will still detect international.
-  */
+  const [guestNationality, setGuestNationality] = useState(
+    defaultGuestNationality,
+  );
+
   const hotelCountryCode = getSafeValue(
     hotel?.country_code,
     hotel?.CountryCode,
@@ -241,6 +262,7 @@ const HotelBooking = () => {
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
         Age: "",
+        Nationality: defaultGuestNationality,
 
         PassportNo: "",
         PassportIssueDate: "",
@@ -259,9 +281,28 @@ const HotelBooking = () => {
     setGuestList(updated);
   };
 
+  const handleNationalityChange = (value) => {
+    setGuestNationality(value);
+
+    setGuestList((prev) =>
+      prev.map((guest) => ({
+        ...guest,
+        Nationality: value,
+      })),
+    );
+  };
+
   const validateGuests = () => {
+    if (!guestNationality) {
+      return "Guest nationality is required";
+    }
+
     for (let i = 0; i < guestList.length; i++) {
       const g = guestList[i];
+
+      if (!g.Nationality) {
+        return `Guest ${i + 1}: Nationality is required`;
+      }
 
       if (!g.FirstName.trim() || !g.LastName.trim()) {
         return `Guest ${i + 1}: First name and last name are required`;
@@ -365,6 +406,9 @@ const HotelBooking = () => {
           PaxType: g.PaxType,
           LeadPassenger: i === 0,
           Age: Number(g.Age),
+
+          // ✅ passenger nationality
+          Nationality: g.Nationality || guestNationality,
         };
 
         if (isInternationalHotel) {
@@ -372,13 +416,8 @@ const HotelBooking = () => {
           baseGuest.PassportIssueDate = toTBODate(g.PassportIssueDate);
           baseGuest.PassportExpDate = toTBODate(g.PassportExpDate);
 
-          if (g.PAN.trim()) {
-            baseGuest.PAN = g.PAN.trim().toUpperCase();
-          }
-
-          if (g.AadhaarNo.trim()) {
-            baseGuest.AadhaarNo = g.AadhaarNo.trim();
-          }
+          baseGuest.PAN = g.PAN.trim().toUpperCase();
+          baseGuest.AadhaarNo = g.AadhaarNo.trim();
         }
 
         return baseGuest;
@@ -393,7 +432,10 @@ const HotelBooking = () => {
       const finalPayload = {
         BookingCode: bookingCode,
         IsVoucherBooking: true,
+
+        // ✅ selected nationality goes here
         GuestNationality: guestNationality,
+
         RequestedBookingMode: 5,
         NetAmount: net,
         HotelRoomsDetails,
@@ -456,6 +498,24 @@ const HotelBooking = () => {
               🛏 {roomData?.Name?.[0] || "Standard Room"}
             </p>
 
+            <div className="mt-4 max-w-sm">
+              <label className="block text-xs text-gray-400 mb-1">
+                Guest Nationality <span className="text-red-400">*</span>
+              </label>
+
+              <select
+                className="input"
+                value={guestNationality}
+                onChange={(e) => handleNationalityChange(e.target.value)}
+              >
+                {nationalityOptions.map((country) => (
+                  <option key={country.Code} value={country.Code}>
+                    {country.Name} ({country.Code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="text-xs px-3 py-1 rounded-full bg-yellow-400/10 text-yellow-300 border border-yellow-400/20">
                 Guest Nationality: {guestNationality}
@@ -515,6 +575,26 @@ const HotelBooking = () => {
 
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">
+                    Nationality <span className="text-red-400">*</span>
+                  </label>
+
+                  <select
+                    className="input"
+                    value={guest.Nationality}
+                    onChange={(e) =>
+                      updateGuest(index, "Nationality", e.target.value)
+                    }
+                  >
+                    {nationalityOptions.map((country) => (
+                      <option key={country.Code} value={country.Code}>
+                        {country.Name} ({country.Code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">
                     {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
                   </label>
 
@@ -567,23 +647,30 @@ const HotelBooking = () => {
 
                     <p className="text-xs text-gray-400 mb-4">
                       Required because this hotel destination is outside India.
-                      Indian user booking Dubai hotel needs passport and ID
-                      details.
+                      Indian user booking Dubai hotel needs passport, PAN and
+                      Aadhaar details.
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <input
-                        placeholder="Passport Number"
-                        className="input uppercase"
-                        value={guest.PassportNo}
-                        onChange={(e) =>
-                          updateGuest(
-                            index,
-                            "PassportNo",
-                            e.target.value.toUpperCase(),
-                          )
-                        }
-                      />
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Passport Number{" "}
+                          <span className="text-red-400">*</span>
+                        </label>
+
+                        <input
+                          placeholder="Enter Passport Number"
+                          className="input uppercase"
+                          value={guest.PassportNo}
+                          onChange={(e) =>
+                            updateGuest(
+                              index,
+                              "PassportNo",
+                              e.target.value.toUpperCase(),
+                            )
+                          }
+                        />
+                      </div>
 
                       <div>
                         <label className="block text-xs text-gray-400 mb-1">
@@ -607,8 +694,10 @@ const HotelBooking = () => {
 
                       <div>
                         <label className="block text-xs text-gray-400 mb-1">
-                          Passport Issue Date
+                          Passport Issue Date{" "}
+                          <span className="text-red-400">*</span>
                         </label>
+
                         <input
                           type="date"
                           className="input"
@@ -625,8 +714,10 @@ const HotelBooking = () => {
 
                       <div>
                         <label className="block text-xs text-gray-400 mb-1">
-                          Passport Expiry Date
+                          Passport Expiry Date{" "}
+                          <span className="text-red-400">*</span>
                         </label>
+
                         <input
                           type="date"
                           className="input"
