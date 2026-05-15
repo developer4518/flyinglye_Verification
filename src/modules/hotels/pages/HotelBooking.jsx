@@ -326,16 +326,20 @@ const HotelBooking = () => {
           return `Guest ${i + 1}: Passport expiry date must be after issue date`;
         }
 
-        if (!g.AadhaarNo.trim() && !g.PAN.trim()) {
-          return `Guest ${i + 1}: Aadhaar or PAN number is required`;
+        if (!g.PAN.trim()) {
+          return `Guest ${i + 1}: PAN number is required`;
         }
 
-        if (g.AadhaarNo && !/^[0-9]{12}$/.test(g.AadhaarNo)) {
-          return `Guest ${i + 1}: Aadhaar must be 12 digits`;
-        }
-
-        if (g.PAN && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
           return `Guest ${i + 1}: Enter valid PAN number`;
+        }
+
+        if (!g.AadhaarNo.trim()) {
+          return `Guest ${i + 1}: Aadhaar number is required`;
+        }
+
+        if (!/^[0-9]{12}$/.test(g.AadhaarNo)) {
+          return `Guest ${i + 1}: Aadhaar must be 12 digits`;
         }
       }
     }
@@ -581,19 +585,25 @@ const HotelBooking = () => {
                         }
                       />
 
-                      <input
-                        placeholder="Aadhaar Number"
-                        maxLength={12}
-                        className="input"
-                        value={guest.AadhaarNo}
-                        onChange={(e) =>
-                          updateGuest(
-                            index,
-                            "AadhaarNo",
-                            e.target.value.replace(/\D/g, "").slice(0, 12),
-                          )
-                        }
-                      />
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Aadhaar Number <span className="text-red-400">*</span>
+                        </label>
+
+                        <input
+                          placeholder="Enter Aadhaar Number"
+                          maxLength={12}
+                          className="input"
+                          value={guest.AadhaarNo}
+                          onChange={(e) =>
+                            updateGuest(
+                              index,
+                              "AadhaarNo",
+                              e.target.value.replace(/\D/g, "").slice(0, 12),
+                            )
+                          }
+                        />
+                      </div>
 
                       <div>
                         <label className="block text-xs text-gray-400 mb-1">
@@ -631,18 +641,25 @@ const HotelBooking = () => {
                         />
                       </div>
 
-                      <input
-                        placeholder="PAN Number Optional"
-                        className="input uppercase sm:col-span-2"
-                        value={guest.PAN}
-                        onChange={(e) =>
-                          updateGuest(
-                            index,
-                            "PAN",
-                            e.target.value.toUpperCase(),
-                          )
-                        }
-                      />
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs text-gray-400 mb-1">
+                          PAN Number <span className="text-red-400">*</span>
+                        </label>
+
+                        <input
+                          placeholder="Enter PAN Number"
+                          maxLength={10}
+                          className="input uppercase"
+                          value={guest.PAN}
+                          onChange={(e) =>
+                            updateGuest(
+                              index,
+                              "PAN",
+                              e.target.value.toUpperCase().slice(0, 10),
+                            )
+                          }
+                        />
+                      </div>
                     </div>
 
                     <p className="text-xs text-gray-400 mt-3">
