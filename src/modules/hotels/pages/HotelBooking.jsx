@@ -25,6 +25,25 @@ const getSafeValue = (...values) => {
   return values.find((v) => v !== undefined && v !== null && v !== "") || "";
 };
 
+const toNumberArray = (value) => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => Number(item))
+      .filter((item) => !Number.isNaN(item) && item > 0);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => Number(item.trim()))
+      .filter((item) => !Number.isNaN(item) && item > 0);
+  }
+
+  return [];
+};
+
 const nationalityOptions = [
   { Code: "IN", Name: "India" },
   { Code: "AE", Name: "United Arab Emirates" },
@@ -89,6 +108,30 @@ const HotelBooking = () => {
   const [guestNationality, setGuestNationality] = useState(
     defaultGuestNationality,
   );
+
+  const expectedChildAges = useMemo(() => {
+    const sources = [
+      guests?.childAges,
+      guests?.childrenAges,
+      search?.childAges,
+      search?.childrenAges,
+      payload?.childAges,
+      payload?.childrenAges,
+      payload?.search?.childAges,
+      payload?.search?.childrenAges,
+      preBook?.childAges,
+      preBook?.childrenAges,
+      preBook?.validation?.childAges,
+      preBook?.validation?.childrenAges,
+    ];
+
+    for (const source of sources) {
+      const ages = toNumberArray(source);
+      if (ages.length) return ages;
+    }
+
+    return [];
+  }, [guests, search, payload, preBook]);
 
   const hotelCountryCode = getSafeValue(
     hotel?.country_code,
@@ -236,6 +279,7 @@ const HotelBooking = () => {
     hotelCountryName,
     destinationText,
     isInternationalHotel,
+    expectedChildAges,
     hotel,
     search,
     payload,
@@ -251,6 +295,8 @@ const HotelBooking = () => {
     Array.from({ length: totalGuests }, (_, i) => {
       const adultsCount = guests?.adults || totalGuests;
       const isChild = i >= adultsCount;
+      const childIndex = isChild ? i - adultsCount : -1;
+      const lockedChildAge = isChild ? expectedChildAges?.[childIndex] : "";
 
       return {
         Title: isChild ? "Master" : "Mr",
@@ -261,20 +307,17 @@ const HotelBooking = () => {
         Phoneno: "",
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
-        Age: "",
+        Age: lockedChildAge ? String(lockedChildAge) : "",
         Nationality: defaultGuestNationality,
 
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
 
-        // Adult documents
         PAN: "",
         AadhaarNo: "",
 
-        // Child parent documents
         ParentPAN: "",
-        ParentAadhaarNo: "",
       };
     }),
   );
@@ -303,8 +346,13 @@ const HotelBooking = () => {
       return "Guest nationality is required";
     }
 
+    const adultCount = guests?.adults || totalGuests;
+
     for (let i = 0; i < guestList.length; i++) {
       const g = guestList[i];
+      const isChild = g.PaxType === 2;
+      const childIndex = isChild ? i - adultCount : -1;
+      const expectedChildAge = isChild ? expectedChildAges?.[childIndex] : null;
 
       if (!g.Nationality) {
         return `Guest ${i + 1}: Nationality is required`;
@@ -330,6 +378,12 @@ const HotelBooking = () => {
 
       if (g.PaxType === 2 && age >= 12) {
         return `Guest ${i + 1}: Child age must be below 12`;
+      }
+
+      if (expectedChildAge && age !== Number(expectedChildAge)) {
+        return `Guest ${
+          i + 1
+        }: Child age must match searched age ${expectedChildAge}`;
       }
 
       if (g.LeadPassenger) {
@@ -392,19 +446,12 @@ const HotelBooking = () => {
         }
 
         if (g.PaxType === 2) {
-          if (!g.ParentPAN.trim() && !g.ParentAadhaarNo.trim()) {
-            return `Guest ${i + 1}: Parent PAN or Parent Aadhaar is required`;
+          if (!g.ParentPAN.trim()) {
+            return `Guest ${i + 1}: Parent PAN number is required`;
           }
 
-          if (
-            g.ParentPAN &&
-            !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.ParentPAN.toUpperCase())
-          ) {
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.ParentPAN.toUpperCase())) {
             return `Guest ${i + 1}: Enter valid Parent PAN number`;
-          }
-
-          if (g.ParentAadhaarNo && !/^[0-9]{12}$/.test(g.ParentAadhaarNo)) {
-            return `Guest ${i + 1}: Parent Aadhaar must be 12 digits`;
           }
         }
       }
@@ -445,19 +492,10 @@ const HotelBooking = () => {
           }
 
           if (g.PaxType === 2) {
-            if (g.ParentPAN.trim()) {
-              baseGuest.ParentPAN = g.ParentPAN.trim().toUpperCase();
+            baseGuest.ParentPAN = g.ParentPAN.trim().toUpperCase();
 
-              // fallback if backend/supplier expects PAN key
-              baseGuest.PAN = g.ParentPAN.trim().toUpperCase();
-            }
-
-            if (g.ParentAadhaarNo.trim()) {
-              baseGuest.ParentAadhaarNo = g.ParentAadhaarNo.trim();
-
-              // fallback if backend/supplier expects AadhaarNo key
-              baseGuest.AadhaarNo = g.ParentAadhaarNo.trim();
-            }
+            // fallback if backend/TBO expects PAN key only
+            baseGuest.PAN = g.ParentPAN.trim().toUpperCase();
           }
         }
 
@@ -466,6 +504,7 @@ const HotelBooking = () => {
 
       const HotelRoomsDetails = [
         {
+          RoomIndex: 1,
           HotelPassenger: cleanedGuests,
         },
       ];
@@ -569,260 +608,231 @@ const HotelBooking = () => {
                 </span>
               )}
             </div>
+
+            {expectedChildAges.length > 0 && (
+              <p className="mt-3 text-xs text-blue-300">
+                Child age is locked from search/prebook to prevent child age
+                mismatch: {expectedChildAges.join(", ")}
+              </p>
+            )}
           </div>
 
-          {guestList.map((guest, index) => (
-            <div
-              key={index}
-              className="bg-[#15151C] p-6 rounded-2xl border border-gray-800"
-            >
-              <h3 className="text-yellow-300 mb-4">
-                Guest {index + 1} {guest.LeadPassenger && "(Lead)"}
-              </h3>
+          {guestList.map((guest, index) => {
+            const adultsCount = guests?.adults || totalGuests;
+            const isChild = guest.PaxType === 2;
+            const childIndex = isChild ? index - adultsCount : -1;
+            const expectedChildAge = isChild
+              ? expectedChildAges?.[childIndex]
+              : null;
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <select
-                  className="input"
-                  value={guest.Title}
-                  onChange={(e) => updateGuest(index, "Title", e.target.value)}
-                >
-                  <option value="Mr">Mr</option>
-                  <option value="Ms">Ms</option>
-                  <option value="Mrs">Mrs</option>
-                  <option value="Master">Master</option>
-                  <option value="Miss">Miss</option>
-                </select>
+            return (
+              <div
+                key={index}
+                className="bg-[#15151C] p-6 rounded-2xl border border-gray-800"
+              >
+                <h3 className="text-yellow-300 mb-4">
+                  Guest {index + 1} {guest.LeadPassenger && "(Lead)"}
+                </h3>
 
-                <input
-                  placeholder="First Name"
-                  className="input"
-                  value={guest.FirstName}
-                  onChange={(e) =>
-                    updateGuest(index, "FirstName", e.target.value)
-                  }
-                />
-
-                <input
-                  placeholder="Last Name"
-                  className="input"
-                  value={guest.LastName}
-                  onChange={(e) =>
-                    updateGuest(index, "LastName", e.target.value)
-                  }
-                />
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">
-                    Nationality <span className="text-red-400">*</span>
-                  </label>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <select
                     className="input"
-                    value={guest.Nationality}
+                    value={guest.Title}
                     onChange={(e) =>
-                      updateGuest(index, "Nationality", e.target.value)
+                      updateGuest(index, "Title", e.target.value)
                     }
                   >
-                    {nationalityOptions.map((country) => (
-                      <option key={country.Code} value={country.Code}>
-                        {country.Name} ({country.Code})
-                      </option>
-                    ))}
+                    <option value="Mr">Mr</option>
+                    <option value="Ms">Ms</option>
+                    <option value="Mrs">Mrs</option>
+                    <option value="Master">Master</option>
+                    <option value="Miss">Miss</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">
-                    {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
-                  </label>
 
                   <input
-                    type="number"
-                    min={guest.PaxType === 1 ? 12 : 1}
-                    max={guest.PaxType === 1 ? 120 : 11}
-                    placeholder={
-                      guest.PaxType === 1
-                        ? "Enter adult age"
-                        : "Enter child age"
-                    }
+                    placeholder="First Name"
                     className="input"
-                    value={guest.Age}
-                    onChange={(e) => updateGuest(index, "Age", e.target.value)}
+                    value={guest.FirstName}
+                    onChange={(e) =>
+                      updateGuest(index, "FirstName", e.target.value)
+                    }
                   />
-                </div>
 
-                {guest.LeadPassenger && (
-                  <>
-                    <input
-                      placeholder="Email"
+                  <input
+                    placeholder="Last Name"
+                    className="input"
+                    value={guest.LastName}
+                    onChange={(e) =>
+                      updateGuest(index, "LastName", e.target.value)
+                    }
+                  />
+
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Nationality <span className="text-red-400">*</span>
+                    </label>
+
+                    <select
                       className="input"
-                      value={guest.Email}
+                      value={guest.Nationality}
                       onChange={(e) =>
-                        updateGuest(index, "Email", e.target.value)
+                        updateGuest(index, "Nationality", e.target.value)
                       }
-                    />
+                    >
+                      {nationalityOptions.map((country) => (
+                        <option key={country.Code} value={country.Code}>
+                          {country.Name} ({country.Code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <input
-                      placeholder="Phone"
-                      className="input"
-                      value={guest.Phoneno}
-                      onChange={(e) =>
-                        updateGuest(
-                          index,
-                          "Phoneno",
-                          e.target.value.replace(/\D/g, "").slice(0, 10),
-                        )
-                      }
-                    />
-                  </>
-                )}
-
-                {isInternationalHotel && (
-                  <div className="sm:col-span-2 mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4">
-                    <h4 className="text-yellow-300 font-semibold mb-2">
-                      Passport & ID Details
-                    </h4>
-
-                    <p className="text-xs text-gray-400 mb-4">
-                      Required because this hotel destination is outside India.
-                      Children require their passport and parent PAN or parent
-                      Aadhaar.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">
-                          Passport Number{" "}
-                          <span className="text-red-400">*</span>
-                        </label>
-
-                        <input
-                          placeholder="Enter Passport Number"
-                          className="input uppercase"
-                          value={guest.PassportNo}
-                          onChange={(e) =>
-                            updateGuest(
-                              index,
-                              "PassportNo",
-                              e.target.value.toUpperCase(),
-                            )
-                          }
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">
-                          Passport Issue Date{" "}
-                          <span className="text-red-400">*</span>
-                        </label>
-
-                        <input
-                          type="date"
-                          className="input"
-                          value={guest.PassportIssueDate}
-                          onChange={(e) =>
-                            updateGuest(
-                              index,
-                              "PassportIssueDate",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">
-                          Passport Expiry Date{" "}
-                          <span className="text-red-400">*</span>
-                        </label>
-
-                        <input
-                          type="date"
-                          className="input"
-                          value={guest.PassportExpDate}
-                          onChange={(e) =>
-                            updateGuest(
-                              index,
-                              "PassportExpDate",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-
-                      {guest.PaxType === 1 && (
-                        <>
-                          <div>
-                            <label className="block text-xs text-gray-400 mb-1">
-                              Aadhaar Number{" "}
-                              <span className="text-red-400">*</span>
-                            </label>
-
-                            <input
-                              placeholder="Enter Aadhaar Number"
-                              maxLength={12}
-                              className="input"
-                              value={guest.AadhaarNo}
-                              onChange={(e) =>
-                                updateGuest(
-                                  index,
-                                  "AadhaarNo",
-                                  e.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 12),
-                                )
-                              }
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2">
-                            <label className="block text-xs text-gray-400 mb-1">
-                              PAN Number <span className="text-red-400">*</span>
-                            </label>
-
-                            <input
-                              placeholder="Enter PAN Number"
-                              maxLength={10}
-                              className="input uppercase"
-                              value={guest.PAN}
-                              onChange={(e) =>
-                                updateGuest(
-                                  index,
-                                  "PAN",
-                                  e.target.value.toUpperCase().slice(0, 10),
-                                )
-                              }
-                            />
-                          </div>
-                        </>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
+                      {expectedChildAge && (
+                        <span className="text-blue-300">
+                          {" "}
+                          — matched with search
+                        </span>
                       )}
+                    </label>
 
-                      {guest.PaxType === 2 && (
-                        <div className="sm:col-span-2 rounded-xl border border-blue-400/20 bg-blue-400/5 p-4">
-                          <h5 className="text-blue-300 font-semibold mb-3">
-                            Parent Document Details
-                          </h5>
+                    <input
+                      type="number"
+                      min={guest.PaxType === 1 ? 12 : 1}
+                      max={guest.PaxType === 1 ? 120 : 11}
+                      readOnly={Boolean(expectedChildAge)}
+                      placeholder={
+                        guest.PaxType === 1
+                          ? "Enter adult age"
+                          : "Enter child age"
+                      }
+                      className={`input ${
+                        expectedChildAge ? "opacity-70 cursor-not-allowed" : ""
+                      }`}
+                      value={guest.Age}
+                      onChange={(e) =>
+                        updateGuest(index, "Age", e.target.value)
+                      }
+                    />
+                  </div>
 
-                          <p className="text-xs text-gray-400 mb-4">
-                            For child guests, enter parent Aadhaar or parent
-                            PAN.
-                          </p>
+                  {guest.LeadPassenger && (
+                    <>
+                      <input
+                        placeholder="Email"
+                        className="input"
+                        value={guest.Email}
+                        onChange={(e) =>
+                          updateGuest(index, "Email", e.target.value)
+                        }
+                      />
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <input
+                        placeholder="Phone"
+                        className="input"
+                        value={guest.Phoneno}
+                        onChange={(e) =>
+                          updateGuest(
+                            index,
+                            "Phoneno",
+                            e.target.value.replace(/\D/g, "").slice(0, 10),
+                          )
+                        }
+                      />
+                    </>
+                  )}
+
+                  {isInternationalHotel && (
+                    <div className="sm:col-span-2 mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4">
+                      <h4 className="text-yellow-300 font-semibold mb-2">
+                        Passport & ID Details
+                      </h4>
+
+                      <p className="text-xs text-gray-400 mb-4">
+                        Required because this hotel destination is outside
+                        India. Child guests require passport and parent PAN.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">
+                            Passport Number{" "}
+                            <span className="text-red-400">*</span>
+                          </label>
+
+                          <input
+                            placeholder="Enter Passport Number"
+                            className="input uppercase"
+                            value={guest.PassportNo}
+                            onChange={(e) =>
+                              updateGuest(
+                                index,
+                                "PassportNo",
+                                e.target.value.toUpperCase(),
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">
+                            Passport Issue Date{" "}
+                            <span className="text-red-400">*</span>
+                          </label>
+
+                          <input
+                            type="date"
+                            className="input"
+                            value={guest.PassportIssueDate}
+                            onChange={(e) =>
+                              updateGuest(
+                                index,
+                                "PassportIssueDate",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">
+                            Passport Expiry Date{" "}
+                            <span className="text-red-400">*</span>
+                          </label>
+
+                          <input
+                            type="date"
+                            className="input"
+                            value={guest.PassportExpDate}
+                            onChange={(e) =>
+                              updateGuest(
+                                index,
+                                "PassportExpDate",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </div>
+
+                        {guest.PaxType === 1 && (
+                          <>
                             <div>
                               <label className="block text-xs text-gray-400 mb-1">
-                                Parent Aadhaar Number
+                                Aadhaar Number{" "}
+                                <span className="text-red-400">*</span>
                               </label>
 
                               <input
-                                placeholder="Enter Parent Aadhaar"
+                                placeholder="Enter Aadhaar Number"
                                 maxLength={12}
                                 className="input"
-                                value={guest.ParentAadhaarNo}
+                                value={guest.AadhaarNo}
                                 onChange={(e) =>
                                   updateGuest(
                                     index,
-                                    "ParentAadhaarNo",
+                                    "AadhaarNo",
                                     e.target.value
                                       .replace(/\D/g, "")
                                       .slice(0, 12),
@@ -831,9 +841,43 @@ const HotelBooking = () => {
                               />
                             </div>
 
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs text-gray-400 mb-1">
+                                PAN Number{" "}
+                                <span className="text-red-400">*</span>
+                              </label>
+
+                              <input
+                                placeholder="Enter PAN Number"
+                                maxLength={10}
+                                className="input uppercase"
+                                value={guest.PAN}
+                                onChange={(e) =>
+                                  updateGuest(
+                                    index,
+                                    "PAN",
+                                    e.target.value.toUpperCase().slice(0, 10),
+                                  )
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {guest.PaxType === 2 && (
+                          <div className="sm:col-span-2 rounded-xl border border-blue-400/20 bg-blue-400/5 p-4">
+                            <h5 className="text-blue-300 font-semibold mb-3">
+                              Parent PAN Details
+                            </h5>
+
+                            <p className="text-xs text-gray-400 mb-4">
+                              For child guests, enter parent PAN only.
+                            </p>
+
                             <div>
                               <label className="block text-xs text-gray-400 mb-1">
-                                Parent PAN Number
+                                Parent PAN Number{" "}
+                                <span className="text-red-400">*</span>
                               </label>
 
                               <input
@@ -851,14 +895,14 @@ const HotelBooking = () => {
                               />
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800 h-fit sticky top-24">
