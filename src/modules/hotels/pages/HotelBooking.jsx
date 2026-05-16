@@ -66,6 +66,72 @@ const nationalityOptions = [
   { Code: "VN", Name: "Vietnam" },
 ];
 
+const destinationCountryOptions = [
+  { Code: "IN", Name: "India" },
+  { Code: "AE", Name: "United Arab Emirates" },
+  { Code: "TH", Name: "Thailand" },
+  { Code: "SG", Name: "Singapore" },
+  { Code: "MV", Name: "Maldives" },
+  { Code: "ID", Name: "Indonesia" },
+  { Code: "MY", Name: "Malaysia" },
+  { Code: "VN", Name: "Vietnam" },
+  { Code: "LK", Name: "Sri Lanka" },
+  { Code: "NP", Name: "Nepal" },
+  { Code: "BT", Name: "Bhutan" },
+  { Code: "US", Name: "United States" },
+  { Code: "GB", Name: "United Kingdom" },
+  { Code: "FR", Name: "France" },
+  { Code: "DE", Name: "Germany" },
+  { Code: "IT", Name: "Italy" },
+  { Code: "CH", Name: "Switzerland" },
+  { Code: "AU", Name: "Australia" },
+];
+
+const detectDestinationCountry = (text = "") => {
+  const value = String(text || "").toLowerCase();
+
+  if (
+    value.includes("dubai") ||
+    value.includes("abu dhabi") ||
+    value.includes("sharjah") ||
+    value.includes("ajman") ||
+    value.includes("ras al khaimah") ||
+    value.includes("fujairah") ||
+    value.includes("united arab emirates") ||
+    value.includes("uae")
+  ) {
+    return "AE";
+  }
+
+  if (
+    value.includes("thailand") ||
+    value.includes("bangkok") ||
+    value.includes("phuket") ||
+    value.includes("pattaya") ||
+    value.includes("krabi")
+  ) {
+    return "TH";
+  }
+
+  if (value.includes("singapore")) return "SG";
+  if (value.includes("maldives")) return "MV";
+  if (value.includes("bali") || value.includes("indonesia")) return "ID";
+  if (value.includes("malaysia") || value.includes("kuala lumpur")) return "MY";
+  if (value.includes("vietnam")) return "VN";
+  if (value.includes("sri lanka") || value.includes("colombo")) return "LK";
+  if (value.includes("nepal")) return "NP";
+  if (value.includes("bhutan")) return "BT";
+  if (value.includes("united states") || value.includes("usa")) return "US";
+  if (value.includes("united kingdom") || value.includes("london")) return "GB";
+  if (value.includes("france") || value.includes("paris")) return "FR";
+  if (value.includes("germany")) return "DE";
+  if (value.includes("italy")) return "IT";
+  if (value.includes("switzerland")) return "CH";
+  if (value.includes("australia")) return "AU";
+
+  return "IN";
+};
+
 const HotelBooking = () => {
   const { setGuestDetails } = useHotelStore();
   const location = useLocation();
@@ -175,10 +241,12 @@ const HotelBooking = () => {
       normalizeText(preBook?.raw?.HotelResult?.[0]),
       normalizeText(preBook?.raw?.HotelResult?.[0]?.HotelInfo),
       normalizeText(preBook?.raw?.HotelResult?.[0]?.Rooms),
+      normalizeText(hotelCountryCode),
+      normalizeText(hotelCountryName),
     ].join(" ");
-  }, [hotel, search, payload, preBook]);
+  }, [hotel, search, payload, preBook, hotelCountryCode, hotelCountryName]);
 
-  const isInternationalHotel = useMemo(() => {
+  const detectedDestinationCountry = useMemo(() => {
     const code = String(hotelCountryCode || "")
       .trim()
       .toUpperCase();
@@ -186,99 +254,48 @@ const HotelBooking = () => {
       .trim()
       .toLowerCase();
 
-    if (code) {
-      return !["IN", "IND", "INDIA"].includes(code);
+    if (["IN", "IND", "INDIA"].includes(code)) return "IN";
+    if (["AE", "UAE"].includes(code)) return "AE";
+
+    if (code && !["IN", "IND", "INDIA"].includes(code)) {
+      const exists = destinationCountryOptions.some(
+        (country) => country.Code === code,
+      );
+
+      return exists ? code : "AE";
+    }
+
+    if (name.includes("india")) return "IN";
+
+    if (name.includes("united arab emirates") || name.includes("uae")) {
+      return "AE";
     }
 
     if (name) {
-      return !name.includes("india");
+      const matched = destinationCountryOptions.find((country) =>
+        name.includes(country.Name.toLowerCase()),
+      );
+
+      if (matched) return matched.Code;
     }
 
-    const internationalKeywords = [
-      "dubai",
-      "abu dhabi",
-      "sharjah",
-      "ajman",
-      "ras al khaimah",
-      "fujairah",
-      "united arab emirates",
-      "uae",
-      '"ae"',
-      " ae ",
-      "thailand",
-      "bangkok",
-      "phuket",
-      "pattaya",
-      "krabi",
-      "singapore",
-      "maldives",
-      "bali",
-      "indonesia",
-      "malaysia",
-      "kuala lumpur",
-      "vietnam",
-      "sri lanka",
-      "australia",
-      "united kingdom",
-      "usa",
-      "united states",
-      "france",
-      "germany",
-      "italy",
-      "switzerland",
-    ];
-
-    const indianKeywords = [
-      "india",
-      "delhi",
-      "new delhi",
-      "mumbai",
-      "goa",
-      "jaipur",
-      "udaipur",
-      "manali",
-      "shimla",
-      "kashmir",
-      "srinagar",
-      "bangalore",
-      "bengaluru",
-      "chennai",
-      "hyderabad",
-      "kolkata",
-      "pune",
-      "kerala",
-      "gurgaon",
-      "gurugram",
-      "noida",
-      "lucknow",
-      "amritsar",
-      "chandigarh",
-      "ahmedabad",
-      "surat",
-      "jodhpur",
-      "jaisalmer",
-      "rishikesh",
-      "haridwar",
-      "varanasi",
-    ];
-
-    if (internationalKeywords.some((word) => destinationText.includes(word))) {
-      return true;
-    }
-
-    if (indianKeywords.some((word) => destinationText.includes(word))) {
-      return false;
-    }
-
-    return false;
+    return detectDestinationCountry(destinationText);
   }, [hotelCountryCode, hotelCountryName, destinationText]);
+
+  const [destinationCountry, setDestinationCountry] = useState(
+    detectedDestinationCountry,
+  );
+
+  const isInternationalHotel = destinationCountry !== "IN";
 
   console.log("HOTEL BOOKING DEBUG:", {
     guestNationality,
+    destinationCountry,
+    detectedDestinationCountry,
+    isInternationalHotel,
     hotelCountryCode,
     hotelCountryName,
     destinationText,
-    isInternationalHotel,
     expectedChildAges,
     hotel,
     search,
@@ -344,6 +361,10 @@ const HotelBooking = () => {
   const validateGuests = () => {
     if (!guestNationality) {
       return "Guest nationality is required";
+    }
+
+    if (!destinationCountry) {
+      return "Hotel destination country is required";
     }
 
     const adultCount = guests?.adults || totalGuests;
@@ -538,6 +559,7 @@ const HotelBooking = () => {
           bookingResponse: res.data,
           isInternationalHotel,
           guestNationality,
+          destinationCountry,
         }),
       );
 
@@ -575,27 +597,52 @@ const HotelBooking = () => {
               🛏 {roomData?.Name?.[0] || "Standard Room"}
             </p>
 
-            <div className="mt-4 max-w-sm">
-              <label className="block text-xs text-gray-400 mb-1">
-                Guest Nationality <span className="text-red-400">*</span>
-              </label>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  Guest Nationality <span className="text-red-400">*</span>
+                </label>
 
-              <select
-                className="input"
-                value={guestNationality}
-                onChange={(e) => handleNationalityChange(e.target.value)}
-              >
-                {nationalityOptions.map((country) => (
-                  <option key={country.Code} value={country.Code}>
-                    {country.Name} ({country.Code})
-                  </option>
-                ))}
-              </select>
+                <select
+                  className="input"
+                  value={guestNationality}
+                  onChange={(e) => handleNationalityChange(e.target.value)}
+                >
+                  {nationalityOptions.map((country) => (
+                    <option key={country.Code} value={country.Code}>
+                      {country.Name} ({country.Code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  Hotel Destination Country{" "}
+                  <span className="text-red-400">*</span>
+                </label>
+
+                <select
+                  className="input"
+                  value={destinationCountry}
+                  onChange={(e) => setDestinationCountry(e.target.value)}
+                >
+                  {destinationCountryOptions.map((country) => (
+                    <option key={country.Code} value={country.Code}>
+                      {country.Name} ({country.Code})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="text-xs px-3 py-1 rounded-full bg-yellow-400/10 text-yellow-300 border border-yellow-400/20">
                 Guest Nationality: {guestNationality}
+              </span>
+
+              <span className="text-xs px-3 py-1 rounded-full bg-blue-400/10 text-blue-300 border border-blue-400/20">
+                Destination Country: {destinationCountry}
               </span>
 
               {isInternationalHotel ? (
