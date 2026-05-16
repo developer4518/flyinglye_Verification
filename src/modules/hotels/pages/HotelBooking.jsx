@@ -267,8 +267,14 @@ const HotelBooking = () => {
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
+
+        // Adult documents
         PAN: "",
         AadhaarNo: "",
+
+        // Child parent documents
+        ParentPAN: "",
+        ParentAadhaarNo: "",
       };
     }),
   );
@@ -367,20 +373,39 @@ const HotelBooking = () => {
           return `Guest ${i + 1}: Passport expiry date must be after issue date`;
         }
 
-        if (!g.PAN.trim()) {
-          return `Guest ${i + 1}: PAN number is required`;
+        if (g.PaxType === 1) {
+          if (!g.PAN.trim()) {
+            return `Guest ${i + 1}: PAN number is required`;
+          }
+
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
+            return `Guest ${i + 1}: Enter valid PAN number`;
+          }
+
+          if (!g.AadhaarNo.trim()) {
+            return `Guest ${i + 1}: Aadhaar number is required`;
+          }
+
+          if (!/^[0-9]{12}$/.test(g.AadhaarNo)) {
+            return `Guest ${i + 1}: Aadhaar must be 12 digits`;
+          }
         }
 
-        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
-          return `Guest ${i + 1}: Enter valid PAN number`;
-        }
+        if (g.PaxType === 2) {
+          if (!g.ParentPAN.trim() && !g.ParentAadhaarNo.trim()) {
+            return `Guest ${i + 1}: Parent PAN or Parent Aadhaar is required`;
+          }
 
-        if (!g.AadhaarNo.trim()) {
-          return `Guest ${i + 1}: Aadhaar number is required`;
-        }
+          if (
+            g.ParentPAN &&
+            !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.ParentPAN.toUpperCase())
+          ) {
+            return `Guest ${i + 1}: Enter valid Parent PAN number`;
+          }
 
-        if (!/^[0-9]{12}$/.test(g.AadhaarNo)) {
-          return `Guest ${i + 1}: Aadhaar must be 12 digits`;
+          if (g.ParentAadhaarNo && !/^[0-9]{12}$/.test(g.ParentAadhaarNo)) {
+            return `Guest ${i + 1}: Parent Aadhaar must be 12 digits`;
+          }
         }
       }
     }
@@ -406,8 +431,6 @@ const HotelBooking = () => {
           PaxType: g.PaxType,
           LeadPassenger: i === 0,
           Age: Number(g.Age),
-
-          // ✅ passenger nationality
           Nationality: g.Nationality || guestNationality,
         };
 
@@ -416,8 +439,26 @@ const HotelBooking = () => {
           baseGuest.PassportIssueDate = toTBODate(g.PassportIssueDate);
           baseGuest.PassportExpDate = toTBODate(g.PassportExpDate);
 
-          baseGuest.PAN = g.PAN.trim().toUpperCase();
-          baseGuest.AadhaarNo = g.AadhaarNo.trim();
+          if (g.PaxType === 1) {
+            baseGuest.PAN = g.PAN.trim().toUpperCase();
+            baseGuest.AadhaarNo = g.AadhaarNo.trim();
+          }
+
+          if (g.PaxType === 2) {
+            if (g.ParentPAN.trim()) {
+              baseGuest.ParentPAN = g.ParentPAN.trim().toUpperCase();
+
+              // fallback if backend/supplier expects PAN key
+              baseGuest.PAN = g.ParentPAN.trim().toUpperCase();
+            }
+
+            if (g.ParentAadhaarNo.trim()) {
+              baseGuest.ParentAadhaarNo = g.ParentAadhaarNo.trim();
+
+              // fallback if backend/supplier expects AadhaarNo key
+              baseGuest.AadhaarNo = g.ParentAadhaarNo.trim();
+            }
+          }
         }
 
         return baseGuest;
@@ -432,10 +473,7 @@ const HotelBooking = () => {
       const finalPayload = {
         BookingCode: bookingCode,
         IsVoucherBooking: true,
-
-        // ✅ selected nationality goes here
         GuestNationality: guestNationality,
-
         RequestedBookingMode: 5,
         NetAmount: net,
         HotelRoomsDetails,
@@ -647,8 +685,8 @@ const HotelBooking = () => {
 
                     <p className="text-xs text-gray-400 mb-4">
                       Required because this hotel destination is outside India.
-                      Indian user booking Dubai hotel needs passport, PAN and
-                      Aadhaar details.
+                      Children require their passport and parent PAN or parent
+                      Aadhaar.
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -667,26 +705,6 @@ const HotelBooking = () => {
                               index,
                               "PassportNo",
                               e.target.value.toUpperCase(),
-                            )
-                          }
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">
-                          Aadhaar Number <span className="text-red-400">*</span>
-                        </label>
-
-                        <input
-                          placeholder="Enter Aadhaar Number"
-                          maxLength={12}
-                          className="input"
-                          value={guest.AadhaarNo}
-                          onChange={(e) =>
-                            updateGuest(
-                              index,
-                              "AadhaarNo",
-                              e.target.value.replace(/\D/g, "").slice(0, 12),
                             )
                           }
                         />
@@ -732,25 +750,109 @@ const HotelBooking = () => {
                         />
                       </div>
 
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs text-gray-400 mb-1">
-                          PAN Number <span className="text-red-400">*</span>
-                        </label>
+                      {guest.PaxType === 1 && (
+                        <>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">
+                              Aadhaar Number{" "}
+                              <span className="text-red-400">*</span>
+                            </label>
 
-                        <input
-                          placeholder="Enter PAN Number"
-                          maxLength={10}
-                          className="input uppercase"
-                          value={guest.PAN}
-                          onChange={(e) =>
-                            updateGuest(
-                              index,
-                              "PAN",
-                              e.target.value.toUpperCase().slice(0, 10),
-                            )
-                          }
-                        />
-                      </div>
+                            <input
+                              placeholder="Enter Aadhaar Number"
+                              maxLength={12}
+                              className="input"
+                              value={guest.AadhaarNo}
+                              onChange={(e) =>
+                                updateGuest(
+                                  index,
+                                  "AadhaarNo",
+                                  e.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 12),
+                                )
+                              }
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs text-gray-400 mb-1">
+                              PAN Number <span className="text-red-400">*</span>
+                            </label>
+
+                            <input
+                              placeholder="Enter PAN Number"
+                              maxLength={10}
+                              className="input uppercase"
+                              value={guest.PAN}
+                              onChange={(e) =>
+                                updateGuest(
+                                  index,
+                                  "PAN",
+                                  e.target.value.toUpperCase().slice(0, 10),
+                                )
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {guest.PaxType === 2 && (
+                        <div className="sm:col-span-2 rounded-xl border border-blue-400/20 bg-blue-400/5 p-4">
+                          <h5 className="text-blue-300 font-semibold mb-3">
+                            Parent Document Details
+                          </h5>
+
+                          <p className="text-xs text-gray-400 mb-4">
+                            For child guests, enter parent Aadhaar or parent
+                            PAN.
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-1">
+                                Parent Aadhaar Number
+                              </label>
+
+                              <input
+                                placeholder="Enter Parent Aadhaar"
+                                maxLength={12}
+                                className="input"
+                                value={guest.ParentAadhaarNo}
+                                onChange={(e) =>
+                                  updateGuest(
+                                    index,
+                                    "ParentAadhaarNo",
+                                    e.target.value
+                                      .replace(/\D/g, "")
+                                      .slice(0, 12),
+                                  )
+                                }
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-1">
+                                Parent PAN Number
+                              </label>
+
+                              <input
+                                placeholder="Enter Parent PAN"
+                                maxLength={10}
+                                className="input uppercase"
+                                value={guest.ParentPAN}
+                                onChange={(e) =>
+                                  updateGuest(
+                                    index,
+                                    "ParentPAN",
+                                    e.target.value.toUpperCase().slice(0, 10),
+                                  )
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
