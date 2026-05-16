@@ -25,25 +25,6 @@ const getSafeValue = (...values) => {
   return values.find((v) => v !== undefined && v !== null && v !== "") || "";
 };
 
-const toNumberArray = (value) => {
-  if (!value) return [];
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => Number(item))
-      .filter((item) => !Number.isNaN(item) && item > 0);
-  }
-
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((item) => Number(item.trim()))
-      .filter((item) => !Number.isNaN(item) && item > 0);
-  }
-
-  return [];
-};
-
 const nationalityOptions = [
   { Code: "IN", Name: "India" },
   { Code: "AE", Name: "United Arab Emirates" },
@@ -132,6 +113,22 @@ const detectDestinationCountry = (text = "") => {
   return "IN";
 };
 
+const cleanEmptyKeys = (obj) => {
+  const cleaned = { ...obj };
+
+  Object.keys(cleaned).forEach((key) => {
+    if (
+      cleaned[key] === undefined ||
+      cleaned[key] === null ||
+      cleaned[key] === ""
+    ) {
+      delete cleaned[key];
+    }
+  });
+
+  return cleaned;
+};
+
 const HotelBooking = () => {
   const { setGuestDetails } = useHotelStore();
   const location = useLocation();
@@ -159,10 +156,32 @@ const HotelBooking = () => {
   const roomData = preBook?.raw?.HotelResult?.[0]?.Rooms?.[0];
   const validation = preBook?.validation || {};
 
-  const bookingCode = preBook?.booking_code;
-  const net = preBook?.net_amount || 0;
-  const total = preBook?.total_amount || 0;
-  const convenienceFee = preBook?.convenience_fee || 0;
+  const bookingCode =
+    preBook?.booking_code ||
+    preBook?.BookingCode ||
+    roomData?.BookingCode ||
+    payload?.room?.BookingCode;
+
+  const net =
+    Number(preBook?.net_amount || preBook?.NetAmount || roomData?.NetAmount) ||
+    0;
+
+  const total =
+    Number(
+      preBook?.total_amount || preBook?.TotalAmount || roomData?.TotalFare,
+    ) || 0;
+
+  const convenienceFee =
+    Number(preBook?.convenience_fee || preBook?.ConvenienceFee) || 0;
+
+  const adultsCount =
+    Number(guests?.adults || search?.adults || payload?.adults || 0) || 0;
+
+  const childrenCount =
+    Number(guests?.children || search?.children || payload?.children || 0) || 0;
+
+  const totalGuests =
+    typeof guests === "number" ? guests : adultsCount + childrenCount;
 
   const defaultGuestNationality =
     search?.nationality ||
@@ -174,30 +193,6 @@ const HotelBooking = () => {
   const [guestNationality, setGuestNationality] = useState(
     defaultGuestNationality,
   );
-
-  const expectedChildAges = useMemo(() => {
-    const sources = [
-      guests?.childAges,
-      guests?.childrenAges,
-      search?.childAges,
-      search?.childrenAges,
-      payload?.childAges,
-      payload?.childrenAges,
-      payload?.search?.childAges,
-      payload?.search?.childrenAges,
-      preBook?.childAges,
-      preBook?.childrenAges,
-      preBook?.validation?.childAges,
-      preBook?.validation?.childrenAges,
-    ];
-
-    for (const source of sources) {
-      const ages = toNumberArray(source);
-      if (ages.length) return ages;
-    }
-
-    return [];
-  }, [guests, search, payload, preBook]);
 
   const hotelCountryCode = getSafeValue(
     hotel?.country_code,
@@ -288,32 +283,9 @@ const HotelBooking = () => {
 
   const isInternationalHotel = destinationCountry !== "IN";
 
-  console.log("HOTEL BOOKING DEBUG:", {
-    guestNationality,
-    destinationCountry,
-    detectedDestinationCountry,
-    isInternationalHotel,
-    hotelCountryCode,
-    hotelCountryName,
-    destinationText,
-    expectedChildAges,
-    hotel,
-    search,
-    payload,
-    preBook,
-  });
-
-  const totalGuests =
-    typeof guests === "number"
-      ? guests
-      : (guests?.adults || 0) + (guests?.children || 0);
-
   const [guestList, setGuestList] = useState(
     Array.from({ length: totalGuests }, (_, i) => {
-      const adultsCount = guests?.adults || totalGuests;
       const isChild = i >= adultsCount;
-      const childIndex = isChild ? i - adultsCount : -1;
-      const lockedChildAge = isChild ? expectedChildAges?.[childIndex] : "";
 
       return {
         Title: isChild ? "Master" : "Mr",
@@ -324,7 +296,7 @@ const HotelBooking = () => {
         Phoneno: "",
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
-        Age: lockedChildAge ? String(lockedChildAge) : "",
+        Age: "",
         Nationality: defaultGuestNationality,
 
         PassportNo: "",
@@ -332,8 +304,6 @@ const HotelBooking = () => {
         PassportExpDate: "",
 
         PAN: "",
-        AadhaarNo: "",
-
         ParentPAN: "",
       };
     }),
@@ -342,9 +312,22 @@ const HotelBooking = () => {
   const [loading, setLoading] = useState(false);
 
   const updateGuest = (index, field, value) => {
-    const updated = [...guestList];
-    updated[index][field] = value;
-    setGuestList(updated);
+    setGuestList((prev) => {
+      const updated = [...prev];
+
+      if (field === "Age") {
+        updated[index][field] = value.replace(/\D/g, "").slice(0, 3);
+        return updated;
+      }
+
+      if (field === "PAN" || field === "ParentPAN" || field === "PassportNo") {
+        updated[index][field] = value.toUpperCase();
+        return updated;
+      }
+
+      updated[index][field] = value;
+      return updated;
+    });
   };
 
   const handleNationalityChange = (value) => {
@@ -358,7 +341,15 @@ const HotelBooking = () => {
     );
   };
 
+  const getFinalGuestAge = (guest) => {
+    return Number(guest.Age);
+  };
+
   const validateGuests = () => {
+    if (!bookingCode) {
+      return "Booking code missing. Please select room again.";
+    }
+
     if (!guestNationality) {
       return "Guest nationality is required";
     }
@@ -367,13 +358,9 @@ const HotelBooking = () => {
       return "Hotel destination country is required";
     }
 
-    const adultCount = guests?.adults || totalGuests;
-
     for (let i = 0; i < guestList.length; i++) {
       const g = guestList[i];
-      const isChild = g.PaxType === 2;
-      const childIndex = isChild ? i - adultCount : -1;
-      const expectedChildAge = isChild ? expectedChildAges?.[childIndex] : null;
+      const finalAge = getFinalGuestAge(g);
 
       if (!g.Nationality) {
         return `Guest ${i + 1}: Nationality is required`;
@@ -383,28 +370,20 @@ const HotelBooking = () => {
         return `Guest ${i + 1}: First name and last name are required`;
       }
 
-      if (!g.Age) {
+      if (!finalAge) {
         return `Guest ${i + 1}: Age is required`;
       }
 
-      const age = Number(g.Age);
-
-      if (Number.isNaN(age) || age <= 0) {
+      if (Number.isNaN(finalAge) || finalAge <= 0) {
         return `Guest ${i + 1}: Enter valid age`;
       }
 
-      if (g.PaxType === 1 && age < 12) {
+      if (g.PaxType === 1 && finalAge < 12) {
         return `Guest ${i + 1}: Adult age must be 12 or above`;
       }
 
-      if (g.PaxType === 2 && age >= 12) {
+      if (g.PaxType === 2 && finalAge >= 12) {
         return `Guest ${i + 1}: Child age must be below 12`;
-      }
-
-      if (expectedChildAge && age !== Number(expectedChildAge)) {
-        return `Guest ${
-          i + 1
-        }: Child age must match searched age ${expectedChildAge}`;
       }
 
       if (g.LeadPassenger) {
@@ -453,16 +432,8 @@ const HotelBooking = () => {
             return `Guest ${i + 1}: PAN number is required`;
           }
 
-          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(g.PAN.toUpperCase())) {
             return `Guest ${i + 1}: Enter valid PAN number`;
-          }
-
-          if (!g.AadhaarNo.trim()) {
-            return `Guest ${i + 1}: Aadhaar number is required`;
-          }
-
-          if (!/^[0-9]{12}$/.test(g.AadhaarNo)) {
-            return `Guest ${i + 1}: Aadhaar must be 12 digits`;
           }
         }
 
@@ -471,7 +442,7 @@ const HotelBooking = () => {
             return `Guest ${i + 1}: Parent PAN number is required`;
           }
 
-          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.ParentPAN.toUpperCase())) {
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(g.ParentPAN.toUpperCase())) {
             return `Guest ${i + 1}: Enter valid Parent PAN number`;
           }
         }
@@ -489,6 +460,8 @@ const HotelBooking = () => {
       setLoading(true);
 
       const cleanedGuests = guestList.map((g, i) => {
+        const finalAge = getFinalGuestAge(g);
+
         const baseGuest = {
           Title: g.Title,
           FirstName: g.FirstName.trim(),
@@ -498,7 +471,7 @@ const HotelBooking = () => {
           Phoneno: i === 0 ? g.Phoneno.trim() : undefined,
           PaxType: g.PaxType,
           LeadPassenger: i === 0,
-          Age: Number(g.Age),
+          Age: finalAge,
           Nationality: g.Nationality || guestNationality,
         };
 
@@ -509,18 +482,17 @@ const HotelBooking = () => {
 
           if (g.PaxType === 1) {
             baseGuest.PAN = g.PAN.trim().toUpperCase();
-            baseGuest.AadhaarNo = g.AadhaarNo.trim();
           }
 
           if (g.PaxType === 2) {
             baseGuest.ParentPAN = g.ParentPAN.trim().toUpperCase();
 
-            // fallback if backend/TBO expects PAN key only
+            // Some hotel APIs only read PAN, so send parent PAN in PAN too.
             baseGuest.PAN = g.ParentPAN.trim().toUpperCase();
           }
         }
 
-        return baseGuest;
+        return cleanEmptyKeys(baseGuest);
       });
 
       const HotelRoomsDetails = [
@@ -538,6 +510,14 @@ const HotelBooking = () => {
         NetAmount: net,
         HotelRoomsDetails,
       };
+
+      console.log("CHILD AGE DEBUG:", {
+        adultsCount,
+        childrenCount,
+        enteredChildAges: cleanedGuests
+          .filter((guest) => guest.PaxType === 2)
+          .map((guest) => guest.Age),
+      });
 
       console.log("FINAL PAYLOAD:", JSON.stringify(finalPayload, null, 2));
 
@@ -560,6 +540,9 @@ const HotelBooking = () => {
           isInternationalHotel,
           guestNationality,
           destinationCountry,
+          enteredChildAges: cleanedGuests
+            .filter((guest) => guest.PaxType === 2)
+            .map((guest) => guest.Age),
         }),
       );
 
@@ -570,9 +553,11 @@ const HotelBooking = () => {
       });
     } catch (err) {
       console.log("BOOK ERROR:", err?.response?.data);
+
       alert(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
+          err?.response?.data?.detail ||
           "Booking failed",
       );
     } finally {
@@ -647,7 +632,7 @@ const HotelBooking = () => {
 
               {isInternationalHotel ? (
                 <span className="text-xs px-3 py-1 rounded-full bg-red-400/10 text-red-300 border border-red-400/20">
-                  International Destination: Passport & ID Required
+                  International Destination: Passport & PAN Required
                 </span>
               ) : (
                 <span className="text-xs px-3 py-1 rounded-full bg-green-400/10 text-green-300 border border-green-400/20">
@@ -656,21 +641,16 @@ const HotelBooking = () => {
               )}
             </div>
 
-            {expectedChildAges.length > 0 && (
+            {childrenCount > 0 && (
               <p className="mt-3 text-xs text-blue-300">
-                Child age is locked from search/prebook to prevent child age
-                mismatch: {expectedChildAges.join(", ")}
+                Please enter the correct child age in guest details. This age
+                will be sent in the final hotel booking payload.
               </p>
             )}
           </div>
 
           {guestList.map((guest, index) => {
-            const adultsCount = guests?.adults || totalGuests;
             const isChild = guest.PaxType === 2;
-            const childIndex = isChild ? index - adultsCount : -1;
-            const expectedChildAge = isChild
-              ? expectedChildAges?.[childIndex]
-              : null;
 
             return (
               <div
@@ -679,6 +659,9 @@ const HotelBooking = () => {
               >
                 <h3 className="text-yellow-300 mb-4">
                   Guest {index + 1} {guest.LeadPassenger && "(Lead)"}
+                  {isChild && (
+                    <span className="ml-2 text-xs text-blue-300">Child</span>
+                  )}
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -737,27 +720,19 @@ const HotelBooking = () => {
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">
                       {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
-                      {expectedChildAge && (
-                        <span className="text-blue-300">
-                          {" "}
-                          — matched with search
-                        </span>
-                      )}
+                      <span className="text-red-400"> *</span>
                     </label>
 
                     <input
                       type="number"
                       min={guest.PaxType === 1 ? 12 : 1}
                       max={guest.PaxType === 1 ? 120 : 11}
-                      readOnly={Boolean(expectedChildAge)}
                       placeholder={
                         guest.PaxType === 1
                           ? "Enter adult age"
                           : "Enter child age"
                       }
-                      className={`input ${
-                        expectedChildAge ? "opacity-70 cursor-not-allowed" : ""
-                      }`}
+                      className="input"
                       value={guest.Age}
                       onChange={(e) =>
                         updateGuest(index, "Age", e.target.value)
@@ -794,12 +769,13 @@ const HotelBooking = () => {
                   {isInternationalHotel && (
                     <div className="sm:col-span-2 mt-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4">
                       <h4 className="text-yellow-300 font-semibold mb-2">
-                        Passport & ID Details
+                        Passport & PAN Details
                       </h4>
 
                       <p className="text-xs text-gray-400 mb-4">
                         Required because this hotel destination is outside
-                        India. Child guests require passport and parent PAN.
+                        India. Adults require PAN. Child guests require parent
+                        PAN.
                       </p>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -864,51 +840,25 @@ const HotelBooking = () => {
                         </div>
 
                         {guest.PaxType === 1 && (
-                          <>
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-1">
-                                Aadhaar Number{" "}
-                                <span className="text-red-400">*</span>
-                              </label>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">
+                              PAN Number <span className="text-red-400">*</span>
+                            </label>
 
-                              <input
-                                placeholder="Enter Aadhaar Number"
-                                maxLength={12}
-                                className="input"
-                                value={guest.AadhaarNo}
-                                onChange={(e) =>
-                                  updateGuest(
-                                    index,
-                                    "AadhaarNo",
-                                    e.target.value
-                                      .replace(/\D/g, "")
-                                      .slice(0, 12),
-                                  )
-                                }
-                              />
-                            </div>
-
-                            <div className="sm:col-span-2">
-                              <label className="block text-xs text-gray-400 mb-1">
-                                PAN Number{" "}
-                                <span className="text-red-400">*</span>
-                              </label>
-
-                              <input
-                                placeholder="Enter PAN Number"
-                                maxLength={10}
-                                className="input uppercase"
-                                value={guest.PAN}
-                                onChange={(e) =>
-                                  updateGuest(
-                                    index,
-                                    "PAN",
-                                    e.target.value.toUpperCase().slice(0, 10),
-                                  )
-                                }
-                              />
-                            </div>
-                          </>
+                            <input
+                              placeholder="Enter PAN Number"
+                              maxLength={10}
+                              className="input uppercase"
+                              value={guest.PAN}
+                              onChange={(e) =>
+                                updateGuest(
+                                  index,
+                                  "PAN",
+                                  e.target.value.toUpperCase().slice(0, 10),
+                                )
+                              }
+                            />
+                          </div>
                         )}
 
                         {guest.PaxType === 2 && (
@@ -977,7 +927,7 @@ const HotelBooking = () => {
           <button
             onClick={handleBookHotel}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
+            className="mt-6 w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Processing..." : "Proceed to Payment"}
           </button>

@@ -1,152 +1,140 @@
 import { create } from "zustand";
 
+const DEFAULT_CHILD_AGE = 6;
+
+const normalizeChildAges = (children = 0, ages = []) => {
+  const count = Number(children) || 0;
+  const cleanAges = Array.isArray(ages) ? ages : [];
+
+  return Array.from({ length: count }, (_, index) => {
+    const age = Number(cleanAges[index]);
+    return age > 0 && age < 12 ? age : DEFAULT_CHILD_AGE;
+  });
+};
+
 export const useHotelStore = create((set) => ({
-  /* ===================== */
-  /* 🔍 SEARCH */
-  /* ===================== */
   search: {
     city: "",
     cityName: "",
+    nationality: "IN",
+    nationalityName: "India",
     checkIn: "",
     checkOut: "",
     guests: {
       adults: 1,
       children: 0,
-      rooms: 1, // ✅ ADDED
+      rooms: 1,
       childAges: [],
     },
   },
 
-  /* ===================== */
-  /* 🏨 HOTEL LIST */
-  /* ===================== */
   hotels: [],
-
-  /* ===================== */
-  /* 🏨 HOTEL DETAILS */
-  /* ===================== */
   selectedHotel: null,
-
-  /* ===================== */
-  /* 🛏 ROOM + BOOKING CODE */
-  /* ===================== */
   selectedRoom: null,
   bookingCode: null,
-
-  /* ===================== */
-  /* 💳 PREBOOK */
-  /* ===================== */
   prebookData: null,
-
-  /* ===================== */
-  /* 📦 FINAL BOOKING */
-  /* ===================== */
   bookingData: null,
-
-  /* ===================== */
-  /* 👥 BOOKING GUEST LIST */
-  /* ===================== */
   guestDetails: [],
 
-  /* ===================== */
-  /* ⏳ GLOBAL STATE */
-  /* ===================== */
   loading: false,
   error: null,
 
-  /* ===================== */
-  /* ACTIONS */
-  /* ===================== */
-
-  // 🔍 Set Search
   setSearch: (searchData) =>
-    set((state) => ({
-      search: {
-        ...state.search,
-        ...searchData,
-        guests: {
-          ...state.search.guests,
-          ...(searchData.guests || {}),
-        },
-      },
-    })),
+    set((state) => {
+      const incomingGuests = searchData.guests || {};
+      const mergedGuests = {
+        ...state.search.guests,
+        ...incomingGuests,
+      };
 
-  // 👥 Update Guests Count
+      return {
+        search: {
+          ...state.search,
+          ...searchData,
+          guests: {
+            ...mergedGuests,
+            childAges: normalizeChildAges(
+              mergedGuests.children,
+              mergedGuests.childAges,
+            ),
+          },
+        },
+      };
+    }),
+
   setGuests: (guests) =>
-    set((state) => ({
-      search: {
-        ...state.search,
-        guests: {
-          ...state.search.guests,
-          ...guests,
-        },
-      },
-    })),
+    set((state) => {
+      const mergedGuests = {
+        ...state.search.guests,
+        ...guests,
+      };
 
-  // 👶 Set Child Ages
+      return {
+        search: {
+          ...state.search,
+          guests: {
+            ...mergedGuests,
+            childAges: normalizeChildAges(
+              mergedGuests.children,
+              mergedGuests.childAges,
+            ),
+          },
+        },
+      };
+    }),
+
   setChildAges: (ages) =>
     set((state) => ({
       search: {
         ...state.search,
         guests: {
           ...state.search.guests,
-          childAges: ages,
+          childAges: normalizeChildAges(state.search.guests.children, ages),
         },
       },
     })),
 
-  // 🏨 Set Hotels
   setHotels: (hotelsData) =>
     set(() => ({
       hotels: hotelsData,
     })),
 
-  // 🏨 Select Hotel
   setSelectedHotel: (hotel) =>
     set(() => ({
       selectedHotel: hotel,
     })),
 
-  // 🛏 Select Room
   setSelectedRoom: (room) =>
     set(() => ({
       selectedRoom: room,
       bookingCode: room?.BookingCode || null,
     })),
 
-  // 💳 PreBook
   setPrebookData: (data) =>
     set(() => ({
       prebookData: data,
     })),
 
-  // 📦 Final Booking
   setBookingData: (data) =>
     set(() => ({
       bookingData: data,
     })),
 
-  // 👥 Save Guest Details
   setGuestDetails: (guests) =>
     set(() => ({
       guestDetails: guests,
     })),
 
-  // ⏳ Loading
   setLoading: (value) =>
     set(() => ({
       loading: value,
     })),
 
-  // ❌ Error
   setError: (error) =>
     set(() => ({
       error,
     })),
 
-  /* ===================== */
-  /* 🔁 RESET FLOW */
-  /* ===================== */
   resetFlow: () =>
     set(() => ({
       hotels: [],
