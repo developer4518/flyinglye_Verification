@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { privateApi } from "../../../services/api";
 import { useHotelStore } from "../../../store/hotelStore";
 
@@ -9,6 +9,42 @@ const toTBODate = (date) => {
   if (!date) return "";
   return `${date}T00:00:00`;
 };
+
+const normalizeText = (value) => {
+  if (!value) return "";
+
+  try {
+    if (typeof value === "string") return value.toLowerCase();
+    return JSON.stringify(value).toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+const getSafeValue = (...values) => {
+  return values.find((v) => v !== undefined && v !== null && v !== "") || "";
+};
+
+const nationalityOptions = [
+  { Code: "IN", Name: "India" },
+  { Code: "AE", Name: "United Arab Emirates" },
+  { Code: "US", Name: "United States" },
+  { Code: "GB", Name: "United Kingdom" },
+  { Code: "TH", Name: "Thailand" },
+  { Code: "SG", Name: "Singapore" },
+  { Code: "MY", Name: "Malaysia" },
+  { Code: "ID", Name: "Indonesia" },
+  { Code: "MV", Name: "Maldives" },
+  { Code: "LK", Name: "Sri Lanka" },
+  { Code: "NP", Name: "Nepal" },
+  { Code: "BT", Name: "Bhutan" },
+  { Code: "FR", Name: "France" },
+  { Code: "DE", Name: "Germany" },
+  { Code: "IT", Name: "Italy" },
+  { Code: "ES", Name: "Spain" },
+  { Code: "AU", Name: "Australia" },
+  { Code: "CA", Name: "Canada" },
+];
 
 const HotelBooking = () => {
   const { setGuestDetails } = useHotelStore();
@@ -20,39 +56,203 @@ const HotelBooking = () => {
 
   const { hotel, preBook, checkIn, checkOut, guests } = payload;
 
-  if (!preBook) {
-    return (
-      <div className="p-10 text-center text-white bg-[#0B0B0F] min-h-screen">
-        <h2 className="text-xl text-red-400 mb-4">⚠️ Session Expired</h2>
-        <button
-          onClick={() => navigate("/")}
-          className="px-5 py-2 bg-yellow-400 text-black rounded-lg"
-        >
-          Go Home
-        </button>
-      </div>
+  const rawHotelResult =
+    preBook?.raw?.HotelResult?.[0] ||
+    preBook?.raw?.Response?.HotelResult?.[0] ||
+    preBook?.HotelResult?.[0] ||
+    null;
+
+  const roomData =
+    rawHotelResult?.Rooms?.[0] ||
+    preBook?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
+    preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
+    null;
+
+  const bookingCode = getSafeValue(
+    preBook?.booking_code,
+    preBook?.BookingCode,
+    roomData?.BookingCode,
+    rawHotelResult?.BookingCode,
+  );
+
+  const net = Number(
+    getSafeValue(
+      preBook?.net_amount,
+      preBook?.NetAmount,
+      roomData?.NetAmount,
+      roomData?.TotalFare,
+      0,
+    ),
+  );
+
+  const total = Number(
+    getSafeValue(
+      preBook?.total_amount,
+      preBook?.TotalAmount,
+      preBook?.total,
+      net,
+      0,
+    ),
+  );
+
+  const convenienceFee = Number(
+    getSafeValue(
+      preBook?.convenience_fee,
+      preBook?.convenienceFee,
+      preBook?.ConvenienceFee,
+      0,
+    ),
+  );
+
+  const hotelText = normalizeText({
+    hotel,
+    preBook,
+    rawHotelResult,
+    roomData,
+  });
+
+  const isInternationalHotel = useMemo(() => {
+    const explicitValue = getSafeValue(
+      payload?.isInternational,
+      payload?.is_international,
+      hotel?.isInternational,
+      hotel?.is_international,
+      preBook?.isInternational,
+      preBook?.is_international,
+      rawHotelResult?.IsInternational,
+      roomData?.IsInternational,
     );
-  }
 
-  const roomData = preBook?.raw?.HotelResult?.[0]?.Rooms?.[0];
+    if (typeof explicitValue === "boolean") return explicitValue;
 
-  const bookingCode = preBook?.booking_code;
-  const net = preBook?.net_amount || 0;
-  const total = preBook?.total_amount || 0;
-  const convenienceFee = preBook?.convenience_fee || 0;
+    const countryCode = getSafeValue(
+      payload?.countryCode,
+      payload?.country_code,
+      hotel?.country_code,
+      hotel?.CountryCode,
+      hotel?.countryCode,
+      rawHotelResult?.CountryCode,
+      rawHotelResult?.HotelCountryCode,
+      rawHotelResult?.Country,
+      roomData?.CountryCode,
+    );
+
+    if (countryCode && String(countryCode).toUpperCase() !== "IN") {
+      return true;
+    }
+
+    const cityCountryText = normalizeText(
+      getSafeValue(
+        hotel?.country,
+        hotel?.Country,
+        hotel?.CountryName,
+        hotel?.address,
+        hotel?.Address,
+        hotel?.city_name,
+        hotel?.CityName,
+        hotel?.destination,
+        hotel?.Destination,
+        rawHotelResult?.Country,
+        rawHotelResult?.CountryName,
+        rawHotelResult?.HotelAddress,
+        rawHotelResult?.Address,
+      ),
+    );
+
+    const internationalKeywords = [
+      "dubai",
+      "abu dhabi",
+      "sharjah",
+      "uae",
+      "united arab emirates",
+      "thailand",
+      "bangkok",
+      "phuket",
+      "pattaya",
+      "singapore",
+      "malaysia",
+      "bali",
+      "indonesia",
+      "maldives",
+      "sri lanka",
+      "nepal",
+      "bhutan",
+      "usa",
+      "united states",
+      "united kingdom",
+      "london",
+      "france",
+      "paris",
+      "germany",
+      "italy",
+      "spain",
+      "australia",
+      "canada",
+    ];
+
+    const indiaKeywords = [
+      "india",
+      "delhi",
+      "mumbai",
+      "goa",
+      "jaipur",
+      "manali",
+      "kashmir",
+      "srinagar",
+      "shimla",
+      "kerala",
+      "udaipur",
+      "bangalore",
+      "hyderabad",
+      "chennai",
+      "kolkata",
+    ];
+
+    if (internationalKeywords.some((word) => cityCountryText.includes(word))) {
+      return true;
+    }
+
+    if (indiaKeywords.some((word) => cityCountryText.includes(word))) {
+      return false;
+    }
+
+    return (
+      hotelText.includes("passport") || hotelText.includes("international")
+    );
+  }, [payload, hotel, preBook, rawHotelResult, roomData, hotelText]);
+
+  const defaultGuestNationality = getSafeValue(
+    payload?.guestNationality,
+    payload?.GuestNationality,
+    guests?.nationality,
+    guests?.GuestNationality,
+    isInternationalHotel ? "IN" : "IN",
+  );
 
   const totalGuests =
     typeof guests === "number"
       ? guests
-      : (guests?.adults || 0) + (guests?.children || 0);
+      : Number(guests?.adults || 0) + Number(guests?.children || 0);
+
+  const adultsCount =
+    typeof guests === "number" ? guests : Number(guests?.adults || totalGuests);
+
+  const childrenCount =
+    typeof guests === "number" ? 0 : Number(guests?.children || 0);
+
+  const childAges = Array.isArray(guests?.childAges) ? guests.childAges : [];
+
+  const [guestNationality, setGuestNationality] = useState(
+    defaultGuestNationality || "IN",
+  );
 
   const [guestList, setGuestList] = useState(
     Array.from({ length: totalGuests }, (_, i) => {
-      const adultsCount = guests?.adults || totalGuests;
       const isChild = i >= adultsCount;
+      const childIndex = i - adultsCount;
 
       return {
-        Title: "Mr",
+        Title: isChild ? "Master" : "Mr",
         FirstName: "",
         MiddleName: "",
         LastName: "",
@@ -60,7 +260,7 @@ const HotelBooking = () => {
         Phoneno: "",
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
-        Age: "",
+        Age: isChild ? childAges?.[childIndex] || "" : "",
 
         PassportNo: "",
         PassportIssueDate: "",
@@ -73,12 +273,29 @@ const HotelBooking = () => {
   const [loading, setLoading] = useState(false);
 
   const updateGuest = (index, field, value) => {
-    const updated = [...guestList];
-    updated[index][field] = value;
-    setGuestList(updated);
+    setGuestList((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      };
+      return updated;
+    });
   };
 
   const validateGuests = () => {
+    if (!bookingCode) {
+      return "Booking code missing. Please select the room again.";
+    }
+
+    if (!net || Number.isNaN(net)) {
+      return "Net amount missing. Please prebook the room again.";
+    }
+
+    if (!guestNationality) {
+      return "Guest nationality is required";
+    }
+
     for (let i = 0; i < guestList.length; i++) {
       const g = guestList[i];
 
@@ -105,7 +322,7 @@ const HotelBooking = () => {
       }
 
       if (g.LeadPassenger) {
-        if (!g.Email.includes("@")) {
+        if (!g.Email.trim() || !g.Email.includes("@")) {
           return "Valid email required";
         }
 
@@ -114,28 +331,40 @@ const HotelBooking = () => {
         }
       }
 
-      if (!g.PAN.trim()) {
-        return `Guest ${i + 1}: PAN is required`;
+      if (!isInternationalHotel) {
+        if (!g.PAN.trim()) {
+          return `Guest ${i + 1}: PAN is required`;
+        }
+
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
+          return `Guest ${i + 1}: Enter valid PAN number`;
+        }
       }
 
-      if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(g.PAN.toUpperCase())) {
-        return `Guest ${i + 1}: Enter valid PAN number`;
-      }
+      if (isInternationalHotel) {
+        if (!g.PassportNo.trim()) {
+          return `Guest ${i + 1}: Passport number is required for international hotel`;
+        }
 
-      if (!g.PassportNo.trim()) {
-        return `Guest ${i + 1}: Passport number is required`;
-      }
+        if (!g.PassportIssueDate) {
+          return `Guest ${i + 1}: Passport issue date is required`;
+        }
 
-      if (!g.PassportIssueDate) {
-        return `Guest ${i + 1}: Passport issue date is required`;
-      }
+        if (!g.PassportExpDate) {
+          return `Guest ${i + 1}: Passport expiry date is required`;
+        }
 
-      if (!g.PassportExpDate) {
-        return `Guest ${i + 1}: Passport expiry date is required`;
+        if (new Date(g.PassportExpDate) <= new Date(g.PassportIssueDate)) {
+          return `Guest ${i + 1}: Passport expiry date must be after issue date`;
+        }
       }
+    }
 
-      if (new Date(g.PassportExpDate) <= new Date(g.PassportIssueDate)) {
-        return `Guest ${i + 1}: Passport expiry date must be after issue date`;
+    if (childrenCount > 0) {
+      const enteredChildren = guestList.filter((g) => g.PaxType === 2);
+
+      if (enteredChildren.length !== childrenCount) {
+        return `Children count mismatch. Expected ${childrenCount}, got ${enteredChildren.length}`;
       }
     }
 
@@ -153,20 +382,30 @@ const HotelBooking = () => {
         const passenger = {
           Title: g.Title,
           FirstName: g.FirstName.trim(),
+          MiddleName: g.MiddleName?.trim() || "",
           LastName: g.LastName.trim(),
-          PaxType: g.PaxType,
+          PaxType: Number(g.PaxType),
           LeadPassenger: i === 0,
           Age: Number(g.Age),
-
-          PassportNo: g.PassportNo.trim(),
-          PassportIssueDate: toTBODate(g.PassportIssueDate),
-          PassportExpDate: toTBODate(g.PassportExpDate),
-          PAN: g.PAN.trim().toUpperCase(),
         };
 
         if (i === 0) {
           passenger.Email = g.Email.trim();
           passenger.Phoneno = g.Phoneno.trim();
+        }
+
+        if (!isInternationalHotel && g.PAN?.trim()) {
+          passenger.PAN = g.PAN.trim().toUpperCase();
+        }
+
+        if (isInternationalHotel) {
+          passenger.PassportNo = g.PassportNo.trim();
+          passenger.PassportIssueDate = toTBODate(g.PassportIssueDate);
+          passenger.PassportExpDate = toTBODate(g.PassportExpDate);
+
+          if (g.PAN?.trim()) {
+            passenger.PAN = g.PAN.trim().toUpperCase();
+          }
         }
 
         return passenger;
@@ -175,7 +414,7 @@ const HotelBooking = () => {
       const finalPayload = {
         BookingCode: bookingCode,
         IsVoucherBooking: true,
-        GuestNationality: "IN",
+        GuestNationality: guestNationality,
         RequestedBookingMode: 5,
         NetAmount: net,
 
@@ -186,7 +425,11 @@ const HotelBooking = () => {
         ],
       };
 
-      console.log("FINAL PAYLOAD:", JSON.stringify(finalPayload, null, 2));
+      console.log("IS INTERNATIONAL HOTEL:", isInternationalHotel);
+      console.log(
+        "FINAL HOTEL PAYLOAD:",
+        JSON.stringify(finalPayload, null, 2),
+      );
 
       const res = await privateApi.post(
         "/api/hotels/hotels/book/",
@@ -203,6 +446,13 @@ const HotelBooking = () => {
           hotel,
           checkIn,
           checkOut,
+          isInternationalHotel,
+          guestNationality,
+          pricing: {
+            net,
+            convenienceFee,
+            total,
+          },
           bookingResponse: res.data,
         })
       );
@@ -210,32 +460,99 @@ const HotelBooking = () => {
       setGuestDetails(cleanedGuests);
 
       navigate("/hotel-booking-success", {
-        state: { booking: res.data },
+        state: {
+          booking: res.data,
+          guestList: cleanedGuests,
+          isInternationalHotel,
+          guestNationality,
+        },
       });
     } catch (err) {
-      console.log("BOOK ERROR:", err?.response?.data);
-      alert(err?.response?.data?.message || "Booking failed");
+      console.log("BOOK ERROR:", err?.response?.data || err);
+
+      const apiMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.response?.data?.data?.Error?.ErrorMessage ||
+        err?.response?.data?.data?.Response?.Error?.ErrorMessage ||
+        "Booking failed";
+
+      alert(apiMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  if (!preBook) {
+    return (
+      <div className="p-10 text-center text-white bg-[#0B0B0F] min-h-screen">
+        <h2 className="text-xl text-red-400 mb-4">⚠️ Session Expired</h2>
+        <button
+          onClick={() => navigate("/")}
+          className="px-5 py-2 bg-yellow-400 text-black rounded-lg"
+        >
+          Go Home
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0B0F] text-white px-4 md:px-10 py-24">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800">
-            <h2 className="text-2xl font-bold text-yellow-400">
-              {hotel?.hotel_name}
-            </h2>
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-yellow-300 mb-2">
+                  {isInternationalHotel
+                    ? "International Hotel"
+                    : "Domestic Hotel"}
+                </p>
 
-            <p className="text-gray-400 text-sm mt-2">
-              📅 {checkIn} → {checkOut}
-            </p>
+                <h2 className="text-2xl font-bold text-yellow-400">
+                  {hotel?.hotel_name ||
+                    hotel?.HotelName ||
+                    rawHotelResult?.HotelName ||
+                    "Hotel Booking"}
+                </h2>
 
-            <p className="text-gray-400 text-sm mt-1">
-              🛏 {roomData?.Name?.[0] || "Standard Room"}
-            </p>
+                <p className="text-gray-400 text-sm mt-2">
+                  📅 {checkIn} → {checkOut}
+                </p>
+
+                <p className="text-gray-400 text-sm mt-1">
+                  🛏 {roomData?.Name?.[0] || roomData?.Name || "Standard Room"}
+                </p>
+
+                <p className="text-gray-500 text-xs mt-2 break-all">
+                  BookingCode: {bookingCode || "Missing"}
+                </p>
+              </div>
+
+              <div className="w-full md:w-72">
+                <label className="block text-xs text-gray-400 mb-1">
+                  Guest Nationality
+                </label>
+
+                <select
+                  className="input"
+                  value={guestNationality}
+                  onChange={(e) => setGuestNationality(e.target.value)}
+                >
+                  {nationalityOptions.map((item) => (
+                    <option key={item.Code} value={item.Code}>
+                      {item.Name} ({item.Code})
+                    </option>
+                  ))}
+                </select>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  For Indian travellers, keep this as India even for
+                  international hotels.
+                </p>
+              </div>
+            </div>
           </div>
 
           {guestList.map((guest, index) => (
@@ -243,9 +560,15 @@ const HotelBooking = () => {
               key={index}
               className="bg-[#15151C] p-6 rounded-2xl border border-gray-800"
             >
-              <h3 className="text-yellow-300 mb-4">
-                Guest {index + 1} {guest.LeadPassenger && "(Lead)"}
-              </h3>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="text-yellow-300">
+                  Guest {index + 1} {guest.LeadPassenger && "(Lead)"}
+                </h3>
+
+                <span className="text-xs px-3 py-1 rounded-full bg-black/40 border border-gray-700 text-gray-300">
+                  {guest.PaxType === 1 ? "Adult" : "Child"}
+                </span>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <select
@@ -267,6 +590,15 @@ const HotelBooking = () => {
                   value={guest.FirstName}
                   onChange={(e) =>
                     updateGuest(index, "FirstName", e.target.value)
+                  }
+                />
+
+                <input
+                  placeholder="Middle Name Optional"
+                  className="input"
+                  value={guest.MiddleName}
+                  onChange={(e) =>
+                    updateGuest(index, "MiddleName", e.target.value)
                   }
                 />
 
@@ -323,51 +655,70 @@ const HotelBooking = () => {
                   </>
                 )}
 
-                <input
-                  placeholder="PAN Number"
-                  className="input uppercase"
-                  value={guest.PAN}
-                  onChange={(e) =>
-                    updateGuest(index, "PAN", e.target.value.toUpperCase())
-                  }
-                />
-
-                <input
-                  placeholder="Passport Number"
-                  className="input"
-                  value={guest.PassportNo}
-                  onChange={(e) =>
-                    updateGuest(index, "PassportNo", e.target.value)
-                  }
-                />
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">
-                    Passport Issue Date
-                  </label>
+                {!isInternationalHotel && (
                   <input
-                    type="date"
-                    className="input"
-                    value={guest.PassportIssueDate}
+                    placeholder="PAN Number"
+                    className="input uppercase"
+                    value={guest.PAN}
                     onChange={(e) =>
-                      updateGuest(index, "PassportIssueDate", e.target.value)
+                      updateGuest(index, "PAN", e.target.value.toUpperCase())
                     }
                   />
-                </div>
+                )}
 
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">
-                    Passport Expiry Date
-                  </label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={guest.PassportExpDate}
-                    onChange={(e) =>
-                      updateGuest(index, "PassportExpDate", e.target.value)
-                    }
-                  />
-                </div>
+                {isInternationalHotel && (
+                  <>
+                    <input
+                      placeholder="Passport Number"
+                      className="input"
+                      value={guest.PassportNo}
+                      onChange={(e) =>
+                        updateGuest(index, "PassportNo", e.target.value)
+                      }
+                    />
+
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">
+                        Passport Issue Date
+                      </label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={guest.PassportIssueDate}
+                        onChange={(e) =>
+                          updateGuest(
+                            index,
+                            "PassportIssueDate",
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">
+                        Passport Expiry Date
+                      </label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={guest.PassportExpDate}
+                        onChange={(e) =>
+                          updateGuest(index, "PassportExpDate", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <input
+                      placeholder="PAN Number Optional"
+                      className="input uppercase"
+                      value={guest.PAN}
+                      onChange={(e) =>
+                        updateGuest(index, "PAN", e.target.value.toUpperCase())
+                      }
+                    />
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -391,7 +742,9 @@ const HotelBooking = () => {
 
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span className="text-yellow-400">₹ {Math.round(total)}</span>
+              <span className="text-yellow-400">
+                ₹ {Math.round(total || net + convenienceFee)}
+              </span>
             </div>
           </div>
 
@@ -402,6 +755,12 @@ const HotelBooking = () => {
           >
             {loading ? "Processing..." : "Proceed to Payment"}
           </button>
+
+          <p className="text-xs text-gray-500 mt-4">
+            {isInternationalHotel
+              ? "Passport details will be sent in booking payload."
+              : "PAN details will be sent in booking payload."}
+          </p>
         </div>
       </div>
 
