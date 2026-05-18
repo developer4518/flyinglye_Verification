@@ -710,7 +710,7 @@ const HotelBooking = () => {
                     </div>
 
                     <input
-                      placeholder="PAN Number Optional"
+                      placeholder="PAN Number "
                       className="input uppercase"
                       value={guest.PAN}
                       onChange={(e) =>
