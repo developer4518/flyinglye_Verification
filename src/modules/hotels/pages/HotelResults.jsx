@@ -4,8 +4,7 @@ import { useHotelStore } from "../../../store/hotelStore";
 
 const HotelResults = () => {
   const navigate = useNavigate();
-
-  const { hotels, search, setSelectedHotel } = useHotelStore();
+  const { hotels, search, setSelectedHotel, setSelectedRoom } = useHotelStore();
 
   const { city, checkIn, checkOut, guests } = search || {};
 
@@ -62,25 +61,29 @@ const HotelResults = () => {
   /* ================= VIEW ================= */
   const handleView = useCallback(
     (hotel) => {
+      const selectedRoom = {
+        BookingCode: hotel.BookingCode,
+        Name: hotel.room,
+      };
+
       setSelectedHotel({
         ...hotel.rawHotel,
         bookingCode: hotel.BookingCode,
       });
 
+      setSelectedRoom(selectedRoom);
+
       navigate(`/hotels/${hotel.hotel_code}`, {
         state: {
           hotel: hotel.rawHotel,
-          room: {
-            BookingCode: hotel.BookingCode,
-            Name: hotel.room,
-          },
+          room: selectedRoom,
           checkIn,
           checkOut,
           guests,
         },
       });
     },
-    [navigate, setSelectedHotel, checkIn, checkOut, guests],
+    [navigate, setSelectedHotel, setSelectedRoom, checkIn, checkOut, guests],
   );
 
   const totalGuests = (guests?.adults || 0) + (guests?.children || 0);

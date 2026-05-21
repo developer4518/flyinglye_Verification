@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 const DEFAULT_CHILD_AGE = 6;
 
@@ -12,131 +13,26 @@ const normalizeChildAges = (children = 0, ages = []) => {
   });
 };
 
-export const useHotelStore = create((set) => ({
-  search: {
-    city: "",
-    cityName: "",
-    nationality: "IN",
-    nationalityName: "India",
-    checkIn: "",
-    checkOut: "",
-    guests: {
-      adults: 1,
-      children: 0,
-      rooms: 1,
-      childAges: [],
-    },
+const initialSearch = {
+  city: "",
+  cityName: "",
+  nationality: "IN",
+  nationalityName: "India",
+  checkIn: "",
+  checkOut: "",
+  guests: {
+    adults: 1,
+    children: 0,
+    rooms: 1,
+    childAges: [],
   },
+};
 
-  hotels: [],
-  selectedHotel: null,
-  selectedRoom: null,
-  bookingCode: null,
-  prebookData: null,
-  bookingData: null,
-  guestDetails: [],
+export const useHotelStore = create(
+  persist(
+    (set) => ({
+      search: initialSearch,
 
-  loading: false,
-  error: null,
-
-  setSearch: (searchData) =>
-    set((state) => {
-      const incomingGuests = searchData.guests || {};
-      const mergedGuests = {
-        ...state.search.guests,
-        ...incomingGuests,
-      };
-
-      return {
-        search: {
-          ...state.search,
-          ...searchData,
-          guests: {
-            ...mergedGuests,
-            childAges: normalizeChildAges(
-              mergedGuests.children,
-              mergedGuests.childAges,
-            ),
-          },
-        },
-      };
-    }),
-
-  setGuests: (guests) =>
-    set((state) => {
-      const mergedGuests = {
-        ...state.search.guests,
-        ...guests,
-      };
-
-      return {
-        search: {
-          ...state.search,
-          guests: {
-            ...mergedGuests,
-            childAges: normalizeChildAges(
-              mergedGuests.children,
-              mergedGuests.childAges,
-            ),
-          },
-        },
-      };
-    }),
-
-  setChildAges: (ages) =>
-    set((state) => ({
-      search: {
-        ...state.search,
-        guests: {
-          ...state.search.guests,
-          childAges: normalizeChildAges(state.search.guests.children, ages),
-        },
-      },
-    })),
-
-  setHotels: (hotelsData) =>
-    set(() => ({
-      hotels: hotelsData,
-    })),
-
-  setSelectedHotel: (hotel) =>
-    set(() => ({
-      selectedHotel: hotel,
-    })),
-
-  setSelectedRoom: (room) =>
-    set(() => ({
-      selectedRoom: room,
-      bookingCode: room?.BookingCode || null,
-    })),
-
-  setPrebookData: (data) =>
-    set(() => ({
-      prebookData: data,
-    })),
-
-  setBookingData: (data) =>
-    set(() => ({
-      bookingData: data,
-    })),
-
-  setGuestDetails: (guests) =>
-    set(() => ({
-      guestDetails: guests,
-    })),
-
-  setLoading: (value) =>
-    set(() => ({
-      loading: value,
-    })),
-
-  setError: (error) =>
-    set(() => ({
-      error,
-    })),
-
-  resetFlow: () =>
-    set(() => ({
       hotels: [],
       selectedHotel: null,
       selectedRoom: null,
@@ -144,7 +40,135 @@ export const useHotelStore = create((set) => ({
       prebookData: null,
       bookingData: null,
       guestDetails: [],
+
       loading: false,
       error: null,
-    })),
-}));
+
+      setSearch: (searchData) =>
+        set((state) => {
+          const incomingGuests = searchData.guests || {};
+          const mergedGuests = {
+            ...state.search.guests,
+            ...incomingGuests,
+          };
+
+          return {
+            search: {
+              ...state.search,
+              ...searchData,
+              guests: {
+                ...mergedGuests,
+                childAges: normalizeChildAges(
+                  mergedGuests.children,
+                  mergedGuests.childAges,
+                ),
+              },
+            },
+          };
+        }),
+
+      setGuests: (guests) =>
+        set((state) => {
+          const mergedGuests = {
+            ...state.search.guests,
+            ...guests,
+          };
+
+          return {
+            search: {
+              ...state.search,
+              guests: {
+                ...mergedGuests,
+                childAges: normalizeChildAges(
+                  mergedGuests.children,
+                  mergedGuests.childAges,
+                ),
+              },
+            },
+          };
+        }),
+
+      setChildAges: (ages) =>
+        set((state) => ({
+          search: {
+            ...state.search,
+            guests: {
+              ...state.search.guests,
+              childAges: normalizeChildAges(state.search.guests.children, ages),
+            },
+          },
+        })),
+
+      setHotels: (hotelsData) =>
+        set(() => ({
+          hotels: hotelsData || [],
+        })),
+
+      setSelectedHotel: (hotel) =>
+        set(() => ({
+          selectedHotel: hotel,
+        })),
+
+      setSelectedRoom: (room) =>
+        set(() => ({
+          selectedRoom: room,
+          bookingCode: room?.BookingCode || null,
+        })),
+
+      setPrebookData: (data) =>
+        set(() => ({
+          prebookData: data,
+        })),
+
+      setBookingData: (data) =>
+        set(() => ({
+          bookingData: data,
+        })),
+
+      setGuestDetails: (guests) =>
+        set(() => ({
+          guestDetails: guests,
+        })),
+
+      setLoading: (value) =>
+        set(() => ({
+          loading: value,
+        })),
+
+      setError: (error) =>
+        set(() => ({
+          error,
+        })),
+
+      resetFlow: () =>
+        set(() => ({
+          hotels: [],
+          selectedHotel: null,
+          selectedRoom: null,
+          bookingCode: null,
+          prebookData: null,
+          bookingData: null,
+          guestDetails: [],
+          loading: false,
+          error: null,
+        })),
+
+      clearHotelSearch: () =>
+        set(() => ({
+          search: initialSearch,
+        })),
+    }),
+    {
+      name: "hotel-flow-storage",
+
+      partialize: (state) => ({
+        search: state.search,
+        hotels: state.hotels,
+        selectedHotel: state.selectedHotel,
+        selectedRoom: state.selectedRoom,
+        bookingCode: state.bookingCode,
+        prebookData: state.prebookData,
+      }),
+    },
+  ),
+);

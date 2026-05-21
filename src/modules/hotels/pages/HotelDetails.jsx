@@ -1,18 +1,27 @@
 "use client";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useHotelStore } from "../../../store/hotelStore";
 
 const HotelDetails = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
 
-  const { hotel, room, checkIn, checkOut, guests } = state || {};
+  const { selectedHotel, selectedRoom, search } = useHotelStore();
+
+  const payload = state || {};
+
+  const hotel = payload.hotel || selectedHotel;
+  const room = payload.room || selectedRoom;
+  const checkIn = payload.checkIn || search?.checkIn;
+  const checkOut = payload.checkOut || search?.checkOut;
+  const guests = payload.guests || search?.guests;
 
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  if (!state || !hotel) {
+  if (!hotel) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400">
         No hotel data found

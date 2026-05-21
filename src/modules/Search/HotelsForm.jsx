@@ -10,7 +10,7 @@ import { useHotelStore } from "../../store/hotelStore";
 const HotelsForm = () => {
   const navigate = useNavigate();
 
-  const { setHotels, setSearch, setLoading, setError, resetFlow } =
+  const { search, setHotels, setSearch, setLoading, setError, resetFlow } =
     useHotelStore();
 
   const today = new Date().toLocaleDateString("en-CA");
@@ -18,31 +18,28 @@ const HotelsForm = () => {
   const [loading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [cityInput, setCityInput] = useState("");
+  const [cityInput, setCityInput] = useState(search?.cityName || "");
   const [citySuggestions, setCitySuggestions] = useState([]);
 
-  const [nationalityInput, setNationalityInput] = useState("India");
+  const [nationalityInput, setNationalityInput] = useState(
+    search?.nationalityName || "India",
+  );
   const [nationalitySuggestions, setNationalitySuggestions] = useState([]);
 
-  const [guestOpen, setGuestOpen] = useState(false);
-
-  const cityRef = useRef(null);
-  const nationalityRef = useRef(null);
-  const guestRef = useRef(null);
-
   const [formData, setFormData] = useState({
-    city: "",
-    cityName: "",
-    nationality: "IN",
-    nationalityName: "India",
-    checkIn: "",
-    checkOut: "",
+    city: search?.city || "",
+    cityName: search?.cityName || "",
+    nationality: search?.nationality || "IN",
+    nationalityName: search?.nationalityName || "India",
+    checkIn: search?.checkIn || "",
+    checkOut: search?.checkOut || "",
   });
 
   const [guests, setGuests] = useState({
-    adults: 1,
-    children: 0,
-    rooms: 1,
+    adults: search?.guests?.adults || 1,
+    children: search?.guests?.children || 0,
+    rooms: search?.guests?.rooms || 1,
+    childAges: search?.guests?.childAges || [],
   });
 
   /* ================= CLICK OUTSIDE ================= */
@@ -67,6 +64,13 @@ const HotelsForm = () => {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  useEffect(() => {
+    setSearch({
+      ...formData,
+      guests,
+    });
+  }, [formData, guests, setSearch]);
 
   /* ================= SEARCH CITY ================= */
   const searchCities = (query) => {

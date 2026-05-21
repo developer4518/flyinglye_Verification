@@ -1,38 +1,51 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { privateApi } from "../../../services/api";
+import { useHotelStore } from "../../../store/hotelStore";
 
 const PrebookLoader = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ✅ Handle both direct state & return-from-login payload
+  const {
+    selectedHotel,
+    selectedRoom,
+    search,
+    setPrebookData,
+    setSelectedHotel,
+    setSelectedRoom,
+  } = useHotelStore();
+
   const state = location.state || {};
   const payload = state?.payload || state;
 
-  const { hotel, room, checkIn, checkOut, guests } = payload;
+  const hotel = payload.hotel || selectedHotel;
+  const room = payload.room || selectedRoom;
+  const checkIn = payload.checkIn || search?.checkIn;
+  const checkOut = payload.checkOut || search?.checkOut;
+  const guests = payload.guests || search?.guests;
 
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
-  const [hasRun, setHasRun] = useState(false); // ✅ prevent double API call
+  const [hasRun, setHasRun] = useState(false);
 
-  // ✅ Safety guard (prevents crash on refresh / invalid entry)
   useEffect(() => {
-    if (!hotel || !room) {
-      navigate("/");
-    }
-  }, [hotel, room, navigate]);
-;
-  useEffect(() => {
-    if (hasRun) return;
-    setHasRun(true);
-
-    if (!room?.BookingCode) {
-      setError("Invalid room selection");
-      setStatus("error");
+    if (!hotel || !room?.BookingCode) {
+      navigate("/hotels");
       return;
     }
+
+    setSelectedHotel(hotel);
+    setSelectedRoom(room);
+  }, [hotel, room, navigate, setSelectedHotel, setSelectedRoom]);
+
+  useEffect(() => {
+    if (hasRun) return;
+    if (!hotel || !room?.BookingCode) return;
+
+    setHasRun(true);
 
     const prebook = async () => {
       try {
@@ -46,10 +59,12 @@ const PrebookLoader = () => {
           const preBookData = data.data;
           const preBookedRoom = preBookData?.raw?.HotelResult?.[0]?.Rooms?.[0];
 
+          setPrebookData(preBookData);
+
           navigate("/hotel-booking", {
             state: {
               hotel,
-              room: preBookedRoom,
+              room: preBookedRoom || room,
               preBook: preBookData,
               checkIn,
               checkOut,
@@ -66,9 +81,10 @@ const PrebookLoader = () => {
         console.log("STATUS:", statusCode);
         console.log("MESSAGE:", message);
 
-        // ✅ Proper auth detection
         if (
           statusCode === 400 ||
+          statusCode === 401 ||
+          statusCode === 403 ||
           message.toLowerCase().includes("auth") ||
           message.toLowerCase().includes("login") ||
           message.toLowerCase().includes("token")
@@ -89,17 +105,17 @@ const PrebookLoader = () => {
 
     prebook();
   }, [
-    room,
     hasRun,
-    location.pathname,
     hotel,
+    room,
     checkIn,
     checkOut,
     guests,
     navigate,
+    location.pathname,
+    setPrebookData,
   ]);
 
-  /* UI */
   if (status === "error") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0B0F] text-white px-4">

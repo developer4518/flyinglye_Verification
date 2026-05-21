@@ -47,14 +47,26 @@ const nationalityOptions = [
 ];
 
 const HotelBooking = () => {
-  const { setGuestDetails } = useHotelStore();
+  const {
+    setGuestDetails,
+    prebookData,
+    selectedHotel,
+    selectedRoom,
+    search: storeSearch,
+  } = useHotelStore();
+
   const location = useLocation();
   const navigate = useNavigate();
 
   const state = location.state || {};
   const payload = state?.payload || state;
 
-  const { hotel, preBook, checkIn, checkOut, guests } = payload;
+  const hotel = payload.hotel || selectedHotel;
+  const preBook = payload.preBook || prebookData;
+  const checkIn = payload.checkIn || storeSearch?.checkIn;
+  const checkOut = payload.checkOut || storeSearch?.checkOut;
+  const guests = payload.guests || storeSearch?.guests;
+  const room = payload.room || selectedRoom;
 
   const rawHotelResult =
     preBook?.raw?.HotelResult?.[0] ||
@@ -66,6 +78,7 @@ const HotelBooking = () => {
     rawHotelResult?.Rooms?.[0] ||
     preBook?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
     preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
+    room ||
     null;
 
   const bookingCode = getSafeValue(
@@ -133,7 +146,6 @@ const HotelBooking = () => {
       hotel?.countryCode,
       rawHotelResult?.CountryCode,
       rawHotelResult?.HotelCountryCode,
-      rawHotelResult?.Country,
       roomData?.CountryCode,
     );
 
@@ -226,7 +238,7 @@ const HotelBooking = () => {
     payload?.GuestNationality,
     guests?.nationality,
     guests?.GuestNationality,
-    isInternationalHotel ? "IN" : "IN",
+    "IN",
   );
 
   const totalGuests =
@@ -261,13 +273,12 @@ const HotelBooking = () => {
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
         Age: isChild ? childAges?.[childIndex] || "" : "",
-
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
         PAN: "",
       };
-    })
+    }),
   );
 
   const [loading, setLoading] = useState(false);
@@ -417,7 +428,6 @@ const HotelBooking = () => {
         GuestNationality: guestNationality,
         RequestedBookingMode: 5,
         NetAmount: net,
-
         HotelRoomsDetails: [
           {
             HotelPassenger: cleanedGuests,
@@ -433,7 +443,7 @@ const HotelBooking = () => {
 
       const res = await privateApi.post(
         "/api/hotels/hotels/book/",
-        finalPayload
+        finalPayload,
       );
 
       console.log("BOOK RESPONSE:", res.data);
@@ -454,7 +464,7 @@ const HotelBooking = () => {
             total,
           },
           bookingResponse: res.data,
-        })
+        }),
       );
 
       setGuestDetails(cleanedGuests);
@@ -574,9 +584,7 @@ const HotelBooking = () => {
                 <select
                   className="input"
                   value={guest.Title}
-                  onChange={(e) =>
-                    updateGuest(index, "Title", e.target.value)
-                  }
+                  onChange={(e) => updateGuest(index, "Title", e.target.value)}
                 >
                   <option value="Mr">Mr</option>
                   <option value="Mrs">Mrs</option>
@@ -627,9 +635,7 @@ const HotelBooking = () => {
                     }
                     className="input"
                     value={guest.Age}
-                    onChange={(e) =>
-                      updateGuest(index, "Age", e.target.value)
-                    }
+                    onChange={(e) => updateGuest(index, "Age", e.target.value)}
                   />
                 </div>
 
@@ -710,7 +716,7 @@ const HotelBooking = () => {
                     </div>
 
                     <input
-                      placeholder="PAN Number "
+                      placeholder="PAN Number Optional"
                       className="input uppercase"
                       value={guest.PAN}
                       onChange={(e) =>
@@ -751,7 +757,7 @@ const HotelBooking = () => {
           <button
             onClick={handleBookHotel}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60"
+            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Processing..." : "Proceed to Payment"}
           </button>
@@ -764,7 +770,7 @@ const HotelBooking = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .input {
           background: #0b0b0f;
           border: 1px solid #2a2a2f;
