@@ -25,6 +25,11 @@ const HotelsForm = () => {
     search?.nationalityName || "India",
   );
   const [nationalitySuggestions, setNationalitySuggestions] = useState([]);
+  const [guestOpen, setGuestOpen] = useState(false);
+
+  const cityRef = useRef(null);
+  const nationalityRef = useRef(null);
+  const guestRef = useRef(null);
 
   const [formData, setFormData] = useState({
     city: search?.city || "",
