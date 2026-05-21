@@ -6,7 +6,9 @@ const HotelResults = () => {
   const navigate = useNavigate();
   const { hotels, search, setSelectedHotel, setSelectedRoom } = useHotelStore();
 
-  const { city, checkIn, checkOut, guests } = search || {};
+  const { city, cityName, checkIn, checkOut, guests } = search || {};
+
+  const displayCity = cityName || city || "Destination";
 
   /* ================= NORMALIZE ================= */
   const hotelList = useMemo(() => {
@@ -93,7 +95,7 @@ const HotelResults = () => {
       {/* ================= HEADER ================= */}
       <div className="sticky top-0 z-40 bg-[#0B0B0F]/90 backdrop-blur border-b border-gray-800 px-4 md:px-10 py-24">
         <h1 className="text-xl md:text-2xl font-bold text-yellow-400">
-          Hotels in {city || "Destination"}
+          Hotels in {displayCity}
         </h1>
         <p className="text-xs md:text-sm text-gray-400 mt-1">
           {checkIn} → {checkOut} • {totalGuests} Guests
