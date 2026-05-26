@@ -587,74 +587,6 @@ const HotelBooking = () => {
     try {
       setLoading(true);
 
-      const enteredChildAges = getEnteredChildAges();
-      const searchedChildAges = getSearchChildAges();
-
-      let finalBookingCode = bookingCode;
-      let finalNetAmount = net;
-      let refreshedPrebookData = null;
-
-      if (
-        childrenCount > 0 &&
-        !areChildAgesSame(enteredChildAges, searchedChildAges)
-      ) {
-        try {
-          setRefreshingPrebook(true);
-
-          refreshedPrebookData = await refreshPrebookWithEnteredChildAges();
-
-          const freshBookingCode =
-            extractFreshBookingCode(refreshedPrebookData);
-          const freshNetAmount = extractFreshNetAmount(refreshedPrebookData);
-
-          if (!freshBookingCode) {
-            alert(
-              "Child age changed. Please search hotel again with this child age because updated booking code was not received.",
-            );
-            return;
-          }
-
-          finalBookingCode = freshBookingCode;
-          finalNetAmount = freshNetAmount;
-
-          const updatedSearch = {
-            ...(storeSearch || {}),
-            guests: {
-              ...(storeSearch?.guests || guests || {}),
-              adults: adultsCount,
-              children: childrenCount,
-              rooms: guests?.rooms || storeSearch?.guests?.rooms || 1,
-              childAges: enteredChildAges,
-            },
-          };
-
-          if (typeof setSearch === "function") {
-            setSearch(updatedSearch);
-          }
-
-          if (typeof setPrebookData === "function") {
-            setPrebookData(refreshedPrebookData);
-          }
-        } catch (prebookErr) {
-          console.log(
-            "PREBOOK REFRESH ERROR:",
-            prebookErr?.response?.data || prebookErr,
-          );
-
-          const msg =
-            prebookErr?.response?.data?.message ||
-            prebookErr?.response?.data?.error ||
-            prebookErr?.response?.data?.data?.Error?.ErrorMessage ||
-            prebookErr?.response?.data?.data?.Response?.Error?.ErrorMessage ||
-            "Child age changed. Please search hotel again with this child age.";
-
-          alert(msg);
-          return;
-        } finally {
-          setRefreshingPrebook(false);
-        }
-      }
-
       const cleanedGuests = guestList.map((g, i) => {
         const passenger = {
           Title: g.Title,
@@ -663,6 +595,8 @@ const HotelBooking = () => {
           LastName: g.LastName.trim(),
           PaxType: Number(g.PaxType),
           LeadPassenger: i === 0,
+
+          // ✅ User-entered adult/child age will be sent directly
           Age: Number(g.Age),
         };
 
@@ -685,11 +619,11 @@ const HotelBooking = () => {
       });
 
       const finalPayload = {
-        BookingCode: finalBookingCode,
+        BookingCode: bookingCode,
         IsVoucherBooking: true,
         GuestNationality: guestNationality,
         RequestedBookingMode: 5,
-        NetAmount: finalNetAmount,
+        NetAmount: net,
         HotelRoomsDetails: [
           {
             HotelPassenger: cleanedGuests,
@@ -714,18 +648,17 @@ const HotelBooking = () => {
         "hotelBookingData",
         JSON.stringify({
           guestList: cleanedGuests,
-          bookingCode: finalBookingCode,
+          bookingCode,
           hotel,
           checkIn,
           checkOut,
           isInternationalHotel,
           guestNationality,
           pricing: {
-            net: finalNetAmount,
+            net,
             convenienceFee,
-            total: finalNetAmount + convenienceFee,
+            total: total || net + convenienceFee,
           },
-          refreshedPrebookData,
           bookingResponse: res.data,
         }),
       );
@@ -1035,7 +968,7 @@ const HotelBooking = () => {
           <button
             onClick={handleBookHotel}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
+            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading
               ? refreshingPrebook
