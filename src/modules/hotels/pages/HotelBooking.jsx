@@ -372,7 +372,7 @@ const HotelBooking = () => {
       ? storeSearch.guests.childAges
       : [];
 
-  const getLockedChildAge = (childIndex) => {
+  const getDefaultChildAge = (childIndex) => {
     const age = Number(childAges?.[childIndex]);
     return age > 0 && age < 12 ? age : "";
   };
@@ -385,7 +385,6 @@ const HotelBooking = () => {
     Array.from({ length: totalGuests || 1 }, (_, i) => {
       const isChild = i >= adultsCount;
       const childIndex = i - adultsCount;
-      const lockedChildAge = isChild ? getLockedChildAge(childIndex) : "";
 
       return {
         Title: isChild ? "Master" : "Mr",
@@ -396,7 +395,10 @@ const HotelBooking = () => {
         Phoneno: "",
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
-        Age: isChild ? lockedChildAge : "",
+
+        // User can enter/change child age here
+        Age: isChild ? getDefaultChildAge(childIndex) : "",
+
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -432,40 +434,31 @@ const HotelBooking = () => {
 
     for (let i = 0; i < guestList.length; i++) {
       const g = guestList[i];
-      const isChild = g.PaxType === 2;
-      const childIndex = isChild
-        ? guestList.slice(0, i).filter((item) => item.PaxType === 2).length
-        : -1;
-
-      const lockedChildAge = isChild ? getLockedChildAge(childIndex) : "";
+      const age = Number(g.Age);
+      const isChild = Number(g.PaxType) === 2;
 
       if (!g.FirstName.trim() || !g.LastName.trim()) {
         return `Guest ${i + 1}: First name and last name are required`;
       }
 
-      const finalAge =
-        isChild && lockedChildAge ? lockedChildAge : Number(g.Age);
-
-      if (!finalAge) {
+      if (!g.Age) {
         return `Guest ${i + 1}: Age is required`;
       }
-
-      const age = Number(finalAge);
 
       if (Number.isNaN(age) || age <= 0) {
         return `Guest ${i + 1}: Enter valid age`;
       }
 
-      if (g.PaxType === 1 && age < 12) {
+      if (!Number.isInteger(age)) {
+        return `Guest ${i + 1}: Age must be a whole number`;
+      }
+
+      if (Number(g.PaxType) === 1 && age < 12) {
         return `Guest ${i + 1}: Adult age must be 12 or above`;
       }
 
-      if (g.PaxType === 2 && age >= 12) {
+      if (isChild && age >= 12) {
         return `Guest ${i + 1}: Child age must be below 12`;
-      }
-
-      if (g.PaxType === 2 && lockedChildAge && age !== Number(lockedChildAge)) {
-        return `Guest ${i + 1}: Child age must match search age ${lockedChildAge}`;
       }
 
       if (g.LeadPassenger) {
@@ -498,7 +491,7 @@ const HotelBooking = () => {
     }
 
     if (childrenCount > 0) {
-      const enteredChildren = guestList.filter((g) => g.PaxType === 2);
+      const enteredChildren = guestList.filter((g) => Number(g.PaxType) === 2);
 
       if (enteredChildren.length !== childrenCount) {
         return `Children count mismatch. Expected ${childrenCount}, got ${enteredChildren.length}`;
@@ -515,14 +508,7 @@ const HotelBooking = () => {
     try {
       setLoading(true);
 
-      let childCounter = 0;
-
       const cleanedGuests = guestList.map((g, i) => {
-        const isChild = Number(g.PaxType) === 2;
-        const lockedChildAge = isChild ? getLockedChildAge(childCounter) : "";
-
-        if (isChild) childCounter += 1;
-
         const passenger = {
           Title: g.Title,
           FirstName: g.FirstName.trim(),
@@ -530,7 +516,9 @@ const HotelBooking = () => {
           LastName: g.LastName.trim(),
           PaxType: Number(g.PaxType),
           LeadPassenger: i === 0,
-          Age: Number(isChild && lockedChildAge ? lockedChildAge : g.Age),
+
+          // Sends user-entered age
+          Age: Number(g.Age),
         };
 
         if (i === 0) {
@@ -693,13 +681,7 @@ const HotelBooking = () => {
           </div>
 
           {guestList.map((guest, index) => {
-            const isChild = guest.PaxType === 2;
-            const childIndex = isChild
-              ? guestList.slice(0, index).filter((item) => item.PaxType === 2)
-                  .length
-              : -1;
-
-            const lockedChildAge = isChild ? getLockedChildAge(childIndex) : "";
+            const isChild = Number(guest.PaxType) === 2;
 
             return (
               <div
@@ -712,7 +694,7 @@ const HotelBooking = () => {
                   </h3>
 
                   <span className="text-xs px-3 py-1 rounded-full bg-black/40 border border-gray-700 text-gray-300">
-                    {guest.PaxType === 1 ? "Adult" : "Child"}
+                    {Number(guest.PaxType) === 1 ? "Adult" : "Child"}
                   </span>
                 </div>
 
@@ -759,29 +741,28 @@ const HotelBooking = () => {
 
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">
-                      {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
+                      {Number(guest.PaxType) === 1 ? "Adult Age" : "Child Age"}
                     </label>
 
                     <input
                       type="number"
-                      min={guest.PaxType === 1 ? 12 : 1}
-                      max={guest.PaxType === 1 ? 120 : 11}
+                      min={Number(guest.PaxType) === 1 ? 12 : 1}
+                      max={Number(guest.PaxType) === 1 ? 120 : 11}
                       placeholder={
-                        guest.PaxType === 1
+                        Number(guest.PaxType) === 1
                           ? "Enter adult age"
                           : "Enter child age"
                       }
-                      className="input disabled:opacity-60 disabled:cursor-not-allowed"
-                      value={lockedChildAge || guest.Age}
-                      disabled={Boolean(lockedChildAge)}
+                      className="input"
+                      value={guest.Age}
                       onChange={(e) =>
                         updateGuest(index, "Age", e.target.value)
                       }
                     />
 
-                    {lockedChildAge && (
+                    {isChild && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Child age locked from hotel search to avoid mismatch.
+                        Enter child age below 12 years.
                       </p>
                     )}
                   </div>
