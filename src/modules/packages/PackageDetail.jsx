@@ -356,7 +356,7 @@ Please share the best quote and itinerary.`;
   return (
     <div className="bg-(--bg-main) text-white min-h-screen pb-28 overflow-hidden">
       {/* HERO */}
-      <section className="relative min-h-[720px] overflow-hidden">
+      <section className="relative min-h-180 overflow-hidden">
         <img
           src={heroImage}
           alt={packageTitle}
@@ -364,8 +364,8 @@ Please share the best quote and itinerary.`;
         />
 
         <div className="absolute inset-0 bg-black/55" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#03070d] via-[#07101acc] to-black/40" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-(--bg-main)" />
+        <div className="absolute inset-0 bg-linear-to-r from-[#03070d] via-[#07101acc] to-black/40" />
+        <div className="absolute inset-0 bg-linear-to-b from-black/20 via-transparent to-(--bg-main)" />
 
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-yellow-500/20 blur-[120px] rounded-full" />
         <div className="absolute top-40 -right-32 w-96 h-96 bg-blue-500/10 blur-[120px] rounded-full" />
@@ -474,7 +474,7 @@ Please share the best quote and itinerary.`;
                     </div>
                   </div>
 
-                  <div className="grid gap-3 min-w-[230px]">
+                  <div className="grid gap-3 min-w-57.5">
                     <button
                       onClick={handleBookClick}
                       className="relative overflow-hidden bg-linear-to-r from-start to-end text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-[1.02] transition shadow-[0_15px_40px_rgba(245,186,74,0.25)]"

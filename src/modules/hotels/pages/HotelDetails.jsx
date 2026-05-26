@@ -218,7 +218,7 @@ const HotelDetails = () => {
             src={images[0]}
             alt={hotelName}
             onClick={() => setSelectedImage(images[0])}
-            className="w-full h-64 md:h-[420px] object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
+            className="w-full h-64 md:h-105 object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
           />
         </div>
 
@@ -230,7 +230,7 @@ const HotelDetails = () => {
               src={img}
               alt={`${hotelName} ${i + 2}`}
               onClick={() => setSelectedImage(img)}
-              className="w-full h-32 md:h-[200px] object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
+              className="w-full h-32 md:h-50 object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
             />
           ))}
         </div>
@@ -395,7 +395,7 @@ const HotelDetails = () => {
           <button
             onClick={handlePreBook}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-gradient-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 disabled:opacity-60 disabled:hover:scale-100 transition"
+            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-linear-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 disabled:opacity-60 disabled:hover:scale-100 transition"
           >
             {loading ? "Processing..." : "Book Now"}
           </button>
