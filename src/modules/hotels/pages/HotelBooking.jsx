@@ -25,6 +25,101 @@ const getSafeValue = (...values) => {
   return values.find((v) => v !== undefined && v !== null && v !== "") || "";
 };
 
+const isTrueValue = (value) => {
+  if (value === true) return true;
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "international"].includes(value.toLowerCase());
+  }
+  return false;
+};
+
+const isFalseValue = (value) => {
+  if (value === false) return true;
+  if (typeof value === "string") {
+    return ["false", "0", "no", "domestic"].includes(value.toLowerCase());
+  }
+  return false;
+};
+
+const INDIA_CITY_KEYWORDS = [
+  "india",
+  "delhi",
+  "new delhi",
+  "mumbai",
+  "goa",
+  "jaipur",
+  "manali",
+  "kashmir",
+  "srinagar",
+  "shimla",
+  "kerala",
+  "udaipur",
+  "bangalore",
+  "bengaluru",
+  "hyderabad",
+  "chennai",
+  "kolkata",
+  "pune",
+  "gurgaon",
+  "gurugram",
+  "noida",
+  "lucknow",
+  "varanasi",
+  "amritsar",
+  "jodhpur",
+  "rishikesh",
+  "haridwar",
+  "dehradun",
+  "ahmedabad",
+  "surat",
+  "indore",
+  "bhopal",
+  "chandigarh",
+  "kochi",
+  "cochin",
+  "ooty",
+  "mysore",
+  "mysuru",
+  "nainital",
+  "mussoorie",
+  "darjeeling",
+  "gangtok",
+  "leh",
+  "ladakh",
+  "agra",
+];
+
+const INTERNATIONAL_CITY_KEYWORDS = [
+  "dubai",
+  "abu dhabi",
+  "sharjah",
+  "uae",
+  "united arab emirates",
+  "thailand",
+  "bangkok",
+  "phuket",
+  "pattaya",
+  "singapore",
+  "malaysia",
+  "bali",
+  "indonesia",
+  "maldives",
+  "sri lanka",
+  "nepal",
+  "bhutan",
+  "usa",
+  "united states",
+  "united kingdom",
+  "london",
+  "france",
+  "paris",
+  "germany",
+  "italy",
+  "spain",
+  "australia",
+  "canada",
+];
+
 const nationalityOptions = [
   { Code: "IN", Name: "India" },
   { Code: "AE", Name: "United Arab Emirates" },
@@ -122,122 +217,153 @@ const HotelBooking = () => {
     preBook,
     rawHotelResult,
     roomData,
+    search: storeSearch,
+    payload,
   });
 
   const isInternationalHotel = useMemo(() => {
-    const explicitValue = getSafeValue(
+    const cityText = normalizeText(
+      getSafeValue(
+        storeSearch?.cityName,
+        storeSearch?.CityName,
+        storeSearch?.city,
+        storeSearch?.City,
+        payload?.cityName,
+        payload?.CityName,
+        payload?.search?.cityName,
+        payload?.search?.CityName,
+        payload?.search?.city,
+        payload?.search?.City,
+        hotel?.cityName,
+        hotel?.CityName,
+        hotel?.city_name,
+        hotel?.City,
+        hotel?.HotelCityName,
+        hotel?.destination,
+        hotel?.Destination,
+        rawHotelResult?.CityName,
+        rawHotelResult?.HotelCityName,
+        rawHotelResult?.Destination,
+        rawHotelResult?.Address,
+        rawHotelResult?.HotelAddress,
+        hotel?.address,
+        hotel?.Address,
+      ),
+    );
+
+    const countryCode = String(
+      getSafeValue(
+        storeSearch?.countryCode,
+        storeSearch?.CountryCode,
+        payload?.countryCode,
+        payload?.CountryCode,
+        payload?.search?.countryCode,
+        payload?.search?.CountryCode,
+        hotel?.country_code,
+        hotel?.countryCode,
+        hotel?.CountryCode,
+        rawHotelResult?.CountryCode,
+        rawHotelResult?.HotelCountryCode,
+        roomData?.CountryCode,
+      ),
+    ).toUpperCase();
+
+    const countryName = normalizeText(
+      getSafeValue(
+        storeSearch?.countryName,
+        storeSearch?.CountryName,
+        payload?.countryName,
+        payload?.CountryName,
+        payload?.search?.countryName,
+        payload?.search?.CountryName,
+        hotel?.country,
+        hotel?.Country,
+        hotel?.countryName,
+        hotel?.CountryName,
+        rawHotelResult?.Country,
+        rawHotelResult?.CountryName,
+        rawHotelResult?.HotelCountryName,
+      ),
+    );
+
+    const locationText = `${cityText} ${countryName}`;
+
+    const hasIndiaCountryCode = ["IN", "IND", "INDIA"].includes(countryCode);
+    const hasIndiaCountryName = countryName === "india";
+    const hasIndianCity = INDIA_CITY_KEYWORDS.some((word) =>
+      locationText.includes(word),
+    );
+
+    // Domestic override: Delhi/India should never become international
+    if (
+      payload?.isDomesticHotel === true ||
+      payload?.hotelType === "domestic"
+    ) {
+      return false;
+    }
+
+    if (hasIndiaCountryCode || hasIndiaCountryName || hasIndianCity) {
+      return false;
+    }
+
+    const explicitDomestic = getSafeValue(
+      payload?.isDomestic,
+      payload?.is_domestic,
+      hotel?.isDomestic,
+      hotel?.is_domestic,
+      preBook?.isDomestic,
+      preBook?.is_domestic,
+    );
+
+    if (isTrueValue(explicitDomestic)) {
+      return false;
+    }
+
+    const explicitInternational = getSafeValue(
+      payload?.isInternationalHotel,
       payload?.isInternational,
       payload?.is_international,
+      hotel?.isInternationalHotel,
       hotel?.isInternational,
       hotel?.is_international,
+      preBook?.isInternationalHotel,
       preBook?.isInternational,
       preBook?.is_international,
       rawHotelResult?.IsInternational,
       roomData?.IsInternational,
     );
 
-    if (typeof explicitValue === "boolean") return explicitValue;
-
-    const countryCode = getSafeValue(
-      payload?.countryCode,
-      payload?.country_code,
-      hotel?.country_code,
-      hotel?.CountryCode,
-      hotel?.countryCode,
-      rawHotelResult?.CountryCode,
-      rawHotelResult?.HotelCountryCode,
-      roomData?.CountryCode,
-    );
-
-    if (countryCode && String(countryCode).toUpperCase() !== "IN") {
-      return true;
-    }
-
-    const cityCountryText = normalizeText(
-      getSafeValue(
-        hotel?.country,
-        hotel?.Country,
-        hotel?.CountryName,
-        hotel?.address,
-        hotel?.Address,
-        hotel?.city_name,
-        hotel?.CityName,
-        hotel?.destination,
-        hotel?.Destination,
-        rawHotelResult?.Country,
-        rawHotelResult?.CountryName,
-        rawHotelResult?.HotelAddress,
-        rawHotelResult?.Address,
-      ),
-    );
-
-    const internationalKeywords = [
-      "dubai",
-      "abu dhabi",
-      "sharjah",
-      "uae",
-      "united arab emirates",
-      "thailand",
-      "bangkok",
-      "phuket",
-      "pattaya",
-      "singapore",
-      "malaysia",
-      "bali",
-      "indonesia",
-      "maldives",
-      "sri lanka",
-      "nepal",
-      "bhutan",
-      "usa",
-      "united states",
-      "united kingdom",
-      "london",
-      "france",
-      "paris",
-      "germany",
-      "italy",
-      "spain",
-      "australia",
-      "canada",
-    ];
-
-    const indiaKeywords = [
-      "india",
-      "delhi",
-      "mumbai",
-      "goa",
-      "jaipur",
-      "manali",
-      "kashmir",
-      "srinagar",
-      "shimla",
-      "kerala",
-      "udaipur",
-      "bangalore",
-      "hyderabad",
-      "chennai",
-      "kolkata",
-    ];
-
-    if (internationalKeywords.some((word) => cityCountryText.includes(word))) {
-      return true;
-    }
-
-    if (indiaKeywords.some((word) => cityCountryText.includes(word))) {
+    if (isFalseValue(explicitInternational)) {
       return false;
     }
 
-    return (
-      hotelText.includes("passport") || hotelText.includes("international")
+    if (isTrueValue(explicitInternational)) {
+      return true;
+    }
+
+    if (countryCode && !["IN", "IND", "INDIA"].includes(countryCode)) {
+      return true;
+    }
+
+    const hasInternationalCity = INTERNATIONAL_CITY_KEYWORDS.some((word) =>
+      locationText.includes(word),
     );
-  }, [payload, hotel, preBook, rawHotelResult, roomData, hotelText]);
+
+    if (hasInternationalCity) {
+      return true;
+    }
+
+    // Do not use "passport" or "international" from random API text as final decision.
+    // Fallback should be domestic to avoid asking passport for Indian hotels.
+    return false;
+  }, [payload, hotel, preBook, rawHotelResult, roomData, storeSearch]);
 
   const defaultGuestNationality = getSafeValue(
     payload?.guestNationality,
     payload?.GuestNationality,
     guests?.nationality,
     guests?.GuestNationality,
+    storeSearch?.nationality,
     "IN",
   );
 
@@ -259,7 +385,7 @@ const HotelBooking = () => {
   );
 
   const [guestList, setGuestList] = useState(
-    Array.from({ length: totalGuests }, (_, i) => {
+    Array.from({ length: totalGuests || 1 }, (_, i) => {
       const isChild = i >= adultsCount;
       const childIndex = i - adultsCount;
 
@@ -405,7 +531,7 @@ const HotelBooking = () => {
           passenger.Phoneno = g.Phoneno.trim();
         }
 
-        if (!isInternationalHotel && g.PAN?.trim()) {
+        if (!isInternationalHotel) {
           passenger.PAN = g.PAN.trim().toUpperCase();
         }
 
@@ -507,6 +633,14 @@ const HotelBooking = () => {
     );
   }
 
+  const hotelName =
+    hotel?.hotel_name ||
+    hotel?.HotelName ||
+    rawHotelResult?.HotelName ||
+    "Hotel Booking";
+
+  const roomName = roomData?.Name?.[0] || roomData?.Name || "Standard Room";
+
   return (
     <div className="min-h-screen bg-[#0B0B0F] text-white px-4 md:px-10 py-24">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -521,19 +655,14 @@ const HotelBooking = () => {
                 </p>
 
                 <h2 className="text-2xl font-bold text-yellow-400">
-                  {hotel?.hotel_name ||
-                    hotel?.HotelName ||
-                    rawHotelResult?.HotelName ||
-                    "Hotel Booking"}
+                  {hotelName}
                 </h2>
 
                 <p className="text-gray-400 text-sm mt-2">
                   📅 {checkIn} → {checkOut}
                 </p>
 
-                <p className="text-gray-400 text-sm mt-1">
-                  🛏 {roomData?.Name?.[0] || roomData?.Name || "Standard Room"}
-                </p>
+                <p className="text-gray-400 text-sm mt-1">🛏 {roomName}</p>
 
                 <p className="text-gray-500 text-xs mt-2 break-all">
                   BookingCode: {bookingCode || "Missing"}
@@ -757,7 +886,7 @@ const HotelBooking = () => {
           <button
             onClick={handleBookHotel}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
+            className="mt-6 w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Processing..." : "Proceed to Payment"}
           </button>

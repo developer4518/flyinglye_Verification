@@ -1,7 +1,60 @@
 "use client";
+
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useHotelStore } from "../../../store/hotelStore";
+
+const INDIA_CITY_KEYWORDS = [
+  "delhi",
+  "new delhi",
+  "mumbai",
+  "bangalore",
+  "bengaluru",
+  "goa",
+  "jaipur",
+  "agra",
+  "kolkata",
+  "chennai",
+  "hyderabad",
+  "pune",
+  "gurgaon",
+  "gurugram",
+  "noida",
+  "lucknow",
+  "varanasi",
+  "amritsar",
+  "udaipur",
+  "jodhpur",
+  "manali",
+  "shimla",
+  "rishikesh",
+  "haridwar",
+  "dehradun",
+  "ahmedabad",
+  "surat",
+  "indore",
+  "bhopal",
+  "chandigarh",
+  "kochi",
+  "cochin",
+  "ooty",
+  "mysore",
+  "nainital",
+  "mussoorie",
+  "darjeeling",
+  "gangtok",
+  "srinagar",
+  "kashmir",
+  "leh",
+  "ladakh",
+];
+
+const getSafeText = (...values) => {
+  return values
+    .find((v) => v !== undefined && v !== null && String(v).trim() !== "")
+    ?.toString()
+    .trim();
+};
 
 const HotelDetails = () => {
   const { state } = useLocation();
@@ -21,9 +74,80 @@ const HotelDetails = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const { isDomesticHotel, isInternationalHotel } = useMemo(() => {
+    if (!hotel) {
+      return {
+        isDomesticHotel: true,
+        isInternationalHotel: false,
+      };
+    }
+
+    const cityName = getSafeText(
+      search?.cityName,
+      search?.CityName,
+      payload?.cityName,
+      payload?.CityName,
+      payload?.search?.cityName,
+      payload?.search?.CityName,
+      hotel?.cityName,
+      hotel?.CityName,
+      hotel?.city,
+      hotel?.City,
+      hotel?.HotelCityName,
+      hotel?.hotel_city,
+      hotel?.Destination,
+      hotel?.destination,
+      hotel?.Address,
+      hotel?.address,
+    )?.toLowerCase();
+
+    const countryCode = getSafeText(
+      search?.countryCode,
+      search?.CountryCode,
+      payload?.countryCode,
+      payload?.CountryCode,
+      payload?.search?.countryCode,
+      payload?.search?.CountryCode,
+      hotel?.countryCode,
+      hotel?.CountryCode,
+      hotel?.HotelCountryCode,
+      hotel?.country_code,
+    )?.toUpperCase();
+
+    const countryName = getSafeText(
+      search?.countryName,
+      search?.CountryName,
+      payload?.countryName,
+      payload?.CountryName,
+      payload?.search?.countryName,
+      payload?.search?.CountryName,
+      hotel?.countryName,
+      hotel?.CountryName,
+      hotel?.country,
+      hotel?.Country,
+      hotel?.HotelCountryName,
+      hotel?.hotel_country,
+    )?.toLowerCase();
+
+    const hasIndiaCountryCode = ["IN", "IND", "INDIA"].includes(countryCode);
+    const hasIndiaCountryName = countryName === "india";
+    const hasIndianCity = INDIA_CITY_KEYWORDS.some((city) =>
+      cityName?.includes(city),
+    );
+
+    const domestic = Boolean(
+      hasIndiaCountryCode || hasIndiaCountryName || hasIndianCity,
+    );
+
+    return {
+      isDomesticHotel: domestic,
+      isInternationalHotel: !domestic,
+    };
+  }, [hotel, search, payload]);
+
   if (!hotel) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">
+      <div className="min-h-screen flex items-center justify-center bg-[#0B0B0F] text-gray-400">
         No hotel data found
       </div>
     );
@@ -34,17 +158,53 @@ const HotelDetails = () => {
       ? hotel.images
       : [hotel?.image || "https://via.placeholder.com/600"];
 
-  const totalGuests = (guests?.adults || 0) + (guests?.children || 0);
+  const totalGuests =
+    Number(guests?.adults || 0) + Number(guests?.children || 0);
 
-  const formatPrice = (val) => Math.round(val || 0).toLocaleString("en-IN");
+  const formatPrice = (val) =>
+    Math.round(Number(val) || 0).toLocaleString("en-IN");
+
+  const roomPrice = Number(
+    hotel?.price || room?.Price || room?.TotalFare || room?.NetAmount || 0,
+  );
+
+  const tax = Number(hotel?.tax || room?.Tax || room?.TotalTax || 0);
+
+  const totalAmount = roomPrice + tax;
+
+  const hotelName =
+    hotel?.hotel_name || hotel?.HotelName || hotel?.Name || "Hotel";
+
+  const roomName = room?.Name || room?.RoomTypeName || "Standard Room";
+
+  const mealPlan = hotel?.meal || room?.MealType || room?.MealPlan || "";
+
+  const description =
+    hotel?.description ||
+    hotel?.Description ||
+    "This premium hotel offers modern rooms, excellent hospitality, and top-class amenities. Ideal for business and leisure stays with easy access to major attractions.";
 
   const handlePreBook = () => {
-    if (!room?.BookingCode) return alert("Invalid room");
+    if (!room?.BookingCode) {
+      alert("Invalid room");
+      return;
+    }
 
     setLoading(true);
 
     navigate("/prebook", {
-      state: { hotel, room, checkIn, checkOut, guests },
+      state: {
+        hotel,
+        room,
+        checkIn,
+        checkOut,
+        guests,
+
+        // Important for guest details / prebook page
+        isDomesticHotel,
+        isInternationalHotel,
+        hotelType: isInternationalHotel ? "international" : "domestic",
+      },
     });
   };
 
@@ -56,8 +216,9 @@ const HotelDetails = () => {
         <div className="md:col-span-2">
           <img
             src={images[0]}
+            alt={hotelName}
             onClick={() => setSelectedImage(images[0])}
-            className="w-full h-64 md:h-105 object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
+            className="w-full h-64 md:h-[420px] object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
           />
         </div>
 
@@ -67,8 +228,9 @@ const HotelDetails = () => {
             <img
               key={i}
               src={img}
+              alt={`${hotelName} ${i + 2}`}
               onClick={() => setSelectedImage(img)}
-              className="w-full h-32 md:h-50 object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
+              className="w-full h-32 md:h-[200px] object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
             />
           ))}
         </div>
@@ -76,16 +238,17 @@ const HotelDetails = () => {
 
       {/* ================= LIGHTBOX ================= */}
       {selectedImage && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 px-4">
           <button
             onClick={() => setSelectedImage(null)}
-            className="absolute top-5 right-5 text-white text-xl"
+            className="absolute top-5 right-5 text-white text-xl bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full"
           >
             ✕
           </button>
 
           <img
             src={selectedImage}
+            alt="Selected hotel"
             className="max-h-[90%] max-w-[90%] rounded-xl"
           />
         </div>
@@ -97,16 +260,38 @@ const HotelDetails = () => {
         <div className="md:col-span-2 space-y-6">
           {/* HOTEL HEADER */}
           <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
-            <h1 className="text-2xl md:text-3xl font-bold text-yellow-400">
-              {hotel.hotel_name}
-            </h1>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="mb-2 text-xs tracking-[0.35em] uppercase text-yellow-300">
+                  {isInternationalHotel
+                    ? "International Hotel"
+                    : "Domestic Hotel"}
+                </p>
 
-            <div className="flex items-center gap-3 mt-2">
+                <h1 className="text-2xl md:text-3xl font-bold text-yellow-400">
+                  {hotelName}
+                </h1>
+              </div>
+
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                  isInternationalHotel
+                    ? "bg-purple-500/10 text-purple-300 border-purple-500/30"
+                    : "bg-green-500/10 text-green-300 border-green-500/30"
+                }`}
+              >
+                {isInternationalHotel
+                  ? "Passport Required"
+                  : "No Passport Needed"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 mt-3">
               <span className="text-yellow-300 text-sm">
-                ⭐ {hotel.rating || "4.2"}
+                ⭐ {hotel?.rating || hotel?.Rating || "4.2"}
               </span>
 
-              {hotel.refundable && (
+              {hotel?.refundable && (
                 <span className="px-2 py-1 text-xs bg-green-600/20 text-green-400 rounded-full">
                   Refundable
                 </span>
@@ -114,7 +299,8 @@ const HotelDetails = () => {
             </div>
 
             <p className="mt-3 text-sm text-gray-400">
-              📅 {checkIn} → {checkOut} • 👤 {totalGuests} Guests
+              📅 {checkIn || "Check-in"} → {checkOut || "Check-out"} • 👤{" "}
+              {totalGuests || 1} Guests
             </p>
           </div>
 
@@ -123,34 +309,46 @@ const HotelDetails = () => {
             <h2 className="text-lg text-yellow-300 mb-3">Room Details</h2>
 
             <p className="text-sm mb-2">
-              🛏 <strong>{room?.Name || "Standard Room"}</strong>
+              🛏 <strong>{roomName}</strong>
             </p>
 
-            {hotel.meal && (
-              <p className="text-sm mb-2">🍽 {hotel.meal.replace("_", " ")}</p>
+            {mealPlan && (
+              <p className="text-sm mb-2">
+                🍽 {String(mealPlan).replace("_", " ")}
+              </p>
             )}
 
             <p className="text-sm text-gray-400">
               ✔ Free WiFi • ✔ AC • ✔ 24h Support
             </p>
+
+            {room?.BookingCode && (
+              <p className="mt-3 text-xs text-gray-500 break-all">
+                Booking Code: {room.BookingCode}
+              </p>
+            )}
           </div>
 
           {/* DESCRIPTION */}
           <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
             <h2 className="text-lg text-yellow-300 mb-3">About this hotel</h2>
 
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-400 leading-relaxed">
               {showFullDesc
-                ? "This premium hotel offers modern rooms, excellent hospitality, and top-class amenities. Ideal for business and leisure stays with easy access to major attractions."
-                : "This premium hotel offers modern rooms and excellent hospitality..."}
+                ? description
+                : description.length > 160
+                  ? `${description.slice(0, 160)}...`
+                  : description}
             </p>
 
-            <button
-              onClick={() => setShowFullDesc(!showFullDesc)}
-              className="mt-2 text-sm text-yellow-400 hover:underline"
-            >
-              {showFullDesc ? "Show Less" : "Read More"}
-            </button>
+            {description.length > 160 && (
+              <button
+                onClick={() => setShowFullDesc(!showFullDesc)}
+                className="mt-2 text-sm text-yellow-400 hover:underline"
+              >
+                {showFullDesc ? "Show Less" : "Read More"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -159,31 +357,45 @@ const HotelDetails = () => {
           <h2 className="text-lg text-yellow-300 mb-4">Price Details</h2>
 
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span>Room Price</span>
-              <span>₹ {formatPrice(hotel.price)}</span>
+              <span>₹ {formatPrice(roomPrice)}</span>
             </div>
 
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span>Taxes</span>
-              <span>₹ {formatPrice(hotel.tax)}</span>
+              <span>₹ {formatPrice(tax)}</span>
             </div>
 
             <hr className="border-gray-700 my-2" />
 
-            <div className="flex justify-between text-lg font-bold">
+            <div className="flex justify-between text-lg font-bold gap-4">
               <span>Total</span>
               <span className="text-yellow-400">
-                ₹ {formatPrice(hotel.price + hotel.tax)}
+                ₹ {formatPrice(totalAmount)}
               </span>
             </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-gray-800 bg-black/20 p-3">
+            <p className="text-xs text-gray-400">Hotel Type</p>
+
+            <p className="mt-1 text-sm font-semibold text-white">
+              {isInternationalHotel ? "International Hotel" : "Domestic Hotel"}
+            </p>
+
+            <p className="mt-1 text-xs text-gray-500">
+              {isInternationalHotel
+                ? "Passport details will be required on guest details page."
+                : "Passport details are not required for Indian domestic hotels."}
+            </p>
           </div>
 
           {/* CTA */}
           <button
             onClick={handlePreBook}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-linear-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 transition"
+            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-gradient-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 disabled:opacity-60 disabled:hover:scale-100 transition"
           >
             {loading ? "Processing..." : "Book Now"}
           </button>
