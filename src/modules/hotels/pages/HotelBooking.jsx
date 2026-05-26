@@ -148,6 +148,8 @@ const HotelBooking = () => {
     selectedHotel,
     selectedRoom,
     search: storeSearch,
+    setSearch,
+    setPrebookData,
   } = useHotelStore();
 
   const location = useLocation();
@@ -305,9 +307,7 @@ const HotelBooking = () => {
       preBook?.is_domestic,
     );
 
-    if (isTrueValue(explicitDomestic)) {
-      return false;
-    }
+    if (isTrueValue(explicitDomestic)) return false;
 
     const explicitInternational = getSafeValue(
       payload?.isInternationalHotel,
@@ -323,13 +323,8 @@ const HotelBooking = () => {
       roomData?.IsInternational,
     );
 
-    if (isFalseValue(explicitInternational)) {
-      return false;
-    }
-
-    if (isTrueValue(explicitInternational)) {
-      return true;
-    }
+    if (isFalseValue(explicitInternational)) return false;
+    if (isTrueValue(explicitInternational)) return true;
 
     if (countryCode && !["IN", "IND", "INDIA"].includes(countryCode)) {
       return true;
@@ -339,9 +334,7 @@ const HotelBooking = () => {
       locationText.includes(word),
     );
 
-    if (hasInternationalCity) {
-      return true;
-    }
+    if (hasInternationalCity) return true;
 
     return false;
   }, [payload, hotel, preBook, rawHotelResult, roomData, storeSearch]);
@@ -395,10 +388,7 @@ const HotelBooking = () => {
         Phoneno: "",
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
-
-        // User can enter/change child age here
         Age: isChild ? getDefaultChildAge(childIndex) : "",
-
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -407,6 +397,7 @@ const HotelBooking = () => {
   );
 
   const [loading, setLoading] = useState(false);
+  const [refreshingPrebook, setRefreshingPrebook] = useState(false);
 
   const updateGuest = (index, field, value) => {
     setGuestList((prev) => {
@@ -417,6 +408,86 @@ const HotelBooking = () => {
       };
       return updated;
     });
+  };
+
+  const getEnteredChildAges = () => {
+    return guestList
+      .filter((g) => Number(g.PaxType) === 2)
+      .map((g) => Number(g.Age));
+  };
+
+  const getSearchChildAges = () => {
+    return Array.isArray(childAges) ? childAges.map(Number) : [];
+  };
+
+  const areChildAgesSame = (a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    return a.every((age, index) => Number(age) === Number(b[index]));
+  };
+
+  const extractFreshBookingCode = (data) => {
+    return getSafeValue(
+      data?.booking_code,
+      data?.BookingCode,
+      data?.data?.booking_code,
+      data?.data?.BookingCode,
+      data?.raw?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
+      data?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
+      data?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
+      data?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
+    );
+  };
+
+  const extractFreshNetAmount = (data) => {
+    return Number(
+      getSafeValue(
+        data?.net_amount,
+        data?.NetAmount,
+        data?.data?.net_amount,
+        data?.data?.NetAmount,
+        data?.raw?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
+        data?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
+        data?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
+        data?.Response?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
+        net,
+      ),
+    );
+  };
+
+  const refreshPrebookWithEnteredChildAges = async () => {
+    const enteredChildAges = getEnteredChildAges();
+
+    const updatedGuests = {
+      ...(guests || {}),
+      adults: adultsCount,
+      children: childrenCount,
+      rooms: guests?.rooms || storeSearch?.guests?.rooms || 1,
+      childAges: enteredChildAges,
+    };
+
+    const refreshPayload = {
+      hotel,
+      room,
+      checkIn,
+      checkOut,
+      guests: updatedGuests,
+      BookingCode: bookingCode,
+      bookingCode,
+    };
+
+    /*
+      IMPORTANT:
+      Your backend should support this endpoint.
+      It must re-prebook/re-price hotel with the new childAges and return
+      updated BookingCode and NetAmount.
+    */
+
+    const res = await privateApi.post(
+      "/api/hotels/hotels/prebook-with-child-age/",
+      refreshPayload,
+    );
+
+    return res.data?.data || res.data;
   };
 
   const validateGuests = () => {
@@ -508,6 +579,74 @@ const HotelBooking = () => {
     try {
       setLoading(true);
 
+      const enteredChildAges = getEnteredChildAges();
+      const searchedChildAges = getSearchChildAges();
+
+      let finalBookingCode = bookingCode;
+      let finalNetAmount = net;
+      let refreshedPrebookData = null;
+
+      if (
+        childrenCount > 0 &&
+        !areChildAgesSame(enteredChildAges, searchedChildAges)
+      ) {
+        try {
+          setRefreshingPrebook(true);
+
+          refreshedPrebookData = await refreshPrebookWithEnteredChildAges();
+
+          const freshBookingCode =
+            extractFreshBookingCode(refreshedPrebookData);
+          const freshNetAmount = extractFreshNetAmount(refreshedPrebookData);
+
+          if (!freshBookingCode) {
+            alert(
+              "Child age changed. Please search hotel again with this child age because updated booking code was not received.",
+            );
+            return;
+          }
+
+          finalBookingCode = freshBookingCode;
+          finalNetAmount = freshNetAmount;
+
+          const updatedSearch = {
+            ...(storeSearch || {}),
+            guests: {
+              ...(storeSearch?.guests || guests || {}),
+              adults: adultsCount,
+              children: childrenCount,
+              rooms: guests?.rooms || storeSearch?.guests?.rooms || 1,
+              childAges: enteredChildAges,
+            },
+          };
+
+          if (typeof setSearch === "function") {
+            setSearch(updatedSearch);
+          }
+
+          if (typeof setPrebookData === "function") {
+            setPrebookData(refreshedPrebookData);
+          }
+        } catch (prebookErr) {
+          console.log(
+            "PREBOOK REFRESH ERROR:",
+            prebookErr?.response?.data || prebookErr,
+          );
+
+          const msg =
+            prebookErr?.response?.data?.message ||
+            prebookErr?.response?.data?.error ||
+            prebookErr?.response?.data?.data?.Error?.ErrorMessage ||
+            prebookErr?.response?.data?.data?.Response?.Error?.ErrorMessage ||
+            "Child age changed. Please search hotel again with this child age.";
+
+          alert(msg);
+          return;
+        } finally {
+          setRefreshingPrebook(false);
+        }
+      }
+
       const cleanedGuests = guestList.map((g, i) => {
         const passenger = {
           Title: g.Title,
@@ -516,8 +655,6 @@ const HotelBooking = () => {
           LastName: g.LastName.trim(),
           PaxType: Number(g.PaxType),
           LeadPassenger: i === 0,
-
-          // Sends user-entered age
           Age: Number(g.Age),
         };
 
@@ -536,11 +673,11 @@ const HotelBooking = () => {
       });
 
       const finalPayload = {
-        BookingCode: bookingCode,
+        BookingCode: finalBookingCode,
         IsVoucherBooking: true,
         GuestNationality: guestNationality,
         RequestedBookingMode: 5,
-        NetAmount: net,
+        NetAmount: finalNetAmount,
         HotelRoomsDetails: [
           {
             HotelPassenger: cleanedGuests,
@@ -565,17 +702,18 @@ const HotelBooking = () => {
         "hotelBookingData",
         JSON.stringify({
           guestList: cleanedGuests,
-          bookingCode,
+          bookingCode: finalBookingCode,
           hotel,
           checkIn,
           checkOut,
           isInternationalHotel,
           guestNationality,
           pricing: {
-            net,
+            net: finalNetAmount,
             convenienceFee,
-            total,
+            total: finalNetAmount + convenienceFee,
           },
+          refreshedPrebookData,
           bookingResponse: res.data,
         }),
       );
@@ -603,6 +741,7 @@ const HotelBooking = () => {
       alert(apiMessage);
     } finally {
       setLoading(false);
+      setRefreshingPrebook(false);
     }
   };
 
@@ -762,7 +901,8 @@ const HotelBooking = () => {
 
                     {isChild && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Enter child age below 12 years.
+                        Enter child age below 12. If age is changed, system will
+                        refresh prebook before final booking.
                       </p>
                     )}
                   </div>
@@ -872,7 +1012,11 @@ const HotelBooking = () => {
             disabled={loading}
             className="mt-6 w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {loading ? "Processing..." : "Proceed to Payment"}
+            {loading
+              ? refreshingPrebook
+                ? "Updating Child Age..."
+                : "Processing..."
+              : "Proceed to Payment"}
           </button>
 
           <p className="text-xs text-gray-500 mt-4">
