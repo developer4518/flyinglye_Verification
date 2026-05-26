@@ -41,6 +41,10 @@ const isFalseValue = (value) => {
   return false;
 };
 
+const isValidPAN = (value = "") => {
+  return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(value.trim().toUpperCase());
+};
+
 const INDIA_CITY_KEYWORDS = [
   "india",
   "delhi",
@@ -389,6 +393,7 @@ const HotelBooking = () => {
         PaxType: isChild ? 2 : 1,
         LeadPassenger: i === 0,
         Age: isChild ? getDefaultChildAge(childIndex) : "",
+        PAN: "",
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -475,13 +480,6 @@ const HotelBooking = () => {
       bookingCode,
     };
 
-    /*
-      IMPORTANT:
-      Your backend should support this endpoint.
-      It must re-prebook/re-price hotel with the new childAges and return
-      updated BookingCode and NetAmount.
-    */
-
     const res = await privateApi.post(
       "/api/hotels/hotels/prebook-with-child-age/",
       refreshPayload,
@@ -543,6 +541,16 @@ const HotelBooking = () => {
       }
 
       if (isInternationalHotel) {
+        const panValue = g.PAN?.trim().toUpperCase();
+
+        if (guestNationality === "IN" && !panValue) {
+          return `Guest ${i + 1}: PAN card number is required for Indian guest in international hotel`;
+        }
+
+        if (panValue && !isValidPAN(panValue)) {
+          return `Guest ${i + 1}: Enter valid PAN card number`;
+        }
+
         if (!g.PassportNo.trim()) {
           return `Guest ${i + 1}: Passport number is required for international hotel`;
         }
@@ -657,6 +665,10 @@ const HotelBooking = () => {
           LeadPassenger: i === 0,
           Age: Number(g.Age),
         };
+
+        if (g.PAN?.trim()) {
+          passenger.PAN = g.PAN.trim().toUpperCase();
+        }
 
         if (i === 0) {
           passenger.Email = g.Email.trim();
@@ -932,6 +944,19 @@ const HotelBooking = () => {
                   {isInternationalHotel && (
                     <>
                       <input
+                        placeholder="PAN Card Number"
+                        className="input"
+                        value={guest.PAN}
+                        onChange={(e) =>
+                          updateGuest(
+                            index,
+                            "PAN",
+                            e.target.value.toUpperCase(),
+                          )
+                        }
+                      />
+
+                      <input
                         placeholder="Passport Number"
                         className="input"
                         value={guest.PassportNo}
@@ -1021,7 +1046,7 @@ const HotelBooking = () => {
 
           <p className="text-xs text-gray-500 mt-4">
             {isInternationalHotel
-              ? "Passport details will be sent in booking payload."
+              ? "PAN and passport details will be sent in booking payload."
               : "PAN card is not required for this booking."}
           </p>
         </div>
