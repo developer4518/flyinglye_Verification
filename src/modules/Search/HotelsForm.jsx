@@ -26,11 +26,15 @@ const getInitialRooms = (search) => {
     Array.isArray(search?.guests?.roomGuests) &&
     search.guests.roomGuests.length
   ) {
-    return search.guests.roomGuests.map((room) => ({
-      adults: Number(room.adults || room.Adults || 1),
-      children: Number(room.children || room.Children || 0),
-      childAges: room.childAges || room.ChildAges || [],
-    }));
+    return search.guests.roomGuests.map((room) => {
+      const ages = room.childAges || room.ChildAges || room.ChildrenAges || [];
+
+      return {
+        adults: Number(room.adults || room.Adults || 1),
+        children: Number(room.children || room.Children || 0),
+        childAges: Array.isArray(ages) ? ages.map(Number) : [],
+      };
+    });
   }
 
   const roomCount = Number(search?.guests?.rooms || 1);
@@ -45,7 +49,7 @@ const getInitialRooms = (search) => {
       return {
         adults: totalAdults,
         children: totalChildren,
-        childAges: savedChildAges,
+        childAges: savedChildAges.map(Number),
       };
     }
 
@@ -99,14 +103,27 @@ const HotelsForm = () => {
       0,
     );
 
-    const childAges = rooms.flatMap((room) => room.childAges || []);
+    const childAges = rooms.flatMap((room) =>
+      (room.childAges || [])
+        .slice(0, Number(room.children || 0))
+        .map((age) => Number(age)),
+    );
+
+    const roomGuests = rooms.map((room, index) => ({
+      roomIndex: index + 1,
+      adults: Number(room.adults || 1),
+      children: Number(room.children || 0),
+      childAges: (room.childAges || [])
+        .slice(0, Number(room.children || 0))
+        .map((age) => Number(age)),
+    }));
 
     return {
       adults,
       children,
       rooms: rooms.length,
       childAges,
-      roomGuests: rooms,
+      roomGuests,
     };
   }, [rooms]);
 
@@ -311,42 +328,76 @@ const HotelsForm = () => {
 
     if (!validateSearch()) return;
 
-    const roomGuests = rooms.map((room, index) => ({
-      RoomIndex: index + 1,
-      Adults: Number(room.adults),
-      Children: Number(room.children),
-      ChildAges: (room.childAges || []).map((age) => Number(age)),
-    }));
+    const roomGuests = rooms.map((room, index) => {
+      const childAges = (room.childAges || [])
+        .slice(0, Number(room.children || 0))
+        .map((age) => Number(age));
+
+      return {
+        RoomIndex: index + 1,
+        Adults: Number(room.adults),
+        Children: Number(room.children),
+
+        // ✅ For your frontend/store
+        ChildAges: childAges,
+
+        // ✅ For TBO/backend compatibility
+        ChildrenAges: childAges,
+      };
+    });
+
+    const flatChildAges = roomGuests.flatMap((room) => room.ChildAges);
 
     const searchPayload = {
       ...formData,
+
       guests: {
         adults: guests.adults,
         children: guests.children,
         rooms: guests.rooms,
-        childAges: guests.childAges,
+
+        // ✅ Always user-entered child ages
+        childAges: flatChildAges,
+
+        // ✅ Keep room-wise children also
         roomGuests,
       },
 
       currency: "INR",
+      nationality: formData.nationality,
+      nationalityName: formData.nationalityName,
+
       parallelSearch: true,
       hotelCodesPerRequest: HOTEL_CODES_PER_REQUEST,
+
       maxRoomsAllowed: MAX_ROOMS,
       maxAdultsPerRoom: MAX_ADULTS_PER_ROOM,
       maxChildrenPerRoom: MAX_CHILDREN_PER_ROOM,
       childAgeAllowed: "1-12",
+
       responseTime: RESPONSE_TIME_SECONDS,
-      useFilters: false,
+
+      // ✅ TBO checklist
+      useFilters: true,
       showAllHotelFeed: true,
       showAllRoomFeed: true,
       exactPriceOnly: true,
-      showInclusion: false,
+      showInclusion: true,
+      showMealType: true,
+      showCancellationPolicy: true,
+      showRateConditions: true,
+      showAmenities: true,
+      showRoomPromotions: true,
+      showSupplements: true,
     };
 
     try {
       resetFlow();
       setLocalLoading(true);
       setLoading(true);
+
+      // ✅ Save before API also, so refresh/back keeps same search age
+      setSearch(searchPayload);
 
       localStorage.setItem("hotelSearchPayload", JSON.stringify(searchPayload));
 
@@ -361,21 +412,41 @@ const HotelsForm = () => {
           children: guests.children,
           rooms: guests.rooms,
 
+          // ✅ Room-wise payload
           roomGuests: JSON.stringify(roomGuests),
-          childAges: guests.childAges.join(","),
+          PaxRooms: JSON.stringify(
+            roomGuests.map((room) => ({
+              Adults: room.Adults,
+              Children: room.Children,
+              ChildrenAges: room.ChildrenAges,
+            })),
+          ),
+
+          // ✅ Child ages in all common formats
+          childAges: flatChildAges.join(","),
+          ChildAges: flatChildAges.join(","),
+          ChildrenAges: flatChildAges.join(","),
 
           nationality: formData.nationality,
           GuestNationality: formData.nationality,
 
           currency: "INR",
           responseTime: RESPONSE_TIME_SECONDS,
+
           parallelSearch: true,
           hotelCodesPerRequest: HOTEL_CODES_PER_REQUEST,
-          useFilters: false,
+
+          useFilters: true,
           showAllHotelFeed: true,
           showAllRoomFeed: true,
           exactPriceOnly: true,
-          showInclusion: false,
+          showInclusion: true,
+          showMealType: true,
+          showCancellationPolicy: true,
+          showRateConditions: true,
+          showAmenities: true,
+          showRoomPromotions: true,
+          showSupplements: true,
         },
       });
 
@@ -384,20 +455,27 @@ const HotelsForm = () => {
         res.data?.HotelResult ||
         res.data?.results ||
         res.data?.data?.results ||
+        res.data?.hotels ||
+        res.data?.data?.hotels ||
         [];
 
-      if (!hotelsData.length) {
+      if (!Array.isArray(hotelsData) || hotelsData.length === 0) {
         setErrorMsg("No hotels found 😔");
         return;
       }
 
+      // ✅ Save search again after success to make sure latest user age is stored
       setSearch(searchPayload);
-      setHotels(hotelsData);
+
+      // ✅ IMPORTANT: send full response, not hotelsData only
+      setHotels(res.data);
 
       navigate("/hotels");
     } catch (err) {
       console.error(err);
-      setError("API Error");
+
+      setError(err?.response?.data || "API Error");
+
       setErrorMsg(
         err?.response?.data?.message ||
           err?.response?.data?.error ||

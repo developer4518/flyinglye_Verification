@@ -60,12 +60,86 @@ const HotelDetails = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
 
-  const { selectedHotel, selectedRoom, search } = useHotelStore();
+  const { selectedHotel, selectedRoom, search, setSelectedRoom } =
+    useHotelStore();
 
   const payload = state || {};
 
   const hotel = payload.hotel || selectedHotel;
-  const room = payload.room || selectedRoom;
+
+  const availableRooms =
+    hotel?.rooms ||
+    hotel?.Rooms ||
+    hotel?.hotel_raw?.Rooms ||
+    hotel?.rawHotel?.Rooms ||
+    [];
+
+  const normalizeRoom = (roomData = {}) => {
+    const rawRoom = roomData.room_raw || roomData;
+
+    const bookingCode =
+      roomData.booking_code ||
+      roomData.BookingCode ||
+      rawRoom?.BookingCode ||
+      null;
+
+    const name =
+      roomData.room_name ||
+      roomData.Name?.[0] ||
+      roomData.Name ||
+      roomData.RoomTypeName ||
+      rawRoom?.Name?.[0] ||
+      rawRoom?.Name ||
+      "Standard Room";
+
+    return {
+      ...roomData,
+      room_raw: rawRoom,
+      booking_code: bookingCode,
+      BookingCode: bookingCode,
+      Name: name,
+      room_name: name,
+      price:
+        Number(
+          roomData.price ||
+            roomData.TotalFare ||
+            rawRoom?.TotalFare ||
+            roomData.Price?.PublishedPrice ||
+            0,
+        ) || 0,
+      tax:
+        Number(
+          roomData.tax ||
+            roomData.TotalTax ||
+            rawRoom?.TotalTax ||
+            roomData.Price?.Tax ||
+            0,
+        ) || 0,
+      meal: roomData.meal || roomData.MealType || rawRoom?.MealType || "",
+      refundable:
+        roomData.refundable ??
+        roomData.IsRefundable ??
+        rawRoom?.IsRefundable ??
+        false,
+      inclusion:
+        roomData.inclusion || roomData.Inclusion || rawRoom?.Inclusion || "",
+      cancel_policies:
+        roomData.cancel_policies ||
+        roomData.CancelPolicies ||
+        rawRoom?.CancelPolicies ||
+        [],
+    };
+  };
+
+  const roomOptions = availableRooms.length
+    ? availableRooms.map(normalizeRoom)
+    : [payload.room || selectedRoom].filter(Boolean).map(normalizeRoom);
+
+  const [activeRoom, setActiveRoom] = useState(() =>
+    normalizeRoom(payload.room || selectedRoom || roomOptions[0]),
+  );
+
+  const room = activeRoom;
   const checkIn = payload.checkIn || search?.checkIn;
   const checkOut = payload.checkOut || search?.checkOut;
   const guests = payload.guests || search?.guests;
@@ -165,19 +239,19 @@ const HotelDetails = () => {
     Math.round(Number(val) || 0).toLocaleString("en-IN");
 
   const roomPrice = Number(
-    hotel?.price || room?.Price || room?.TotalFare || room?.NetAmount || 0,
+    room?.price || room?.TotalFare || room?.NetAmount || 0,
   );
 
-  const tax = Number(hotel?.tax || room?.Tax || room?.TotalTax || 0);
+  const tax = Number(room?.tax || room?.TotalTax || room?.Tax || 0);
 
   const totalAmount = roomPrice + tax;
 
   const hotelName =
     hotel?.hotel_name || hotel?.HotelName || hotel?.Name || "Hotel";
+  const roomName =
+    room?.room_name || room?.Name || room?.RoomTypeName || "Standard Room";
 
-  const roomName = room?.Name || room?.RoomTypeName || "Standard Room";
-
-  const mealPlan = hotel?.meal || room?.MealType || room?.MealPlan || "";
+  const mealPlan = room?.meal || room?.MealType || room?.MealPlan || "";
 
   const description =
     hotel?.description ||
@@ -185,22 +259,40 @@ const HotelDetails = () => {
     "This premium hotel offers modern rooms, excellent hospitality, and top-class amenities. Ideal for business and leisure stays with easy access to major attractions.";
 
   const handlePreBook = () => {
-    if (!room?.BookingCode) {
-      alert("Invalid room");
+    const bookingCode =
+      room?.booking_code || room?.BookingCode || room?.room_raw?.BookingCode;
+
+    if (!bookingCode) {
+      alert("Please select a valid room");
       return;
     }
 
+    const finalRoom = {
+      ...room,
+      booking_code: bookingCode,
+      BookingCode: bookingCode,
+    };
+
+    setSelectedRoom(finalRoom);
     setLoading(true);
 
     navigate("/prebook", {
       state: {
         hotel,
-        room,
+        room: finalRoom,
         checkIn,
         checkOut,
         guests,
 
-        // Important for guest details / prebook page
+        childAges: search?.guests?.childAges || [],
+        roomGuests: search?.guests?.roomGuests || [],
+
+        bookingCode,
+        cancellationPolicies: finalRoom.cancel_policies || [],
+        inclusions: finalRoom.inclusion || "",
+        mealType: finalRoom.meal || "",
+        refundable: finalRoom.refundable,
+
         isDomesticHotel,
         isInternationalHotel,
         hotelType: isInternationalHotel ? "international" : "domestic",
@@ -304,6 +396,100 @@ const HotelDetails = () => {
             </p>
           </div>
 
+          {/* ROOM SELECTION */}
+          {roomOptions.length > 0 && (
+            <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg text-yellow-300">Select Room</h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Choose your preferred room before booking.
+                  </p>
+                </div>
+
+                <span className="text-xs px-3 py-1 rounded-full bg-yellow-400/10 text-yellow-300 border border-yellow-400/20">
+                  {roomOptions.length} Option{roomOptions.length > 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {roomOptions.map((roomItem, index) => {
+                  const isSelected =
+                    (room?.BookingCode || room?.booking_code) ===
+                    (roomItem?.BookingCode || roomItem?.booking_code);
+
+                  return (
+                    <button
+                      type="button"
+                      key={roomItem.BookingCode || index}
+                      onClick={() => {
+                        setActiveRoom(roomItem);
+                        setSelectedRoom(roomItem);
+                      }}
+                      className={`w-full text-left rounded-2xl border p-4 transition ${
+                        isSelected
+                          ? "border-yellow-400 bg-yellow-400/10"
+                          : "border-gray-800 bg-[#0B0B0F] hover:border-yellow-400/40"
+                      }`}
+                    >
+                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-white">
+                            {roomItem.room_name ||
+                              roomItem.Name ||
+                              "Standard Room"}
+                          </p>
+
+                          {roomItem.inclusion && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              ✔ {roomItem.inclusion}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {roomItem.meal && (
+                              <span className="text-[10px] px-2 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                                {String(roomItem.meal).replaceAll("_", " ")}
+                              </span>
+                            )}
+
+                            <span
+                              className={`text-[10px] px-2 py-1 rounded-full border ${
+                                roomItem.refundable
+                                  ? "bg-green-500/10 text-green-300 border-green-500/20"
+                                  : "bg-red-500/10 text-red-300 border-red-500/20"
+                              }`}
+                            >
+                              {roomItem.refundable
+                                ? "Refundable"
+                                : "Non-refundable"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="md:text-right">
+                          <p className="text-xl font-bold text-yellow-400">
+                            ₹ {formatPrice(roomItem.price)}
+                          </p>
+
+                          <p className="text-xs text-gray-500">
+                            + ₹ {formatPrice(roomItem.tax)} taxes
+                          </p>
+
+                          {isSelected && (
+                            <p className="text-xs text-yellow-300 mt-1">
+                              Selected
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* ROOM DETAILS */}
           <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
             <h2 className="text-lg text-yellow-300 mb-3">Room Details</h2>
@@ -322,9 +508,9 @@ const HotelDetails = () => {
               ✔ Free WiFi • ✔ AC • ✔ 24h Support
             </p>
 
-            {room?.BookingCode && (
+            {(room?.BookingCode || room?.booking_code) && (
               <p className="mt-3 text-xs text-gray-500 break-all">
-                Booking Code: {room.BookingCode}
+                Booking Code: {room.BookingCode || room.booking_code}
               </p>
             )}
           </div>

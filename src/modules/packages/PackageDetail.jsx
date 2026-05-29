@@ -413,13 +413,13 @@ Please share the best quote and itinerary.`;
 
                 <div className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 text-white px-3 py-1.5 rounded-full text-[11px] sm:text-sm backdrop-blur-md max-w-full">
                   <MapPin size={14} className="text-(--gold-main) shrink-0" />
-                  <span className="truncate max-w-[220px] sm:max-w-none">
+                  <span className="truncate max-w-55 sm:max-w-none">
                     {destination}
                   </span>
                 </div>
               </div>
 
-              <h1 className="text-[28px] sm:text-5xl md:text-6xl lg:text-7xl font-(--font-hero) leading-[1.08] mb-3 sm:mb-5 break-words">
+              <h1 className="text-[28px] sm:text-5xl md:text-6xl lg:text-7xl font-(--font-hero) leading-[1.08] mb-3 sm:mb-5 wrap-break-words">
                 {packageTitle}
               </h1>
 
@@ -590,7 +590,7 @@ Please share the best quote and itinerary.`;
 
       {/* MINI GALLERY */}
       <section className="max-w-7xl mx-auto px-3 sm:px-6 mt-5 sm:mt-8 relative z-10">
-        <div className="bg-white/[0.03] border border-white/10 rounded-[22px] sm:rounded-[28px] p-3 sm:p-5 backdrop-blur-xl shadow-2xl">
+        <div className="bg-white/3 border border-white/10 rounded-[22px] sm:rounded-[28px] p-3 sm:p-5 backdrop-blur-xl shadow-2xl">
           <div className="flex items-center justify-between gap-4 mb-4 sm:mb-5">
             <div>
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
@@ -1179,7 +1179,7 @@ Please share the best quote and itinerary.`;
 };
 
 const HeroInfo = ({ icon, title, subtitle }) => (
-  <div className="bg-black/40 backdrop-blur-xl border border-white/15 rounded-2xl p-3 sm:p-4 transition group shadow-lg min-h-[86px] sm:min-h-0">
+  <div className="bg-black/40 backdrop-blur-xl border border-white/15 rounded-2xl p-3 sm:p-4 transition group shadow-lg min-h-21.5 sm:min-h-0">
     <div className="text-(--gold-main) mb-2 sm:mb-3 group-hover:scale-110 transition [&>svg]:w-5 sm:[&>svg]:w-7 [&>svg]:h-5 sm:[&>svg]:h-7">
       {icon}
     </div>
@@ -1192,7 +1192,7 @@ const HeroInfo = ({ icon, title, subtitle }) => (
 );
 
 const TrustPill = ({ icon, title }) => (
-  <div className="bg-white/[0.06] border border-white/10 backdrop-blur-md rounded-2xl px-3 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 transition shadow-lg min-h-[48px]">
+  <div className="bg-white/6 border border-white/10 backdrop-blur-md rounded-2xl px-3 py-2.5 sm:py-3 flex items-center gap-2 sm:gap-3 transition shadow-lg min-h-12">
     <div className="text-(--gold-main) shrink-0 [&>svg]:w-4 sm:[&>svg]:w-5 [&>svg]:h-4 sm:[&>svg]:h-5">
       {icon}
     </div>
@@ -1203,7 +1203,7 @@ const TrustPill = ({ icon, title }) => (
 );
 
 const TrustCard = ({ icon, title, small }) => (
-  <div className="bg-black/20 border border-white/10 rounded-2xl p-4 flex items-start gap-3 hover:bg-white/[0.05] transition">
+  <div className="bg-black/20 border border-white/10 rounded-2xl p-4 flex items-start gap-3 hover:bg-white/5 transition">
     <div className="text-(--gold-main) shrink-0 [&>svg]:w-6 sm:[&>svg]:w-7 [&>svg]:h-6 sm:[&>svg]:h-7">
       {icon}
     </div>
@@ -1217,7 +1217,7 @@ const TrustCard = ({ icon, title, small }) => (
 );
 
 const FeatureCard = ({ icon, title, text }) => (
-  <div className="flex gap-3 sm:gap-4 items-start p-3 sm:p-4 rounded-2xl hover:bg-white/[0.04] transition">
+  <div className="flex gap-3 sm:gap-4 items-start p-3 sm:p-4 rounded-2xl hover:bg-white/4 transition">
     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-(--gold-main) shrink-0 [&>svg]:w-5 sm:[&>svg]:w-6 [&>svg]:h-5 sm:[&>svg]:h-6">
       {icon}
     </div>
@@ -1251,7 +1251,7 @@ const ListSection = ({ title, items, type }) => (
         {items.map((item, index) => (
           <div
             key={index}
-            className="bg-black/25 border border-white/10 rounded-2xl p-4 flex gap-3 hover:bg-white/[0.04] transition"
+            className="bg-black/25 border border-white/10 rounded-2xl p-4 flex gap-3 hover:bg-white/4 transition"
           >
             {type === "include" ? (
               <CheckCircle2
