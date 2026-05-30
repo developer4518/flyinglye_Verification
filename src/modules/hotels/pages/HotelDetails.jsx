@@ -273,6 +273,55 @@ const HotelDetails = () => {
       BookingCode: bookingCode,
     };
 
+    const safeRoomGuests = Array.isArray(payload?.roomGuests)
+      ? payload.roomGuests
+      : Array.isArray(payload?.guests?.roomGuests)
+        ? payload.guests.roomGuests
+        : Array.isArray(search?.guests?.roomGuests)
+          ? search.guests.roomGuests
+          : [];
+
+    const normalizedRoomGuests = safeRoomGuests.map((room, index) => {
+      const children = Number(room.Children ?? room.children ?? 0);
+
+      const ages =
+        room.ChildrenAges ||
+        room.ChildAges ||
+        room.childAges ||
+        room.childrenAges ||
+        [];
+
+      const cleanAges = ages
+        .slice(0, children)
+        .map((age) => Number(age))
+        .filter((age) => age >= 1 && age <= 12);
+
+      return {
+        RoomIndex: room.RoomIndex ?? room.roomIndex ?? index + 1,
+        roomIndex: room.roomIndex ?? room.RoomIndex ?? index + 1,
+
+        Adults: Number(room.Adults ?? room.adults ?? 1),
+        adults: Number(room.adults ?? room.Adults ?? 1),
+
+        Children: children,
+        children,
+
+        ChildAges: cleanAges,
+        ChildrenAges: cleanAges,
+        childAges: cleanAges,
+      };
+    });
+
+    const normalizedChildAges = normalizedRoomGuests.flatMap(
+      (room) => room.ChildrenAges,
+    );
+
+    const safeGuests = {
+      ...(guests || {}),
+      childAges: normalizedChildAges,
+      roomGuests: normalizedRoomGuests,
+    };
+
     setSelectedRoom(finalRoom);
     setLoading(true);
 
@@ -282,10 +331,10 @@ const HotelDetails = () => {
         room: finalRoom,
         checkIn,
         checkOut,
-        guests,
+        guests: safeGuests,
 
-        childAges: search?.guests?.childAges || [],
-        roomGuests: search?.guests?.roomGuests || [],
+        childAges: normalizedChildAges,
+        roomGuests: normalizedRoomGuests,
 
         bookingCode,
         cancellationPolicies: finalRoom.cancel_policies || [],

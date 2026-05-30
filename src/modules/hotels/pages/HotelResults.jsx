@@ -495,16 +495,48 @@ const HotelResults = () => {
         setSelectedRoom(finalRoom);
       }
 
+      const safeRoomGuests = Array.isArray(search?.guests?.roomGuests)
+        ? search.guests.roomGuests.map((room, index) => {
+            const children = Number(room.Children ?? room.children ?? 0);
+
+            const ages =
+              room.ChildrenAges || room.ChildAges || room.childAges || [];
+
+            const cleanAges = ages
+              .slice(0, children)
+              .map((age) => Number(age))
+              .filter((age) => age >= 1 && age <= 12);
+
+            return {
+              roomIndex: room.roomIndex ?? room.RoomIndex ?? index + 1,
+              RoomIndex: room.RoomIndex ?? room.roomIndex ?? index + 1,
+              adults: Number(room.adults ?? room.Adults ?? 1),
+              Adults: Number(room.Adults ?? room.adults ?? 1),
+              children,
+              Children: children,
+              childAges: cleanAges,
+              ChildAges: cleanAges,
+              ChildrenAges: cleanAges,
+            };
+          })
+        : [];
+
+      const safeChildAges = safeRoomGuests.flatMap((room) => room.ChildrenAges);
+
       navigate(`/hotels/${hotel.hotel_code || hotel.HotelCode}`, {
         state: {
           hotel: finalHotel,
           room: finalRoom,
           checkIn,
           checkOut,
-          guests,
+          guests: {
+            ...guests,
+            childAges: safeChildAges,
+            roomGuests: safeRoomGuests,
+          },
 
-          childAges: search?.guests?.childAges || [],
-          roomGuests: search?.guests?.roomGuests || [],
+          childAges: safeChildAges,
+          roomGuests: safeRoomGuests,
 
           bookingCode,
           cancellationPolicies: finalRoom.cancel_policies || [],
@@ -613,10 +645,10 @@ const HotelResults = () => {
               return (
                 <div
                   key={`${hotel.hotel_code || hotel.HotelCode || index}-${index}`}
-                  className="group bg-[#15151C] rounded-3xl border border-gray-800 hover:border-yellow-400/40 transition overflow-hidden"
+                  className="group bg-[#15151C] rounded-2xl border border-gray-800 hover:border-yellow-400/40 transition overflow-hidden shadow-lg shadow-black/20"
                 >
                   <div className="flex flex-col lg:flex-row">
-                    <div className="relative lg:w-72 h-56 lg:h-auto shrink-0 bg-[#0B0B0F]">
+                    <div className="relative w-full lg:w-60 h-44 sm:h-48 lg:h-52 shrink-0 bg-[#0B0B0F]">
                       <img
                         src={hotelImage}
                         alt={hotel.hotel_name || "Hotel"}
@@ -640,14 +672,14 @@ const HotelResults = () => {
                       </div>
                     </div>
 
-                    <div className="flex-1 p-4 md:p-5">
+                    <div className="flex-1 p-4">
                       <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
                         <div className="min-w-0">
-                          <h2 className="text-lg md:text-xl font-semibold text-yellow-300">
+                          <h2 className="text-base md:text-lg font-semibold text-yellow-300 line-clamp-2">
                             {hotel.hotel_name || "Hotel"}
                           </h2>
 
-                          <p className="text-xs text-gray-400 mt-1 break-words">
+                          <p className="text-xs text-gray-400 mt-1 wrap-break-word line-clamp-2">
                             🛏{" "}
                             {defaultRoom?.room_name ||
                               hotel.room ||
@@ -655,27 +687,29 @@ const HotelResults = () => {
                           </p>
 
                           {defaultRoom?.inclusion && (
-                            <p className="text-xs text-gray-400 mt-1">
+                            <p className="text-xs text-gray-400 mt-1 line-clamp-1">
                               ✔ {defaultRoom.inclusion}
                             </p>
                           )}
 
                           <div className="flex flex-wrap gap-2 mt-3">
-                            {getRoomBadges(defaultRoom).map((badge, i) => (
-                              <span
-                                key={i}
-                                className={`text-[10px] px-2 py-1 rounded-full border ${badge.className}`}
-                              >
-                                {badge.label}
-                              </span>
-                            ))}
+                            {getRoomBadges(defaultRoom)
+                              .slice(0, 3)
+                              .map((badge, i) => (
+                                <span
+                                  key={i}
+                                  className={`text-[10px] px-2 py-1 rounded-full border ${badge.className}`}
+                                >
+                                  {badge.label}
+                                </span>
+                              ))}
                           </div>
                         </div>
 
                         <div className="xl:text-right shrink-0">
                           <p className="text-xs text-gray-500">Starting from</p>
 
-                          <p className="text-2xl font-bold text-yellow-400">
+                          <p className="text-xl md:text-2xl font-bold text-yellow-400">
                             ₹ {formatPrice(hotel.price)}
                           </p>
 
@@ -694,7 +728,7 @@ const HotelResults = () => {
                                 hotel.BookingCode
                               )
                             }
-                            className="mt-3 px-5 py-2 rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 text-black text-sm font-bold hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition"
+                            className="mt-3 px-4 py-2 rounded-lg bg-linear-to-r from-yellow-400 to-orange-400 text-black text-xs md:text-sm font-bold hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition"
                           >
                             View Details →
                           </button>

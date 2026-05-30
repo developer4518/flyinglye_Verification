@@ -1,694 +1,169 @@
 "use client";
-
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { privateApi } from "../../../services/api";
 import { useHotelStore } from "../../../store/hotelStore";
 
-const toTBODate = (date) => {
-  if (!date) return "";
-  return `${date}T00:00:00`;
-};
-
-const normalizeText = (value) => {
-  if (!value) return "";
-
-  try {
-    if (typeof value === "string") return value.toLowerCase();
-    return JSON.stringify(value).toLowerCase();
-  } catch {
-    return "";
-  }
-};
-
-const getSafeValue = (...values) => {
-  return values.find((v) => v !== undefined && v !== null && v !== "") || "";
-};
-
-const isTrueValue = (value) => {
-  if (value === true) return true;
-  if (typeof value === "string") {
-    return ["true", "1", "yes", "international"].includes(value.toLowerCase());
-  }
-  return false;
-};
-
-const isFalseValue = (value) => {
-  if (value === false) return true;
-  if (typeof value === "string") {
-    return ["false", "0", "no", "domestic"].includes(value.toLowerCase());
-  }
-  return false;
-};
-
-const isValidPAN = (value = "") => {
-  return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(value.trim().toUpperCase());
-};
-
-const INDIA_CITY_KEYWORDS = [
-  "india",
-  "delhi",
-  "new delhi",
-  "mumbai",
-  "goa",
-  "jaipur",
-  "manali",
-  "kashmir",
-  "srinagar",
-  "shimla",
-  "kerala",
-  "udaipur",
-  "bangalore",
-  "bengaluru",
-  "hyderabad",
-  "chennai",
-  "kolkata",
-  "pune",
-  "gurgaon",
-  "gurugram",
-  "noida",
-  "lucknow",
-  "varanasi",
-  "amritsar",
-  "jodhpur",
-  "rishikesh",
-  "haridwar",
-  "dehradun",
-  "ahmedabad",
-  "surat",
-  "indore",
-  "bhopal",
-  "chandigarh",
-  "kochi",
-  "cochin",
-  "ooty",
-  "mysore",
-  "mysuru",
-  "nainital",
-  "mussoorie",
-  "darjeeling",
-  "gangtok",
-  "leh",
-  "ladakh",
-  "agra",
-];
-
-const INTERNATIONAL_CITY_KEYWORDS = [
-  "dubai",
-  "abu dhabi",
-  "sharjah",
-  "uae",
-  "united arab emirates",
-  "thailand",
-  "bangkok",
-  "phuket",
-  "pattaya",
-  "singapore",
-  "malaysia",
-  "bali",
-  "indonesia",
-  "maldives",
-  "sri lanka",
-  "nepal",
-  "bhutan",
-  "usa",
-  "united states",
-  "united kingdom",
-  "london",
-  "france",
-  "paris",
-  "germany",
-  "italy",
-  "spain",
-  "australia",
-  "canada",
-];
-
-const nationalityOptions = [
-  { Code: "IN", Name: "India" },
-  { Code: "AE", Name: "United Arab Emirates" },
-  { Code: "US", Name: "United States" },
-  { Code: "GB", Name: "United Kingdom" },
-  { Code: "TH", Name: "Thailand" },
-  { Code: "SG", Name: "Singapore" },
-  { Code: "MY", Name: "Malaysia" },
-  { Code: "ID", Name: "Indonesia" },
-  { Code: "MV", Name: "Maldives" },
-  { Code: "LK", Name: "Sri Lanka" },
-  { Code: "NP", Name: "Nepal" },
-  { Code: "BT", Name: "Bhutan" },
-  { Code: "FR", Name: "France" },
-  { Code: "DE", Name: "Germany" },
-  { Code: "IT", Name: "Italy" },
-  { Code: "ES", Name: "Spain" },
-  { Code: "AU", Name: "Australia" },
-  { Code: "CA", Name: "Canada" },
-];
-
 const HotelBooking = () => {
-  const {
-    setGuestDetails,
-    prebookData,
-    selectedHotel,
-    selectedRoom,
-    search: storeSearch,
-    setSearch,
-    setPrebookData,
-  } = useHotelStore();
-
+  const { setGuestDetails } = useHotelStore();
   const location = useLocation();
   const navigate = useNavigate();
 
   const state = location.state || {};
   const payload = state?.payload || state;
 
-  const hotel = payload.hotel || selectedHotel;
-  const preBook = payload.preBook || prebookData;
-  const checkIn = payload.checkIn || storeSearch?.checkIn;
-  const checkOut = payload.checkOut || storeSearch?.checkOut;
-  const guests = payload.guests || storeSearch?.guests;
-  const room = payload.room || selectedRoom;
+  const { hotel, preBook, checkIn, checkOut, guests } = payload;
 
-  const rawHotelResult =
-    preBook?.raw?.HotelResult?.[0] ||
-    preBook?.raw?.Response?.HotelResult?.[0] ||
-    preBook?.HotelResult?.[0] ||
-    null;
+  const roomData = preBook?.raw?.HotelResult?.[0]?.Rooms?.[0];
+  const validation = preBook?.validation || {};
 
-  const roomData =
-    rawHotelResult?.Rooms?.[0] ||
-    preBook?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
-    preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
-    room ||
-    null;
+  const bookingCode =
+    preBook?.booking_code ||
+    preBook?.BookingCode ||
+    preBook?.room?.BookingCode ||
+    preBook?.room?.booking_code ||
+    preBook?.raw?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode ||
+    preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode;
 
-  const bookingCode = getSafeValue(
-    preBook?.booking_code,
-    preBook?.BookingCode,
-    roomData?.BookingCode,
-    rawHotelResult?.BookingCode,
-  );
+  const net = Number(preBook?.net_amount || preBook?.NetAmount || 0);
+  // const total = Number(
+  //   preBook?.total_amount || preBook?.TotalAmount || net || 0,
+  // );
 
-  const net = Number(
-    getSafeValue(
-      preBook?.net_amount,
-      preBook?.NetAmount,
-      roomData?.NetAmount,
-      roomData?.TotalFare,
-      0,
-    ),
-  );
+  const isPANRequired =
+    Boolean(validation?.PANRequired) ||
+    Boolean(validation?.IsPANRequired) ||
+    Boolean(preBook?.PANRequired) ||
+    Boolean(preBook?.raw?.PANRequired) ||
+    Boolean(roomData?.PANRequired) ||
+    Boolean(hotel?.isInternational) ||
+    Boolean(hotel?.IsInternational) ||
+    Boolean(hotel?.is_international);
 
-  const total = Number(
-    getSafeValue(
-      preBook?.total_amount,
-      preBook?.TotalAmount,
-      preBook?.total,
-      net,
-      0,
-    ),
-  );
+  const normalizeAgeArray = (ages = [], children = 0) => {
+    const list = Array.isArray(ages) ? ages : [];
 
-  const convenienceFee = Number(
-    getSafeValue(
-      preBook?.convenience_fee,
-      preBook?.convenienceFee,
-      preBook?.ConvenienceFee,
-      0,
-    ),
-  );
-
-  const isInternationalHotel = useMemo(() => {
-    const cityText = normalizeText(
-      getSafeValue(
-        storeSearch?.cityName,
-        storeSearch?.CityName,
-        storeSearch?.city,
-        storeSearch?.City,
-        payload?.cityName,
-        payload?.CityName,
-        payload?.search?.cityName,
-        payload?.search?.CityName,
-        payload?.search?.city,
-        payload?.search?.City,
-        hotel?.cityName,
-        hotel?.CityName,
-        hotel?.city_name,
-        hotel?.City,
-        hotel?.HotelCityName,
-        hotel?.destination,
-        hotel?.Destination,
-        rawHotelResult?.CityName,
-        rawHotelResult?.HotelCityName,
-        rawHotelResult?.Destination,
-        rawHotelResult?.Address,
-        rawHotelResult?.HotelAddress,
-        hotel?.address,
-        hotel?.Address,
-      ),
-    );
-
-    const countryCode = String(
-      getSafeValue(
-        storeSearch?.countryCode,
-        storeSearch?.CountryCode,
-        payload?.countryCode,
-        payload?.CountryCode,
-        payload?.search?.countryCode,
-        payload?.search?.CountryCode,
-        hotel?.country_code,
-        hotel?.countryCode,
-        hotel?.CountryCode,
-        rawHotelResult?.CountryCode,
-        rawHotelResult?.HotelCountryCode,
-        roomData?.CountryCode,
-      ),
-    ).toUpperCase();
-
-    const countryName = normalizeText(
-      getSafeValue(
-        storeSearch?.countryName,
-        storeSearch?.CountryName,
-        payload?.countryName,
-        payload?.CountryName,
-        payload?.search?.countryName,
-        payload?.search?.CountryName,
-        hotel?.country,
-        hotel?.Country,
-        hotel?.countryName,
-        hotel?.CountryName,
-        rawHotelResult?.Country,
-        rawHotelResult?.CountryName,
-        rawHotelResult?.HotelCountryName,
-      ),
-    );
-
-    const locationText = `${cityText} ${countryName}`;
-
-    const hasIndiaCountryCode = ["IN", "IND", "INDIA"].includes(countryCode);
-    const hasIndiaCountryName = countryName === "india";
-    const hasIndianCity = INDIA_CITY_KEYWORDS.some((word) =>
-      locationText.includes(word),
-    );
-
-    if (
-      payload?.isDomesticHotel === true ||
-      payload?.hotelType === "domestic"
-    ) {
-      return false;
-    }
-
-    if (hasIndiaCountryCode || hasIndiaCountryName || hasIndianCity) {
-      return false;
-    }
-
-    const explicitDomestic = getSafeValue(
-      payload?.isDomestic,
-      payload?.is_domestic,
-      hotel?.isDomestic,
-      hotel?.is_domestic,
-      preBook?.isDomestic,
-      preBook?.is_domestic,
-    );
-
-    if (isTrueValue(explicitDomestic)) return false;
-
-    const explicitInternational = getSafeValue(
-      payload?.isInternationalHotel,
-      payload?.isInternational,
-      payload?.is_international,
-      hotel?.isInternationalHotel,
-      hotel?.isInternational,
-      hotel?.is_international,
-      preBook?.isInternationalHotel,
-      preBook?.isInternational,
-      preBook?.is_international,
-      rawHotelResult?.IsInternational,
-      roomData?.IsInternational,
-    );
-
-    if (isFalseValue(explicitInternational)) return false;
-    if (isTrueValue(explicitInternational)) return true;
-
-    if (countryCode && !["IN", "IND", "INDIA"].includes(countryCode)) {
-      return true;
-    }
-
-    const hasInternationalCity = INTERNATIONAL_CITY_KEYWORDS.some((word) =>
-      locationText.includes(word),
-    );
-
-    if (hasInternationalCity) return true;
-
-    return false;
-  }, [payload, hotel, preBook, rawHotelResult, roomData, storeSearch]);
-
-  const defaultGuestNationality = getSafeValue(
-    payload?.guestNationality,
-    payload?.GuestNationality,
-    guests?.nationality,
-    guests?.GuestNationality,
-    storeSearch?.nationality,
-    "IN",
-  );
-
-  const totalGuests =
-    typeof guests === "number"
-      ? guests
-      : Number(guests?.adults || 0) + Number(guests?.children || 0);
-
-  const adultsCount =
-    typeof guests === "number" ? guests : Number(guests?.adults || totalGuests);
-
-  const childrenCount =
-    typeof guests === "number" ? 0 : Number(guests?.children || 0);
-
-  const childAges = Array.isArray(guests?.childAges)
-    ? guests.childAges
-    : Array.isArray(storeSearch?.guests?.childAges)
-      ? storeSearch.guests.childAges
-      : [];
-
-  const getDefaultChildAge = (childIndex) => {
-    const age = Number(childAges?.[childIndex]);
-    return age > 0 && age < 12 ? age : "";
-  };
-
-  const [guestNationality, setGuestNationality] = useState(
-    defaultGuestNationality || "IN",
-  );
-
-  const [guestList, setGuestList] = useState(
-    Array.from({ length: totalGuests || 1 }, (_, i) => {
-      const isChild = i >= adultsCount;
-      const childIndex = i - adultsCount;
-
-      return {
-        Title: isChild ? "Master" : "Mr",
-        FirstName: "",
-        MiddleName: "",
-        LastName: "",
-        Email: "",
-        Phoneno: "",
-        PaxType: isChild ? 2 : 1,
-        LeadPassenger: i === 0,
-        Age: isChild ? getDefaultChildAge(childIndex) : "",
-        PAN: "",
-        PassportNo: "",
-        PassportIssueDate: "",
-        PassportExpDate: "",
-      };
-    }),
-  );
-
-  const [loading, setLoading] = useState(false);
-  const [refreshingPrebook, setRefreshingPrebook] = useState(false);
-
-  const updateGuest = (index, field, value) => {
-    setGuestList((prev) => {
-      const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
-      };
-      return updated;
+    return Array.from({ length: Number(children) || 0 }, (_, index) => {
+      const age = Number(list[index]);
+      return age >= 1 && age <= 12 ? age : "";
     });
   };
 
-  const getEnteredChildAges = () => {
-    return guestList
-      .filter((g) => Number(g.PaxType) === 2)
-      .map((g) => Number(g.Age));
-  };
+  const normalizedRooms = useMemo(() => {
+    const roomGuests =
+      preBook?.roomGuests ||
+      preBook?.RoomGuests ||
+      preBook?.Guests?.roomGuests ||
+      preBook?.Guests?.RoomGuests ||
+      payload?.roomGuests ||
+      payload?.RoomGuests ||
+      payload?.guests?.roomGuests ||
+      payload?.guests?.RoomGuests ||
+      guests?.roomGuests ||
+      guests?.RoomGuests ||
+      [];
 
-  const getSearchChildAges = () => {
-    return Array.isArray(childAges) ? childAges.map(Number) : [];
-  };
+    if (Array.isArray(roomGuests) && roomGuests.length > 0) {
+      return roomGuests.map((room) => {
+        const children = Number(room.Children ?? room.children ?? 0);
 
-  const areChildAgesSame = (a = [], b = []) => {
-    if (a.length !== b.length) return false;
-    return a.every((age, index) => Number(age) === Number(b[index]));
-  };
+        const ages =
+          room.ChildrenAges ||
+          room.ChildAges ||
+          room.childAges ||
+          room.childrenAges ||
+          [];
 
-  const extractFreshBookingCode = (data) => {
-    return getSafeValue(
-      data?.booking_code,
-      data?.BookingCode,
-      data?.data?.booking_code,
-      data?.data?.BookingCode,
-      data?.raw?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
-      data?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
-      data?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
-      data?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode,
-    );
-  };
-
-  const extractFreshNetAmount = (data) => {
-    return Number(
-      getSafeValue(
-        data?.net_amount,
-        data?.NetAmount,
-        data?.data?.net_amount,
-        data?.data?.NetAmount,
-        data?.raw?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
-        data?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
-        data?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
-        data?.Response?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
-        net,
-      ),
-    );
-  };
-
-  const refreshPrebookWithEnteredChildAges = async () => {
-    const enteredChildAges = getEnteredChildAges();
-
-    const updatedGuests = {
-      ...(guests || {}),
-      adults: adultsCount,
-      children: childrenCount,
-      rooms: guests?.rooms || storeSearch?.guests?.rooms || 1,
-      childAges: enteredChildAges,
-    };
-
-    const refreshPayload = {
-      hotel,
-      room,
-      checkIn,
-      checkOut,
-      guests: updatedGuests,
-      BookingCode: bookingCode,
-      bookingCode,
-    };
-
-    const res = await privateApi.post(
-      "/api/hotels/hotels/prebook-with-child-age/",
-      refreshPayload,
-    );
-
-    return res.data?.data || res.data;
-  };
-
-  const validateGuests = () => {
-    if (!bookingCode) {
-      return "Booking code missing. Please select the room again.";
-    }
-
-    if (!net || Number.isNaN(net)) {
-      return "Net amount missing. Please prebook the room again.";
-    }
-
-    if (!guestNationality) {
-      return "Guest nationality is required";
-    }
-
-    for (let i = 0; i < guestList.length; i++) {
-      const g = guestList[i];
-      const age = Number(g.Age);
-      const isChild = Number(g.PaxType) === 2;
-
-      if (!g.FirstName.trim() || !g.LastName.trim()) {
-        return `Guest ${i + 1}: First name and last name are required`;
-      }
-
-      if (!g.Age) {
-        return `Guest ${i + 1}: Age is required`;
-      }
-
-      if (Number.isNaN(age) || age <= 0) {
-        return `Guest ${i + 1}: Enter valid age`;
-      }
-
-      if (!Number.isInteger(age)) {
-        return `Guest ${i + 1}: Age must be a whole number`;
-      }
-
-      if (Number(g.PaxType) === 1 && age < 12) {
-        return `Guest ${i + 1}: Adult age must be 12 or above`;
-      }
-
-      if (isChild && age >= 12) {
-        return `Guest ${i + 1}: Child age must be below 12`;
-      }
-
-      if (g.LeadPassenger) {
-        if (!g.Email.trim() || !g.Email.includes("@")) {
-          return "Valid email required";
-        }
-
-        if (!/^[0-9]{10}$/.test(g.Phoneno)) {
-          return "Valid 10-digit phone required";
-        }
-      }
-
-      if (isInternationalHotel) {
-        const panValue = g.PAN?.trim().toUpperCase();
-
-        if (guestNationality === "IN" && !panValue) {
-          return `Guest ${i + 1}: PAN card number is required for Indian guest in international hotel`;
-        }
-
-        if (panValue && !isValidPAN(panValue)) {
-          return `Guest ${i + 1}: Enter valid PAN card number`;
-        }
-
-        if (!g.PassportNo.trim()) {
-          return `Guest ${i + 1}: Passport number is required for international hotel`;
-        }
-
-        if (!g.PassportIssueDate) {
-          return `Guest ${i + 1}: Passport issue date is required`;
-        }
-
-        if (!g.PassportExpDate) {
-          return `Guest ${i + 1}: Passport expiry date is required`;
-        }
-
-        if (new Date(g.PassportExpDate) <= new Date(g.PassportIssueDate)) {
-          return `Guest ${i + 1}: Passport expiry date must be after issue date`;
-        }
-      }
-    }
-
-    if (childrenCount > 0) {
-      const enteredChildren = guestList.filter((g) => Number(g.PaxType) === 2);
-
-      if (enteredChildren.length !== childrenCount) {
-        return `Children count mismatch. Expected ${childrenCount}, got ${enteredChildren.length}`;
-      }
-    }
-
-    return null;
-  };
-
-  const handleBookHotel = async () => {
-    const error = validateGuests();
-    if (error) return alert(error);
-
-    try {
-      setLoading(true);
-
-      const cleanedGuests = guestList.map((g, i) => {
-        const passenger = {
-          Title: g.Title,
-          FirstName: g.FirstName.trim(),
-          MiddleName: g.MiddleName?.trim() || "",
-          LastName: g.LastName.trim(),
-          PaxType: Number(g.PaxType),
-          LeadPassenger: i === 0,
-
-          // ✅ User-entered adult/child age will be sent directly
-          Age: Number(g.Age),
+        return {
+          Adults: Number(room.Adults ?? room.adults ?? 1),
+          Children: children,
+          ChildrenAges: normalizeAgeArray(ages, children),
         };
-
-        if (g.PAN?.trim()) {
-          passenger.PAN = g.PAN.trim().toUpperCase();
-        }
-
-        if (i === 0) {
-          passenger.Email = g.Email.trim();
-          passenger.Phoneno = g.Phoneno.trim();
-        }
-
-        if (isInternationalHotel) {
-          passenger.PassportNo = g.PassportNo.trim();
-          passenger.PassportIssueDate = toTBODate(g.PassportIssueDate);
-          passenger.PassportExpDate = toTBODate(g.PassportExpDate);
-        }
-
-        return passenger;
       });
-
-      const finalPayload = {
-        BookingCode: bookingCode,
-        IsVoucherBooking: true,
-        GuestNationality: guestNationality,
-        RequestedBookingMode: 5,
-        NetAmount: net,
-        HotelRoomsDetails: [
-          {
-            HotelPassenger: cleanedGuests,
-          },
-        ],
-      };
-
-      console.log("IS INTERNATIONAL HOTEL:", isInternationalHotel);
-      console.log(
-        "FINAL HOTEL PAYLOAD:",
-        JSON.stringify(finalPayload, null, 2),
-      );
-
-      const res = await privateApi.post(
-        "/api/hotels/hotels/book/",
-        finalPayload,
-      );
-
-      console.log("BOOK RESPONSE:", res.data);
-
-      localStorage.setItem(
-        "hotelBookingData",
-        JSON.stringify({
-          guestList: cleanedGuests,
-          bookingCode,
-          hotel,
-          checkIn,
-          checkOut,
-          isInternationalHotel,
-          guestNationality,
-          pricing: {
-            net,
-            convenienceFee,
-            total: total || net + convenienceFee,
-          },
-          bookingResponse: res.data,
-        }),
-      );
-
-      setGuestDetails(cleanedGuests);
-
-      navigate("/hotel-booking-success", {
-        state: {
-          booking: res.data,
-          guestList: cleanedGuests,
-          isInternationalHotel,
-          guestNationality,
-        },
-      });
-    } catch (err) {
-      console.log("BOOK ERROR:", err?.response?.data || err);
-
-      const apiMessage =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.response?.data?.data?.Error?.ErrorMessage ||
-        err?.response?.data?.data?.Response?.Error?.ErrorMessage ||
-        "Booking failed";
-
-      alert(apiMessage);
-    } finally {
-      setLoading(false);
-      setRefreshingPrebook(false);
     }
-  };
+
+    const paxRooms =
+      preBook?.PaxRooms ||
+      preBook?.Guests?.PaxRooms ||
+      payload?.PaxRooms ||
+      payload?.guests?.PaxRooms ||
+      guests?.PaxRooms ||
+      [];
+
+    if (Array.isArray(paxRooms) && paxRooms.length > 0) {
+      return paxRooms.map((room) => {
+        const children = Number(room.Children ?? room.children ?? 0);
+
+        return {
+          Adults: Number(room.Adults ?? room.adults ?? 1),
+          Children: children,
+          ChildrenAges: normalizeAgeArray(
+            room.ChildrenAges || room.ChildAges || room.childAges || [],
+            children,
+          ),
+        };
+      });
+    }
+
+    const children = Number(guests?.children || guests?.Children || 0);
+
+    return [
+      {
+        Adults: Number(guests?.adults || guests?.Adults || 1),
+        Children: children,
+        ChildrenAges: normalizeAgeArray(
+          payload?.childAges ||
+            preBook?.childAges ||
+            guests?.childAges ||
+            guests?.ChildrenAges ||
+            [],
+          children,
+        ),
+      },
+    ];
+  }, [guests, preBook, payload]);
+
+  const initialGuests = useMemo(() => {
+    const list = [];
+
+    normalizedRooms.forEach((room, roomIndex) => {
+      for (let i = 0; i < room.Adults; i++) {
+        list.push({
+          RoomIndex: roomIndex,
+          Title: i === 1 ? "Mrs" : "Mr",
+          FirstName: "",
+          MiddleName: "",
+          LastName: "",
+          Email: "",
+          Phoneno: "",
+          PaxType: 1,
+          LeadPassenger: list.length === 0,
+          Age: "",
+        });
+      }
+
+      for (let i = 0; i < room.Children; i++) {
+        list.push({
+          RoomIndex: roomIndex,
+          Title: "Mstr",
+          FirstName: "",
+          MiddleName: "",
+          LastName: "",
+          Email: "",
+          Phoneno: "",
+          PaxType: 2,
+          LeadPassenger: false,
+          Age: room.ChildrenAges?.[i] ? String(room.ChildrenAges[i]) : "",
+        });
+      }
+    });
+
+    return list;
+  }, [normalizedRooms]);
+
+  const [guestList, setGuestList] = useState(initialGuests);
+  const [corporatePAN, setCorporatePAN] = useState("");
+  const [loading, setLoading] = useState(false);
 
   if (!preBook) {
     return (
@@ -704,241 +179,391 @@ const HotelBooking = () => {
     );
   }
 
-  const hotelName =
-    hotel?.hotel_name ||
-    hotel?.HotelName ||
-    rawHotelResult?.HotelName ||
-    "Hotel Booking";
+  const updateGuest = (index, field, value) => {
+    const updated = [...guestList];
+    updated[index][field] = value;
+    setGuestList(updated);
+  };
 
-  const roomName = roomData?.Name?.[0] || roomData?.Name || "Standard Room";
+  const isValidPAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
+
+  const validateGuests = () => {
+    if (!bookingCode) return "Booking code missing";
+    if (!net || net <= 0) return "Net amount missing";
+
+    if (isPANRequired && !isValidPAN(corporatePAN.trim().toUpperCase())) {
+      return "Valid PAN number is required";
+    }
+
+    for (let i = 0; i < guestList.length; i++) {
+      const g = guestList[i];
+
+      if (!g.FirstName.trim() || !g.LastName.trim()) {
+        return `Guest ${i + 1}: First name and last name are required`;
+      }
+
+      if (!g.Age) {
+        return `Guest ${i + 1}: Age is required`;
+      }
+
+      const age = Number(g.Age);
+
+      if (Number.isNaN(age) || age <= 0) {
+        return `Guest ${i + 1}: Enter valid age`;
+      }
+
+      if (g.PaxType === 1 && age < 12) {
+        return `Guest ${i + 1}: Adult age must be 12 or above`;
+      }
+
+      if (g.PaxType === 2 && (age < 1 || age > 12)) {
+        return `Guest ${i + 1}: Child age must be between 1 and 12`;
+      }
+
+      if (g.LeadPassenger) {
+        if (!g.Email.includes("@")) return "Valid email required";
+
+        if (!/^[0-9]{10}$/.test(g.Phoneno)) {
+          return "Valid 10-digit phone required";
+        }
+      }
+
+      if (
+        validation?.PaxNameMinLength &&
+        g.FirstName.trim().length < validation.PaxNameMinLength
+      ) {
+        return `Guest ${i + 1}: Name too short`;
+      }
+
+      if (
+        validation?.PaxNameMaxLength &&
+        g.FirstName.trim().length > validation.PaxNameMaxLength
+      ) {
+        return `Guest ${i + 1}: Name too long`;
+      }
+    }
+
+    return null;
+  };
+
+  const buildRoomPayloads = (cleanedGuests) => {
+    const rooms = normalizedRooms.map((_, roomIndex) => {
+      const roomPassengers = cleanedGuests.filter(
+        (guest) => guest.RoomIndex === roomIndex,
+      );
+
+      const adults = roomPassengers.filter((guest) => guest.PaxType === 1);
+      const children = roomPassengers.filter((guest) => guest.PaxType === 2);
+
+      return {
+        HotelRoomDetail: {
+          HotelPassenger: roomPassengers.map(
+            ({ RoomIndex, ...guest }) => guest,
+          ),
+        },
+        PaxRoom: {
+          Adults: adults.length,
+          Children: children.length,
+          ChildrenAges: children.map((child) => Number(child.Age)),
+        },
+      };
+    });
+
+    return {
+      HotelRoomsDetails: rooms.map((room) => room.HotelRoomDetail),
+      PaxRooms: rooms.map((room) => room.PaxRoom),
+    };
+  };
+
+  const handleBookHotel = async () => {
+    const error = validateGuests();
+    if (error) return alert(error);
+
+    try {
+      setLoading(true);
+
+      const finalPAN = corporatePAN.trim().toUpperCase();
+
+      const cleanedGuests = guestList.map((g, i) => {
+        const passenger = {
+          RoomIndex: g.RoomIndex,
+          Title: g.PaxType === 2 ? "Mstr" : g.Title,
+          FirstName: g.FirstName.trim(),
+          MiddleName: "",
+          LastName: g.LastName.trim(),
+          PaxType: g.PaxType,
+          Age: Number(g.Age),
+          LeadPassenger: i === 0,
+        };
+
+        if (i === 0) {
+          passenger.Email = g.Email.trim();
+          passenger.Phoneno = g.Phoneno.trim();
+        }
+
+        if (isPANRequired) {
+          passenger.PAN = finalPAN;
+        }
+
+        return passenger;
+      });
+
+      const { HotelRoomsDetails, PaxRooms } = buildRoomPayloads(cleanedGuests);
+
+      const finalPayload = {
+        BookingCode: bookingCode,
+        GuestNationality:
+          payload?.GuestNationality ||
+          payload?.guestNationality ||
+          preBook?.GuestNationality ||
+          guests?.nationality ||
+          "IN",
+        IsVoucherBooking: true,
+        NetAmount: net,
+        PreBookNetAmount: net,
+        HotelRoomsDetails,
+        PaxRooms,
+      };
+
+      // International / PAN required hotel payload
+      if (isPANRequired) {
+        finalPayload.PANRequired = true;
+        finalPayload.CorporateBooking = true;
+        finalPayload.CorporatePAN = finalPAN;
+      }
+
+      console.log(
+        isPANRequired
+          ? "FINAL INTERNATIONAL HOTEL PAYLOAD:"
+          : "FINAL DOMESTIC HOTEL PAYLOAD:",
+        JSON.stringify(finalPayload, null, 2),
+      );
+
+      console.log("ROOM-WISE PAX ROOMS:", JSON.stringify(PaxRooms, null, 2));
+      console.log(
+        "ROOM-WISE HOTEL ROOMS:",
+        JSON.stringify(HotelRoomsDetails, null, 2),
+      );
+
+      const searchedRooms =
+        preBook?.roomGuests ||
+        preBook?.RoomGuests ||
+        preBook?.Guests?.roomGuests ||
+        preBook?.Guests?.RoomGuests ||
+        payload?.roomGuests ||
+        payload?.RoomGuests ||
+        payload?.guests?.roomGuests ||
+        payload?.guests?.RoomGuests ||
+        guests?.roomGuests ||
+        guests?.RoomGuests ||
+        [];
+
+      console.log(
+        "SEARCH/PREBOOK ROOM GUESTS:",
+        JSON.stringify(searchedRooms, null, 2),
+      );
+      console.log("FINAL BOOKING PAXROOMS:", JSON.stringify(PaxRooms, null, 2));
+
+      searchedRooms.forEach((room, index) => {
+        const searchAges =
+          room.ChildrenAges ||
+          room.ChildAges ||
+          room.childAges ||
+          room.childrenAges ||
+          [];
+
+        const finalAges = PaxRooms[index]?.ChildrenAges || [];
+
+        if (
+          JSON.stringify(searchAges.map(Number)) !==
+          JSON.stringify(finalAges.map(Number))
+        ) {
+          throw new Error(
+            `Child age mismatch before booking. Room ${index + 1}: searched age ${searchAges.join(", ")} but booking age ${finalAges.join(", ")}`,
+          );
+        }
+      });
+
+      const res = await privateApi.post(
+        "/api/hotels/hotels/book/",
+        finalPayload,
+      );
+
+      console.log("BOOK RESPONSE:", res.data);
+
+      const guestsForStorage = cleanedGuests.map(
+        ({ RoomIndex, ...guest }) => guest,
+      );
+
+      localStorage.setItem(
+        "hotelBookingData",
+        JSON.stringify({
+          guestList: guestsForStorage,
+          bookingCode,
+          hotel,
+          checkIn,
+          checkOut,
+          net,
+          // total,
+          // convenienceFee,
+          isPANRequired,
+          bookingResponse: res.data,
+        }),
+      );
+
+      setGuestDetails(guestsForStorage);
+
+      navigate("/hotel-booking-success", {
+        state: { booking: res.data },
+      });
+    } catch (err) {
+      console.log("BOOK ERROR:", err?.response?.data);
+      alert(
+        err?.response?.data?.message ||
+          err?.response?.data?.Error?.ErrorMessage ||
+          "Booking failed",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0B0F] text-white px-4 md:px-10 py-24">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-yellow-300 mb-2">
-                  {isInternationalHotel
-                    ? "International Hotel"
-                    : "Domestic Hotel"}
-                </p>
+            <h2 className="text-2xl font-bold text-yellow-400">
+              {hotel?.hotel_name || hotel?.HotelName || "Hotel Booking"}
+            </h2>
 
-                <h2 className="text-2xl font-bold text-yellow-400">
-                  {hotelName}
-                </h2>
+            <p className="text-gray-400 text-sm mt-2">
+              📅 {checkIn} → {checkOut}
+            </p>
 
-                <p className="text-gray-400 text-sm mt-2">
-                  📅 {checkIn} → {checkOut}
-                </p>
+            <p className="text-gray-400 text-sm mt-1">
+              🛏 {roomData?.Name?.[0] || "Standard Room"}
+            </p>
 
-                <p className="text-gray-400 text-sm mt-1">🛏 {roomName}</p>
-
-                <p className="text-gray-500 text-xs mt-2 break-all">
-                  BookingCode: {bookingCode || "Missing"}
-                </p>
-              </div>
-
-              <div className="w-full md:w-72">
-                <label className="block text-xs text-gray-400 mb-1">
-                  Guest Nationality
-                </label>
-
-                <select
-                  className="input"
-                  value={guestNationality}
-                  onChange={(e) => setGuestNationality(e.target.value)}
-                >
-                  {nationalityOptions.map((item) => (
-                    <option key={item.Code} value={item.Code}>
-                      {item.Name} ({item.Code})
-                    </option>
-                  ))}
-                </select>
-
-                <p className="text-xs text-gray-500 mt-2">
-                  Nationality is sent as GuestNationality in booking payload.
-                </p>
-              </div>
-            </div>
+            <p className="text-xs mt-3 text-gray-500">
+              {isPANRequired
+                ? "International / PAN required booking"
+                : "Domestic booking"}
+            </p>
           </div>
 
-          {guestList.map((guest, index) => {
-            const isChild = Number(guest.PaxType) === 2;
+          {isPANRequired && (
+            <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800">
+              <h3 className="text-yellow-300 mb-4">PAN Details</h3>
 
-            return (
-              <div
-                key={index}
-                className="bg-[#15151C] p-6 rounded-2xl border border-gray-800"
-              >
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <h3 className="text-yellow-300">
-                    Guest {index + 1} {guest.LeadPassenger && "(Lead)"}
-                  </h3>
+              <input
+                placeholder="Enter Corporate PAN"
+                className="input uppercase"
+                value={corporatePAN}
+                maxLength={10}
+                onChange={(e) => setCorporatePAN(e.target.value.toUpperCase())}
+              />
 
-                  <span className="text-xs px-3 py-1 rounded-full bg-black/40 border border-gray-700 text-gray-300">
-                    {Number(guest.PaxType) === 1 ? "Adult" : "Child"}
-                  </span>
+              <p className="text-xs text-gray-500 mt-2">
+                This PAN will be sent as CorporatePAN and passenger PAN.
+              </p>
+            </div>
+          )}
+
+          {guestList.map((guest, index) => (
+            <div
+              key={index}
+              className="bg-[#15151C] p-6 rounded-2xl border border-gray-800"
+            >
+              <h3 className="text-yellow-300 mb-4">
+                Room {guest.RoomIndex + 1} - Guest {index + 1}{" "}
+                {guest.LeadPassenger && "(Lead)"}{" "}
+                <span className="text-gray-500 text-sm">
+                  {guest.PaxType === 1 ? "Adult" : "Child"}
+                </span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <select
+                  className="input"
+                  value={guest.Title}
+                  disabled={guest.PaxType === 2}
+                  onChange={(e) => updateGuest(index, "Title", e.target.value)}
+                >
+                  {guest.PaxType === 1 ? (
+                    <>
+                      <option value="Mr">Mr</option>
+                      <option value="Mrs">Mrs</option>
+                      <option value="Ms">Ms</option>
+                    </>
+                  ) : (
+                    <option value="Mstr">Mstr</option>
+                  )}
+                </select>
+
+                <input
+                  placeholder="First Name"
+                  className="input"
+                  value={guest.FirstName}
+                  onChange={(e) =>
+                    updateGuest(index, "FirstName", e.target.value)
+                  }
+                />
+
+                <input
+                  placeholder="Last Name"
+                  className="input"
+                  value={guest.LastName}
+                  onChange={(e) =>
+                    updateGuest(index, "LastName", e.target.value)
+                  }
+                />
+
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">
+                    {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
+                  </label>
+
+                  <input
+                    type="number"
+                    min={guest.PaxType === 1 ? 12 : 1}
+                    max={guest.PaxType === 1 ? 120 : 12}
+                    placeholder={
+                      guest.PaxType === 1
+                        ? "Enter adult age"
+                        : "Child age from search"
+                    }
+                    className="input"
+                    value={guest.Age}
+                    disabled={guest.PaxType === 2}
+                    onChange={(e) => updateGuest(index, "Age", e.target.value)}
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <select
-                    className="input"
-                    value={guest.Title}
-                    onChange={(e) =>
-                      updateGuest(index, "Title", e.target.value)
-                    }
-                  >
-                    <option value="Mr">Mr</option>
-                    <option value="Mrs">Mrs</option>
-                    <option value="Ms">Ms</option>
-                    <option value="Master">Master</option>
-                  </select>
-
-                  <input
-                    placeholder="First Name"
-                    className="input"
-                    value={guest.FirstName}
-                    onChange={(e) =>
-                      updateGuest(index, "FirstName", e.target.value)
-                    }
-                  />
-
-                  <input
-                    placeholder="Middle Name Optional"
-                    className="input"
-                    value={guest.MiddleName}
-                    onChange={(e) =>
-                      updateGuest(index, "MiddleName", e.target.value)
-                    }
-                  />
-
-                  <input
-                    placeholder="Last Name"
-                    className="input"
-                    value={guest.LastName}
-                    onChange={(e) =>
-                      updateGuest(index, "LastName", e.target.value)
-                    }
-                  />
-
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">
-                      {Number(guest.PaxType) === 1 ? "Adult Age" : "Child Age"}
-                    </label>
-
+                {guest.LeadPassenger && (
+                  <>
                     <input
-                      type="number"
-                      min={Number(guest.PaxType) === 1 ? 12 : 1}
-                      max={Number(guest.PaxType) === 1 ? 120 : 11}
-                      placeholder={
-                        Number(guest.PaxType) === 1
-                          ? "Enter adult age"
-                          : "Enter child age"
-                      }
+                      placeholder="Email"
                       className="input"
-                      value={guest.Age}
+                      value={guest.Email}
                       onChange={(e) =>
-                        updateGuest(index, "Age", e.target.value)
+                        updateGuest(index, "Email", e.target.value)
                       }
                     />
 
-                    {isChild && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Enter child age below 12. If age is changed, system will
-                        refresh prebook before final booking.
-                      </p>
-                    )}
-                  </div>
-
-                  {guest.LeadPassenger && (
-                    <>
-                      <input
-                        placeholder="Email"
-                        className="input"
-                        value={guest.Email}
-                        onChange={(e) =>
-                          updateGuest(index, "Email", e.target.value)
-                        }
-                      />
-
-                      <input
-                        placeholder="Phone"
-                        className="input"
-                        value={guest.Phoneno}
-                        onChange={(e) =>
-                          updateGuest(index, "Phoneno", e.target.value)
-                        }
-                      />
-                    </>
-                  )}
-
-                  {isInternationalHotel && (
-                    <>
-                      <input
-                        placeholder="PAN Card Number"
-                        className="input"
-                        value={guest.PAN}
-                        onChange={(e) =>
-                          updateGuest(
-                            index,
-                            "PAN",
-                            e.target.value.toUpperCase(),
-                          )
-                        }
-                      />
-
-                      <input
-                        placeholder="Passport Number"
-                        className="input"
-                        value={guest.PassportNo}
-                        onChange={(e) =>
-                          updateGuest(index, "PassportNo", e.target.value)
-                        }
-                      />
-
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">
-                          Passport Issue Date
-                        </label>
-                        <input
-                          type="date"
-                          className="input"
-                          value={guest.PassportIssueDate}
-                          onChange={(e) =>
-                            updateGuest(
-                              index,
-                              "PassportIssueDate",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">
-                          Passport Expiry Date
-                        </label>
-                        <input
-                          type="date"
-                          className="input"
-                          value={guest.PassportExpDate}
-                          onChange={(e) =>
-                            updateGuest(
-                              index,
-                              "PassportExpDate",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
+                    <input
+                      placeholder="Phone"
+                      className="input"
+                      value={guest.Phoneno}
+                      onChange={(e) =>
+                        updateGuest(index, "Phoneno", e.target.value)
+                      }
+                    />
+                  </>
+                )}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
         <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800 h-fit sticky top-24">
@@ -950,42 +575,25 @@ const HotelBooking = () => {
               <span>₹ {Math.round(net)}</span>
             </div>
 
-            <div className="flex justify-between">
-              <span>Convenience Fees</span>
-              <span>₹ {Math.round(convenienceFee)}</span>
-            </div>
-
             <hr className="border-gray-700" />
 
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span className="text-yellow-400">
-                ₹ {Math.round(total || net + convenienceFee)}
-              </span>
+              <span className="text-yellow-400">₹ {Math.round(net)}</span>
             </div>
           </div>
 
           <button
             onClick={handleBookHotel}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60 disabled:cursor-not-allowed"
+            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60"
           >
-            {loading
-              ? refreshingPrebook
-                ? "Updating Child Age..."
-                : "Processing..."
-              : "Proceed to Payment"}
+            {loading ? "Processing..." : "Proceed to Payment"}
           </button>
-
-          <p className="text-xs text-gray-500 mt-4">
-            {isInternationalHotel
-              ? "PAN and passport details will be sent in booking payload."
-              : "PAN card is not required for this booking."}
-          </p>
         </div>
       </div>
 
-      <style>{`
+      <style jsx>{`
         .input {
           background: #0b0b0f;
           border: 1px solid #2a2a2f;
@@ -1000,13 +608,9 @@ const HotelBooking = () => {
           border-color: #facc15;
         }
 
-        .input::placeholder {
-          color: #777;
-        }
-
-        select.input option {
-          background: #0b0b0f;
-          color: white;
+        .input:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
       `}</style>
     </div>

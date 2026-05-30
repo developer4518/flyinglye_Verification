@@ -1,15 +1,15 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-const DEFAULT_CHILD_AGE = 6;
-
 const normalizeChildAges = (children = 0, ages = []) => {
   const count = Number(children) || 0;
   const cleanAges = Array.isArray(ages) ? ages : [];
 
   return Array.from({ length: count }, (_, index) => {
     const age = Number(cleanAges[index]);
-    return age > 0 && age < 12 ? age : DEFAULT_CHILD_AGE;
+
+    // Child age allowed: 1 to 12
+    return age >= 1 && age <= 12 ? age : "";
   });
 };
 
@@ -288,6 +288,11 @@ export const useHotelStore = create(
 
           const children = Number(mergedGuests.children) || 0;
 
+          const normalizedFlatChildAges = normalizeChildAges(
+            children,
+            mergedGuests.childAges,
+          );
+
           return {
             search: {
               ...state.search,
@@ -298,8 +303,38 @@ export const useHotelStore = create(
                 children,
                 rooms: Number(mergedGuests.rooms) || 1,
 
-                // ✅ USER ENTERED CHILD AGE FROM SEARCH PAGE
-                childAges: normalizeChildAges(children, mergedGuests.childAges),
+                childAges: normalizedFlatChildAges,
+
+                // Keep room-wise child ages also
+                roomGuests: Array.isArray(mergedGuests.roomGuests)
+                  ? mergedGuests.roomGuests.map((room, index) => {
+                      const roomChildren = Number(
+                        room.Children ?? room.children ?? 0,
+                      );
+
+                      const roomAges =
+                        room.ChildrenAges ||
+                        room.ChildAges ||
+                        room.childAges ||
+                        [];
+
+                      const cleanAges = normalizeChildAges(
+                        roomChildren,
+                        roomAges,
+                      );
+
+                      return {
+                        ...room,
+                        RoomIndex:
+                          room.RoomIndex ?? room.roomIndex ?? index + 1,
+                        Adults: Number(room.Adults ?? room.adults ?? 1),
+                        Children: roomChildren,
+                        ChildAges: cleanAges,
+                        ChildrenAges: cleanAges,
+                        childAges: cleanAges,
+                      };
+                    })
+                  : mergedGuests.roomGuests || [],
               },
             },
           };
@@ -323,8 +358,37 @@ export const useHotelStore = create(
                 children,
                 rooms: Number(mergedGuests.rooms) || 1,
 
-                // ✅ USER ENTERED CHILD AGE FROM SEARCH PAGE
                 childAges: normalizeChildAges(children, mergedGuests.childAges),
+
+                roomGuests: Array.isArray(mergedGuests.roomGuests)
+                  ? mergedGuests.roomGuests.map((room, index) => {
+                      const roomChildren = Number(
+                        room.Children ?? room.children ?? 0,
+                      );
+
+                      const roomAges =
+                        room.ChildrenAges ||
+                        room.ChildAges ||
+                        room.childAges ||
+                        [];
+
+                      const cleanAges = normalizeChildAges(
+                        roomChildren,
+                        roomAges,
+                      );
+
+                      return {
+                        ...room,
+                        RoomIndex:
+                          room.RoomIndex ?? room.roomIndex ?? index + 1,
+                        Adults: Number(room.Adults ?? room.adults ?? 1),
+                        Children: roomChildren,
+                        ChildAges: cleanAges,
+                        ChildrenAges: cleanAges,
+                        childAges: cleanAges,
+                      };
+                    })
+                  : mergedGuests.roomGuests || [],
               },
             },
           };
@@ -374,6 +438,10 @@ export const useHotelStore = create(
                 // Do NOT use hotel.child_ages / pax_rooms child age from API.
                 // Always keep child age entered by user on search page.
                 childAges: normalizeChildAges(currentChildren, userChildAges),
+
+                roomGuests: Array.isArray(state.search.guests.roomGuests)
+                  ? state.search.guests.roomGuests
+                  : [],
               },
             },
           };

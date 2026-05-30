@@ -401,6 +401,12 @@ const HotelsForm = () => {
 
       localStorage.setItem("hotelSearchPayload", JSON.stringify(searchPayload));
 
+      const paxRooms = roomGuests.map((room) => ({
+        Adults: room.Adults,
+        Children: room.Children,
+        ChildrenAges: room.ChildrenAges,
+      }));
+
       const res = await publicApi.get("/api/hotels/search-hotels/", {
         params: {
           city: formData.city,
@@ -412,17 +418,13 @@ const HotelsForm = () => {
           children: guests.children,
           rooms: guests.rooms,
 
-          // ✅ Room-wise payload
           roomGuests: JSON.stringify(roomGuests),
-          PaxRooms: JSON.stringify(
-            roomGuests.map((room) => ({
-              Adults: room.Adults,
-              Children: room.Children,
-              ChildrenAges: room.ChildrenAges,
-            })),
-          ),
 
-          // ✅ Child ages in all common formats
+          // send all backend-compatible keys
+          PaxRooms: JSON.stringify(paxRooms),
+          paxRooms: JSON.stringify(paxRooms),
+          pax_rooms: JSON.stringify(paxRooms),
+
           childAges: flatChildAges.join(","),
           ChildAges: flatChildAges.join(","),
           ChildrenAges: flatChildAges.join(","),
