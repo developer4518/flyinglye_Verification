@@ -15,6 +15,55 @@ const MAX_CHILD_AGE = 12;
 const HOTEL_CODES_PER_REQUEST = 100;
 const RESPONSE_TIME_SECONDS = 23;
 
+const INDIA_NATIONALITY = {
+  Code: "IN",
+  Name: "India",
+};
+
+const INTERNATIONAL_DESTINATION_KEYWORDS = [
+  "dubai",
+  "abu dhabi",
+  "sharjah",
+  "ras al khaimah",
+  "uae",
+  "united arab emirates",
+  "singapore",
+  "bangkok",
+  "phuket",
+  "pattaya",
+  "krabi",
+  "thailand",
+  "bali",
+  "indonesia",
+  "kuala lumpur",
+  "malaysia",
+  "maldives",
+  "vietnam",
+  "sri lanka",
+  "london",
+  "united kingdom",
+  "uk",
+  "paris",
+  "france",
+  "rome",
+  "milan",
+  "italy",
+  "zurich",
+  "switzerland",
+  "new york",
+  "usa",
+  "united states",
+  "australia",
+];
+
+const isInternationalDestination = (cityName = "") => {
+  const value = String(cityName || "").toLowerCase();
+
+  return INTERNATIONAL_DESTINATION_KEYWORDS.some((keyword) =>
+    value.includes(keyword),
+  );
+};
+
 const createRoom = () => ({
   adults: 1,
   children: 0,
@@ -92,6 +141,10 @@ const HotelsForm = () => {
 
   const [rooms, setRooms] = useState(() => getInitialRooms(search));
 
+  const isInternationalHotelSearch = isInternationalDestination(
+    formData.cityName || cityInput,
+  );
+
   const guests = useMemo(() => {
     const adults = rooms.reduce(
       (sum, room) => sum + Number(room.adults || 0),
@@ -152,15 +205,39 @@ const HotelsForm = () => {
   }, []);
 
   useEffect(() => {
+    if (!isInternationalHotelSearch) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      nationality: INDIA_NATIONALITY.Code,
+      nationalityName: INDIA_NATIONALITY.Name,
+    }));
+
+    setNationalityInput(INDIA_NATIONALITY.Name);
+    setNationalitySuggestions([]);
+  }, [isInternationalHotelSearch]);
+
+  useEffect(() => {
+    const finalNationality = isInternationalHotelSearch
+      ? INDIA_NATIONALITY.Code
+      : formData.nationality;
+
+    const finalNationalityName = isInternationalHotelSearch
+      ? INDIA_NATIONALITY.Name
+      : formData.nationalityName;
+
     setSearch({
       ...formData,
+      nationality: finalNationality,
+      nationalityName: finalNationalityName,
       guests,
       currency: "INR",
       responseTime: RESPONSE_TIME_SECONDS,
       parallelSearch: true,
       hotelCodesPerRequest: HOTEL_CODES_PER_REQUEST,
+      isInternationalHotelSearch,
     });
-  }, [formData, guests, setSearch]);
+  }, [formData, guests, setSearch, isInternationalHotelSearch]);
 
   const searchCities = (query) => {
     if (!query) return [];
@@ -179,6 +256,10 @@ const HotelsForm = () => {
 
   const searchNationalities = (query) => {
     if (!query) return [];
+
+    if (isInternationalHotelSearch) {
+      return [INDIA_NATIONALITY];
+    }
 
     const q = query.toLowerCase();
 
@@ -277,6 +358,13 @@ const HotelsForm = () => {
       return false;
     }
 
+    if (isInternationalHotelSearch && formData.nationality !== "IN") {
+      setErrorMsg(
+        "For international hotel search, only Indian nationality is allowed.",
+      );
+      return false;
+    }
+
     if (!formData.checkIn || !formData.checkOut) {
       setErrorMsg("Select dates");
       return false;
@@ -326,6 +414,29 @@ const HotelsForm = () => {
     e.preventDefault();
     setErrorMsg("");
 
+    const finalNationality = isInternationalHotelSearch
+      ? INDIA_NATIONALITY.Code
+      : formData.nationality;
+
+    const finalNationalityName = isInternationalHotelSearch
+      ? INDIA_NATIONALITY.Name
+      : formData.nationalityName;
+
+    const finalFormData = {
+      ...formData,
+      nationality: finalNationality,
+      nationalityName: finalNationalityName,
+    };
+
+    if (isInternationalHotelSearch) {
+      setFormData((prev) => ({
+        ...prev,
+        nationality: INDIA_NATIONALITY.Code,
+        nationalityName: INDIA_NATIONALITY.Name,
+      }));
+      setNationalityInput(INDIA_NATIONALITY.Name);
+    }
+
     if (!validateSearch()) return;
 
     const roomGuests = rooms.map((room, index) => {
@@ -338,10 +449,10 @@ const HotelsForm = () => {
         Adults: Number(room.adults),
         Children: Number(room.children),
 
-        // ✅ For your frontend/store
+        // For frontend/store
         ChildAges: childAges,
 
-        // ✅ For TBO/backend compatibility
+        // For TBO/backend compatibility
         ChildrenAges: childAges,
       };
     });
@@ -349,23 +460,25 @@ const HotelsForm = () => {
     const flatChildAges = roomGuests.flatMap((room) => room.ChildAges);
 
     const searchPayload = {
-      ...formData,
+      ...finalFormData,
 
       guests: {
         adults: guests.adults,
         children: guests.children,
         rooms: guests.rooms,
 
-        // ✅ Always user-entered child ages
+        // Always user-entered child ages
         childAges: flatChildAges,
 
-        // ✅ Keep room-wise children also
+        // Keep room-wise children also
         roomGuests,
       },
 
       currency: "INR",
-      nationality: formData.nationality,
-      nationalityName: formData.nationalityName,
+      nationality: finalNationality,
+      nationalityName: finalNationalityName,
+
+      isInternationalHotelSearch,
 
       parallelSearch: true,
       hotelCodesPerRequest: HOTEL_CODES_PER_REQUEST,
@@ -377,7 +490,7 @@ const HotelsForm = () => {
 
       responseTime: RESPONSE_TIME_SECONDS,
 
-      // ✅ TBO checklist
+      // TBO checklist
       useFilters: true,
       showAllHotelFeed: true,
       showAllRoomFeed: true,
@@ -396,9 +509,7 @@ const HotelsForm = () => {
       setLocalLoading(true);
       setLoading(true);
 
-      // ✅ Save before API also, so refresh/back keeps same search age
       setSearch(searchPayload);
-
       localStorage.setItem("hotelSearchPayload", JSON.stringify(searchPayload));
 
       const paxRooms = roomGuests.map((room) => ({
@@ -409,10 +520,10 @@ const HotelsForm = () => {
 
       const res = await publicApi.get("/api/hotels/search-hotels/", {
         params: {
-          city: formData.city,
-          cityName: formData.cityName,
-          checkin: formData.checkIn,
-          checkout: formData.checkOut,
+          city: finalFormData.city,
+          cityName: finalFormData.cityName,
+          checkin: finalFormData.checkIn,
+          checkout: finalFormData.checkOut,
 
           adults: guests.adults,
           children: guests.children,
@@ -420,7 +531,6 @@ const HotelsForm = () => {
 
           roomGuests: JSON.stringify(roomGuests),
 
-          // send all backend-compatible keys
           PaxRooms: JSON.stringify(paxRooms),
           paxRooms: JSON.stringify(paxRooms),
           pax_rooms: JSON.stringify(paxRooms),
@@ -429,8 +539,9 @@ const HotelsForm = () => {
           ChildAges: flatChildAges.join(","),
           ChildrenAges: flatChildAges.join(","),
 
-          nationality: formData.nationality,
-          GuestNationality: formData.nationality,
+          // Important TBO nationality rule
+          nationality: finalNationality,
+          GuestNationality: finalNationality,
 
           currency: "INR",
           responseTime: RESPONSE_TIME_SECONDS,
@@ -466,10 +577,7 @@ const HotelsForm = () => {
         return;
       }
 
-      // ✅ Save search again after success to make sure latest user age is stored
       setSearch(searchPayload);
-
-      // ✅ IMPORTANT: send full response, not hotelsData only
       setHotels(res.data);
 
       navigate("/hotels");
@@ -531,13 +639,29 @@ const HotelsForm = () => {
                   type="button"
                   key={city.code}
                   onClick={() => {
+                    const selectedCityName = city.name;
+                    const selectedIsInternational =
+                      isInternationalDestination(selectedCityName);
+
                     setFormData((prev) => ({
                       ...prev,
                       city: city.code,
-                      cityName: city.name,
+                      cityName: selectedCityName,
+                      nationality: selectedIsInternational
+                        ? INDIA_NATIONALITY.Code
+                        : prev.nationality || INDIA_NATIONALITY.Code,
+                      nationalityName: selectedIsInternational
+                        ? INDIA_NATIONALITY.Name
+                        : prev.nationalityName || INDIA_NATIONALITY.Name,
                     }));
-                    setCityInput(city.name);
+
+                    setCityInput(selectedCityName);
                     setCitySuggestions([]);
+
+                    if (selectedIsInternational) {
+                      setNationalityInput(INDIA_NATIONALITY.Name);
+                      setNationalitySuggestions([]);
+                    }
                   }}
                   className="w-full p-3 rounded-xl hover:bg-(--bg-secondary) cursor-pointer text-sm flex items-center justify-between gap-3 text-left transition"
                 >
@@ -561,7 +685,33 @@ const HotelsForm = () => {
             type="text"
             placeholder="Search nationality"
             value={nationalityInput}
+            readOnly={isInternationalHotelSearch}
+            onFocus={() => {
+              if (isInternationalHotelSearch) {
+                setNationalityInput(INDIA_NATIONALITY.Name);
+                setNationalitySuggestions([INDIA_NATIONALITY]);
+
+                setFormData((prev) => ({
+                  ...prev,
+                  nationality: INDIA_NATIONALITY.Code,
+                  nationalityName: INDIA_NATIONALITY.Name,
+                }));
+              }
+            }}
             onChange={(e) => {
+              if (isInternationalHotelSearch) {
+                setNationalityInput(INDIA_NATIONALITY.Name);
+                setNationalitySuggestions([INDIA_NATIONALITY]);
+
+                setFormData((prev) => ({
+                  ...prev,
+                  nationality: INDIA_NATIONALITY.Code,
+                  nationalityName: INDIA_NATIONALITY.Name,
+                }));
+
+                return;
+              }
+
               const value = e.target.value;
               setNationalityInput(value);
               setFormData((prev) => ({
@@ -571,8 +721,17 @@ const HotelsForm = () => {
               }));
               setNationalitySuggestions(searchNationalities(value));
             }}
-            className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
+            className={`w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition ${
+              isInternationalHotelSearch ? "cursor-not-allowed opacity-80" : ""
+            }`}
           />
+
+          {isInternationalHotelSearch && (
+            <p className="mt-1 text-[11px] text-(--gold-main)">
+              For international hotel search, only Indian nationality is
+              allowed.
+            </p>
+          )}
 
           {nationalitySuggestions.length > 0 && (
             <div className="absolute top-full left-0 mt-2 w-full bg-(--bg-card) border border-(--border-soft) rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto p-1">
@@ -581,6 +740,17 @@ const HotelsForm = () => {
                   type="button"
                   key={country.Code}
                   onClick={() => {
+                    if (isInternationalHotelSearch) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        nationality: INDIA_NATIONALITY.Code,
+                        nationalityName: INDIA_NATIONALITY.Name,
+                      }));
+                      setNationalityInput(INDIA_NATIONALITY.Name);
+                      setNationalitySuggestions([]);
+                      return;
+                    }
+
                     setFormData((prev) => ({
                       ...prev,
                       nationality: country.Code,
