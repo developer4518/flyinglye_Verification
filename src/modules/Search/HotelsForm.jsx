@@ -530,11 +530,20 @@ const HotelsForm = () => {
       showSupplements: true,
     };
 
-    const apiParams = {
+    const baseApiParams = {
       city: finalFormData.city,
-      cityName: finalFormData.cityName,
       checkin: finalFormData.checkIn,
       checkout: finalFormData.checkOut,
+      nationality: finalNationality,
+      GuestNationality: finalNationality,
+      currency: "INR",
+      pax_rooms: JSON.stringify(paxRooms),
+    };
+
+    const domesticApiParams = {
+      ...baseApiParams,
+
+      cityName: finalFormData.cityName,
 
       adults: guests.adults,
       children: guests.children,
@@ -544,18 +553,12 @@ const HotelsForm = () => {
 
       PaxRooms: JSON.stringify(paxRooms),
       paxRooms: JSON.stringify(paxRooms),
-      pax_rooms: JSON.stringify(paxRooms),
 
       childAges: flatChildAges.join(","),
       ChildAges: flatChildAges.join(","),
       ChildrenAges: flatChildAges.join(","),
 
-      nationality: finalNationality,
-      GuestNationality: finalNationality,
-
-      currency: "INR",
       responseTime: RESPONSE_TIME_SECONDS,
-
       parallelSearch: true,
       hotelCodesPerRequest: HOTEL_CODES_PER_REQUEST,
 
@@ -571,6 +574,10 @@ const HotelsForm = () => {
       showRoomPromotions: true,
       showSupplements: true,
     };
+
+    const apiParams = isInternationalHotelSearch
+      ? baseApiParams
+      : domesticApiParams;
 
     try {
       resetFlow();
@@ -617,16 +624,23 @@ const HotelsForm = () => {
     } catch (err) {
       console.error("HOTEL SEARCH ERROR:", err?.response?.data || err);
 
+      const isNetworkError = err?.code === "ERR_NETWORK";
+
       const apiMessage =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.response?.data?.Error?.ErrorMessage ||
         err?.response?.data?.data?.Error?.ErrorMessage ||
         err?.message ||
-        "Hotel search failed. Please check selected city code and try again.";
+        "Hotel search failed. Please try again.";
 
       setError(err?.response?.data || apiMessage);
-      setErrorMsg(apiMessage);
+
+      setErrorMsg(
+        isNetworkError
+          ? "Hotel search failed from server. Please check backend international hotel search handling."
+          : apiMessage,
+      );
     } finally {
       setLocalLoading(false);
       setLoading(false);
