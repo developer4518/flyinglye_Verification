@@ -490,9 +490,20 @@ const HotelDetails = () => {
                           </p>
 
                           {roomItem.inclusion && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              ✔ {roomItem.inclusion}
-                            </p>
+                            <div className="mt-3 space-y-1">
+                              {roomItem.inclusion
+                                .split(",")
+                                .filter(Boolean)
+                                .map((item, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex items-center gap-2 text-sm text-gray-300"
+                                  >
+                                    <span className="text-green-400">✓</span>
+                                    <span>{item.trim()}</span>
+                                  </div>
+                                ))}
+                            </div>
                           )}
 
                           <div className="flex flex-wrap gap-2 mt-2">

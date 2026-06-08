@@ -687,9 +687,21 @@ const HotelResults = () => {
                           </p>
 
                           {defaultRoom?.inclusion && (
-                            <p className="text-xs text-gray-400 mt-1 line-clamp-1">
-                              ✔ {defaultRoom.inclusion}
-                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {defaultRoom.inclusion
+                                .split(",")
+                                .filter(Boolean)
+                                .map((item, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-2 py-1 rounded-full text-[11px]
+          bg-emerald-500/10 border border-emerald-500/20
+          text-emerald-300"
+                                  >
+                                    ✓ {item.trim()}
+                                  </span>
+                                ))}
+                            </div>
                           )}
 
                           <div className="flex flex-wrap gap-2 mt-3">
