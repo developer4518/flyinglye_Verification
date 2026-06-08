@@ -49,12 +49,11 @@ const INDIA_CITY_KEYWORDS = [
   "ladakh",
 ];
 
-const getSafeText = (...values) => {
-  return values
+const getSafeText = (...values) =>
+  values
     .find((v) => v !== undefined && v !== null && String(v).trim() !== "")
     ?.toString()
     .trim();
-};
 
 const HotelDetails = () => {
   const { state } = useLocation();
@@ -64,7 +63,6 @@ const HotelDetails = () => {
     useHotelStore();
 
   const payload = state || {};
-
   const hotel = payload.hotel || selectedHotel;
 
   const availableRooms =
@@ -150,67 +148,43 @@ const HotelDetails = () => {
 
   const { isDomesticHotel, isInternationalHotel } = useMemo(() => {
     if (!hotel) {
-      return {
-        isDomesticHotel: true,
-        isInternationalHotel: false,
-      };
+      return { isDomesticHotel: true, isInternationalHotel: false };
     }
 
     const cityName = getSafeText(
       search?.cityName,
-      search?.CityName,
       payload?.cityName,
-      payload?.CityName,
-      payload?.search?.cityName,
-      payload?.search?.CityName,
       hotel?.cityName,
       hotel?.CityName,
       hotel?.city,
       hotel?.City,
       hotel?.HotelCityName,
-      hotel?.hotel_city,
-      hotel?.Destination,
-      hotel?.destination,
       hotel?.Address,
       hotel?.address,
     )?.toLowerCase();
 
     const countryCode = getSafeText(
       search?.countryCode,
-      search?.CountryCode,
       payload?.countryCode,
-      payload?.CountryCode,
-      payload?.search?.countryCode,
-      payload?.search?.CountryCode,
       hotel?.countryCode,
       hotel?.CountryCode,
       hotel?.HotelCountryCode,
-      hotel?.country_code,
     )?.toUpperCase();
 
     const countryName = getSafeText(
       search?.countryName,
-      search?.CountryName,
       payload?.countryName,
-      payload?.CountryName,
-      payload?.search?.countryName,
-      payload?.search?.CountryName,
       hotel?.countryName,
       hotel?.CountryName,
       hotel?.country,
       hotel?.Country,
       hotel?.HotelCountryName,
-      hotel?.hotel_country,
     )?.toLowerCase();
 
-    const hasIndiaCountryCode = ["IN", "IND", "INDIA"].includes(countryCode);
-    const hasIndiaCountryName = countryName === "india";
-    const hasIndianCity = INDIA_CITY_KEYWORDS.some((city) =>
-      cityName?.includes(city),
-    );
-
     const domestic = Boolean(
-      hasIndiaCountryCode || hasIndiaCountryName || hasIndianCity,
+      ["IN", "IND", "INDIA"].includes(countryCode) ||
+      countryName === "india" ||
+      INDIA_CITY_KEYWORDS.some((city) => cityName?.includes(city)),
     );
 
     return {
@@ -243,11 +217,32 @@ const HotelDetails = () => {
   );
 
   const tax = Number(room?.tax || room?.TotalTax || room?.Tax || 0);
-
   const totalAmount = roomPrice + tax;
+
+  const getCancellationCharge = (policy = {}) => {
+    const charge = Number(policy.CancellationCharge || 0);
+    const type = String(policy.ChargeType || "").toLowerCase();
+
+    if (type.includes("percent")) {
+      return (totalAmount * charge) / 100;
+    }
+
+    return charge;
+  };
+
+  const getCancellationTypeText = (policy = {}) => {
+    const type = String(policy.ChargeType || "").toLowerCase();
+
+    if (type.includes("percent")) {
+      return `${policy.CancellationCharge || 0}% of total amount`;
+    }
+
+    return "Fixed charge";
+  };
 
   const hotelName =
     hotel?.hotel_name || hotel?.HotelName || hotel?.Name || "Hotel";
+
   const roomName =
     room?.room_name || room?.Name || room?.RoomTypeName || "Standard Room";
 
@@ -299,13 +294,10 @@ const HotelDetails = () => {
       return {
         RoomIndex: room.RoomIndex ?? room.roomIndex ?? index + 1,
         roomIndex: room.roomIndex ?? room.RoomIndex ?? index + 1,
-
         Adults: Number(room.Adults ?? room.adults ?? 1),
         adults: Number(room.adults ?? room.Adults ?? 1),
-
         Children: children,
         children,
-
         ChildAges: cleanAges,
         ChildrenAges: cleanAges,
         childAges: cleanAges,
@@ -316,12 +308,6 @@ const HotelDetails = () => {
       (room) => room.ChildrenAges,
     );
 
-    const safeGuests = {
-      ...(guests || {}),
-      childAges: normalizedChildAges,
-      roomGuests: normalizedRoomGuests,
-    };
-
     setSelectedRoom(finalRoom);
     setLoading(true);
 
@@ -331,17 +317,18 @@ const HotelDetails = () => {
         room: finalRoom,
         checkIn,
         checkOut,
-        guests: safeGuests,
-
+        guests: {
+          ...(guests || {}),
+          childAges: normalizedChildAges,
+          roomGuests: normalizedRoomGuests,
+        },
         childAges: normalizedChildAges,
         roomGuests: normalizedRoomGuests,
-
         bookingCode,
         cancellationPolicies: finalRoom.cancel_policies || [],
         inclusions: finalRoom.inclusion || "",
         mealType: finalRoom.meal || "",
         refundable: finalRoom.refundable,
-
         isDomesticHotel,
         isInternationalHotel,
         hotelType: isInternationalHotel ? "international" : "domestic",
@@ -351,9 +338,7 @@ const HotelDetails = () => {
 
   return (
     <div className="min-h-screen bg-[#0B0B0F] text-white px-4 md:px-10 py-16 md:py-24">
-      {/* ================= IMAGE GRID ================= */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-        {/* MAIN IMAGE */}
         <div className="md:col-span-2">
           <img
             src={images[0]}
@@ -363,7 +348,6 @@ const HotelDetails = () => {
           />
         </div>
 
-        {/* SIDE IMAGES */}
         <div className="grid grid-cols-2 gap-3 md:col-span-2">
           {images.slice(1, 5).map((img, i) => (
             <img
@@ -377,7 +361,6 @@ const HotelDetails = () => {
         </div>
       </div>
 
-      {/* ================= LIGHTBOX ================= */}
       {selectedImage && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 px-4">
           <button
@@ -395,11 +378,8 @@ const HotelDetails = () => {
         </div>
       )}
 
-      {/* ================= CONTENT ================= */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* LEFT */}
         <div className="md:col-span-2 space-y-6">
-          {/* HOTEL HEADER */}
           <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -431,12 +411,6 @@ const HotelDetails = () => {
               <span className="text-yellow-300 text-sm">
                 ⭐ {hotel?.rating || hotel?.Rating || "4.2"}
               </span>
-
-              {hotel?.refundable && (
-                <span className="px-2 py-1 text-xs bg-green-600/20 text-green-400 rounded-full">
-                  Refundable
-                </span>
-              )}
             </div>
 
             <p className="mt-3 text-sm text-gray-400">
@@ -445,7 +419,6 @@ const HotelDetails = () => {
             </p>
           </div>
 
-          {/* ROOM SELECTION */}
           {roomOptions.length > 0 && (
             <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
               <div className="flex items-center justify-between gap-3 mb-4">
@@ -550,7 +523,6 @@ const HotelDetails = () => {
             </div>
           )}
 
-          {/* ROOM DETAILS */}
           <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
             <h2 className="text-lg text-yellow-300 mb-3">Room Details</h2>
 
@@ -575,7 +547,45 @@ const HotelDetails = () => {
             )}
           </div>
 
-          {/* DESCRIPTION */}
+          {room?.cancel_policies?.length > 0 && (
+            <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
+              <h2 className="text-lg text-yellow-300 mb-4">
+                Cancellation Policy
+              </h2>
+
+              <div className="space-y-3">
+                {room.cancel_policies.map((policy, index) => {
+                  const calculatedCharge = getCancellationCharge(policy);
+
+                  return (
+                    <div
+                      key={index}
+                      className="rounded-xl border border-gray-800 bg-[#0B0B0F] p-4"
+                    >
+                      <p className="text-sm text-gray-300">
+                        From:
+                        <span className="text-white ml-2">
+                          {policy.FromDate || "N/A"}
+                        </span>
+                      </p>
+
+                      <p className="text-sm mt-2">
+                        Charge:
+                        <span className="text-red-300 ml-2">
+                          ₹ {formatPrice(calculatedCharge)}
+                        </span>
+                      </p>
+
+                      <p className="text-xs text-gray-500 mt-1">
+                        {getCancellationTypeText(policy)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
             <h2 className="text-lg text-yellow-300 mb-3">About this hotel</h2>
 
@@ -598,7 +608,6 @@ const HotelDetails = () => {
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR */}
         <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800 md:sticky md:top-24 h-fit">
           <h2 className="text-lg text-yellow-300 mb-4">Price Details</h2>
 
@@ -637,7 +646,6 @@ const HotelDetails = () => {
             </p>
           </div>
 
-          {/* CTA */}
           <button
             onClick={handlePreBook}
             disabled={loading}
