@@ -888,13 +888,13 @@ const HotelDetails = () => {
                 Cancellation
               </p>
 
-              <p className="mt-1 text-xs text-gray-300">
+              {/* <p className="mt-1 text-xs text-gray-300">
                 {selectedRoomPolicies.some(
                   (policy) => Number(policy.CancellationCharge || 0) === 0,
                 )
                   ? "Free cancellation available as per room policy."
                   : "Cancellation charges apply as per room policy."}
-              </p>
+              </p> */}
             </div>
           )}
 
