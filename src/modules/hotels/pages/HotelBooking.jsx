@@ -1,4 +1,5 @@
 "use client";
+
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { privateApi } from "../../../services/api";
@@ -26,9 +27,6 @@ const HotelBooking = () => {
     preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode;
 
   const net = Number(preBook?.net_amount || preBook?.NetAmount || 0);
-  // const total = Number(
-  //   preBook?.total_amount || preBook?.TotalAmount || net || 0,
-  // );
 
   const isPANRequired =
     Boolean(validation?.PANRequired) ||
@@ -185,6 +183,24 @@ const HotelBooking = () => {
     setGuestList(updated);
   };
 
+  const cleanNameInput = (value) => value.replace(/[^A-Za-z ]/g, "");
+
+  const normalizeName = (name) =>
+    name.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const isValidName = (name) => /^[A-Za-z ]{3,}$/.test(name.trim());
+
+  const isDuplicateFirstName = (currentIndex, firstName) => {
+    const current = normalizeName(firstName);
+
+    if (!current) return false;
+
+    return guestList.some(
+      (guest, index) =>
+        index !== currentIndex && normalizeName(guest.FirstName) === current,
+    );
+  };
+
   const isValidPAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
 
   const validateGuests = () => {
@@ -200,6 +216,18 @@ const HotelBooking = () => {
 
       if (!g.FirstName.trim() || !g.LastName.trim()) {
         return `Guest ${i + 1}: First name and last name are required`;
+      }
+
+      if (!isValidName(g.FirstName)) {
+        return `Guest ${i + 1}: First name must contain only alphabets and minimum 3 characters`;
+      }
+
+      if (!isValidName(g.LastName)) {
+        return `Guest ${i + 1}: Last name must contain only alphabets and minimum 3 characters`;
+      }
+
+      if (isDuplicateFirstName(i, g.FirstName)) {
+        return `Guest ${i + 1}: Same first name is not allowed for multiple guests`;
       }
 
       if (!g.Age) {
@@ -221,7 +249,9 @@ const HotelBooking = () => {
       }
 
       if (g.LeadPassenger) {
-        if (!g.Email.includes("@")) return "Valid email required";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g.Email.trim())) {
+          return "Valid email required";
+        }
 
         if (!/^[0-9]{10}$/.test(g.Phoneno)) {
           return "Valid 10-digit phone required";
@@ -288,9 +318,15 @@ const HotelBooking = () => {
         const passenger = {
           RoomIndex: g.RoomIndex,
           Title: g.PaxType === 2 ? "Mstr" : g.Title,
-          FirstName: g.FirstName.trim(),
+          FirstName: normalizeName(g.FirstName)
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" "),
           MiddleName: "",
-          LastName: g.LastName.trim(),
+          LastName: normalizeName(g.LastName)
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" "),
           PaxType: g.PaxType,
           Age: Number(g.Age),
           LeadPassenger: i === 0,
@@ -325,25 +361,11 @@ const HotelBooking = () => {
         PaxRooms,
       };
 
-      // International / PAN required hotel payload
       if (isPANRequired) {
         finalPayload.PANRequired = true;
         finalPayload.CorporateBooking = true;
         finalPayload.CorporatePAN = finalPAN;
       }
-
-      console.log(
-        isPANRequired
-          ? "FINAL INTERNATIONAL HOTEL PAYLOAD:"
-          : "FINAL DOMESTIC HOTEL PAYLOAD:",
-        JSON.stringify(finalPayload, null, 2),
-      );
-
-      console.log("ROOM-WISE PAX ROOMS:", JSON.stringify(PaxRooms, null, 2));
-      console.log(
-        "ROOM-WISE HOTEL ROOMS:",
-        JSON.stringify(HotelRoomsDetails, null, 2),
-      );
 
       const searchedRooms =
         preBook?.roomGuests ||
@@ -357,12 +379,6 @@ const HotelBooking = () => {
         guests?.roomGuests ||
         guests?.RoomGuests ||
         [];
-
-      console.log(
-        "SEARCH/PREBOOK ROOM GUESTS:",
-        JSON.stringify(searchedRooms, null, 2),
-      );
-      console.log("FINAL BOOKING PAXROOMS:", JSON.stringify(PaxRooms, null, 2));
 
       searchedRooms.forEach((room, index) => {
         const searchAges =
@@ -384,12 +400,15 @@ const HotelBooking = () => {
         }
       });
 
+      console.log(
+        "FINAL HOTEL PAYLOAD:",
+        JSON.stringify(finalPayload, null, 2),
+      );
+
       const res = await privateApi.post(
         "/api/hotels/hotels/book/",
         finalPayload,
       );
-
-      console.log("BOOK RESPONSE:", res.data);
 
       const guestsForStorage = cleanedGuests.map(
         ({ RoomIndex, ...guest }) => guest,
@@ -404,8 +423,6 @@ const HotelBooking = () => {
           checkIn,
           checkOut,
           net,
-          // total,
-          // convenienceFee,
           isPANRequired,
           bookingResponse: res.data,
         }),
@@ -417,10 +434,12 @@ const HotelBooking = () => {
         state: { booking: res.data },
       });
     } catch (err) {
-      console.log("BOOK ERROR:", err?.response?.data);
+      console.log("BOOK ERROR:", err?.response?.data || err);
+
       alert(
         err?.response?.data?.message ||
           err?.response?.data?.Error?.ErrorMessage ||
+          err?.message ||
           "Booking failed",
       );
     } finally {
@@ -461,7 +480,11 @@ const HotelBooking = () => {
                 className="input uppercase"
                 value={corporatePAN}
                 maxLength={10}
-                onChange={(e) => setCorporatePAN(e.target.value.toUpperCase())}
+                onChange={(e) =>
+                  setCorporatePAN(
+                    e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
+                  )
+                }
               />
 
               <p className="text-xs text-gray-500 mt-2">
@@ -505,8 +528,13 @@ const HotelBooking = () => {
                   placeholder="First Name"
                   className="input"
                   value={guest.FirstName}
+                  maxLength={30}
                   onChange={(e) =>
-                    updateGuest(index, "FirstName", e.target.value)
+                    updateGuest(
+                      index,
+                      "FirstName",
+                      cleanNameInput(e.target.value),
+                    )
                   }
                 />
 
@@ -514,8 +542,13 @@ const HotelBooking = () => {
                   placeholder="Last Name"
                   className="input"
                   value={guest.LastName}
+                  maxLength={30}
                   onChange={(e) =>
-                    updateGuest(index, "LastName", e.target.value)
+                    updateGuest(
+                      index,
+                      "LastName",
+                      cleanNameInput(e.target.value),
+                    )
                   }
                 />
 
@@ -547,7 +580,7 @@ const HotelBooking = () => {
                       className="input"
                       value={guest.Email}
                       onChange={(e) =>
-                        updateGuest(index, "Email", e.target.value)
+                        updateGuest(index, "Email", e.target.value.trim())
                       }
                     />
 
@@ -555,8 +588,13 @@ const HotelBooking = () => {
                       placeholder="Phone"
                       className="input"
                       value={guest.Phoneno}
+                      maxLength={10}
                       onChange={(e) =>
-                        updateGuest(index, "Phoneno", e.target.value)
+                        updateGuest(
+                          index,
+                          "Phoneno",
+                          e.target.value.replace(/\D/g, ""),
+                        )
                       }
                     />
                   </>
