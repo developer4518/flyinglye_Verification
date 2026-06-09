@@ -55,6 +55,159 @@ const getSafeText = (...values) =>
     ?.toString()
     .trim();
 
+const formatPriceValue = (val) =>
+  Math.round(Number(val) || 0).toLocaleString("en-IN");
+
+const getMatchedRawRoom = (roomData = {}, hotel = {}) => {
+  const bookingCode =
+    roomData?.booking_code ||
+    roomData?.BookingCode ||
+    roomData?.room_raw?.BookingCode;
+
+  const rawRooms =
+    hotel?.hotel_raw?.Rooms ||
+    hotel?.rawHotel?.Rooms ||
+    hotel?.HotelResult?.[0]?.Rooms ||
+    hotel?.raw?.HotelResult?.[0]?.Rooms ||
+    [];
+
+  if (!Array.isArray(rawRooms) || !bookingCode) return roomData?.room_raw || {};
+
+  return (
+    rawRooms.find((rawRoom) => rawRoom?.BookingCode === bookingCode) ||
+    roomData?.room_raw ||
+    {}
+  );
+};
+
+const getRoomCancelPolicies = (roomData = {}, rawRoom = {}) => {
+  const policies =
+    roomData?.cancel_policies ||
+    roomData?.CancelPolicies ||
+    roomData?.CancellationPolicies ||
+    rawRoom?.CancelPolicies ||
+    rawRoom?.CancellationPolicies ||
+    [];
+
+  return Array.isArray(policies) ? policies : [];
+};
+
+const getRoomDescription = (roomData = {}, hotel = {}) => {
+  const name =
+    roomData?.room_name ||
+    roomData?.Name?.[0] ||
+    roomData?.Name ||
+    roomData?.RoomName ||
+    "";
+
+  const roomDetails =
+    hotel?.rooms ||
+    hotel?.roomDetails ||
+    hotel?.HotelRooms ||
+    hotel?.hotelRooms ||
+    hotel?.RoomsDetails ||
+    [];
+
+  const matchedDetail = Array.isArray(roomDetails)
+    ? roomDetails.find((item) => {
+        const detailName = String(
+          item?.RoomName || item?.room_name || item?.Name || "",
+        ).toLowerCase();
+
+        return (
+          detailName &&
+          String(name).toLowerCase() &&
+          (detailName.includes(String(name).toLowerCase()) ||
+            String(name).toLowerCase().includes(detailName))
+        );
+      })
+    : null;
+
+  return (
+    roomData?.RoomDescription ||
+    roomData?.room_description ||
+    roomData?.description ||
+    matchedDetail?.RoomDescription ||
+    matchedDetail?.room_description ||
+    matchedDetail?.Description ||
+    ""
+  );
+};
+
+const normalizeRoomData = (roomData = {}, hotel = {}) => {
+  const matchedRawRoom = getMatchedRawRoom(roomData, hotel);
+  const rawRoom = roomData?.room_raw || matchedRawRoom || roomData;
+
+  const bookingCode =
+    roomData?.booking_code ||
+    roomData?.BookingCode ||
+    rawRoom?.BookingCode ||
+    matchedRawRoom?.BookingCode ||
+    null;
+
+  const name =
+    roomData?.room_name ||
+    roomData?.Name?.[0] ||
+    roomData?.Name ||
+    roomData?.RoomTypeName ||
+    roomData?.RoomName ||
+    rawRoom?.Name?.[0] ||
+    rawRoom?.Name ||
+    rawRoom?.RoomName ||
+    "Standard Room";
+
+  const cancelPolicies = getRoomCancelPolicies(roomData, rawRoom);
+
+  return {
+    ...roomData,
+    room_raw: rawRoom,
+    booking_code: bookingCode,
+    BookingCode: bookingCode,
+    Name: name,
+    room_name: name,
+
+    price:
+      Number(
+        roomData?.price ||
+          roomData?.TotalFare ||
+          rawRoom?.TotalFare ||
+          roomData?.Price?.PublishedPrice ||
+          roomData?.PublishedPrice ||
+          0,
+      ) || 0,
+
+    tax:
+      Number(
+        roomData?.tax ||
+          roomData?.TotalTax ||
+          rawRoom?.TotalTax ||
+          roomData?.Price?.Tax ||
+          roomData?.Tax ||
+          0,
+      ) || 0,
+
+    meal:
+      roomData?.meal ||
+      roomData?.MealType ||
+      rawRoom?.MealType ||
+      roomData?.MealPlan ||
+      "",
+
+    refundable:
+      roomData?.refundable ??
+      roomData?.IsRefundable ??
+      rawRoom?.IsRefundable ??
+      false,
+
+    inclusion:
+      roomData?.inclusion || roomData?.Inclusion || rawRoom?.Inclusion || "",
+
+    room_description: getRoomDescription(roomData, hotel),
+    cancel_policies: cancelPolicies,
+    CancelPolicies: cancelPolicies,
+  };
+};
+
 const HotelDetails = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
@@ -72,69 +225,20 @@ const HotelDetails = () => {
     hotel?.rawHotel?.Rooms ||
     [];
 
-  const normalizeRoom = (roomData = {}) => {
-    const rawRoom = roomData.room_raw || roomData;
+  const roomOptions = useMemo(() => {
+    const rooms = Array.isArray(availableRooms) ? availableRooms : [];
 
-    const bookingCode =
-      roomData.booking_code ||
-      roomData.BookingCode ||
-      rawRoom?.BookingCode ||
-      null;
+    if (rooms.length > 0) {
+      return rooms.map((roomData) => normalizeRoomData(roomData, hotel));
+    }
 
-    const name =
-      roomData.room_name ||
-      roomData.Name?.[0] ||
-      roomData.Name ||
-      roomData.RoomTypeName ||
-      rawRoom?.Name?.[0] ||
-      rawRoom?.Name ||
-      "Standard Room";
-
-    return {
-      ...roomData,
-      room_raw: rawRoom,
-      booking_code: bookingCode,
-      BookingCode: bookingCode,
-      Name: name,
-      room_name: name,
-      price:
-        Number(
-          roomData.price ||
-            roomData.TotalFare ||
-            rawRoom?.TotalFare ||
-            roomData.Price?.PublishedPrice ||
-            0,
-        ) || 0,
-      tax:
-        Number(
-          roomData.tax ||
-            roomData.TotalTax ||
-            rawRoom?.TotalTax ||
-            roomData.Price?.Tax ||
-            0,
-        ) || 0,
-      meal: roomData.meal || roomData.MealType || rawRoom?.MealType || "",
-      refundable:
-        roomData.refundable ??
-        roomData.IsRefundable ??
-        rawRoom?.IsRefundable ??
-        false,
-      inclusion:
-        roomData.inclusion || roomData.Inclusion || rawRoom?.Inclusion || "",
-      cancel_policies:
-        roomData.cancel_policies ||
-        roomData.CancelPolicies ||
-        rawRoom?.CancelPolicies ||
-        [],
-    };
-  };
-
-  const roomOptions = availableRooms.length
-    ? availableRooms.map(normalizeRoom)
-    : [payload.room || selectedRoom].filter(Boolean).map(normalizeRoom);
+    return [payload.room || selectedRoom]
+      .filter(Boolean)
+      .map((roomData) => normalizeRoomData(roomData, hotel));
+  }, [availableRooms, hotel, payload.room, selectedRoom]);
 
   const [activeRoom, setActiveRoom] = useState(() =>
-    normalizeRoom(payload.room || selectedRoom || roomOptions[0]),
+    normalizeRoomData(payload.room || selectedRoom || roomOptions[0], hotel),
   );
 
   const room = activeRoom;
@@ -145,6 +249,12 @@ const HotelDetails = () => {
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [roomSearch, setRoomSearch] = useState("");
+  const [sortBy, setSortBy] = useState("price");
+  const [splitRoom, setSplitRoom] = useState(false);
+  const [openDescriptions, setOpenDescriptions] = useState({});
+  const [openPolicies, setOpenPolicies] = useState({});
 
   const { isDomesticHotel, isInternationalHotel } = useMemo(() => {
     if (!hotel) {
@@ -201,47 +311,27 @@ const HotelDetails = () => {
     );
   }
 
+  const hotelName =
+    hotel?.hotel_name || hotel?.HotelName || hotel?.Name || "Hotel";
+
   const images =
     Array.isArray(hotel?.images) && hotel.images.length > 0
       ? hotel.images
-      : [hotel?.image || "https://via.placeholder.com/600"];
+      : Array.isArray(hotel?.Images) && hotel.Images.length > 0
+        ? hotel.Images
+        : [hotel?.image || hotel?.Image || "https://via.placeholder.com/600"];
 
   const totalGuests =
-    Number(guests?.adults || 0) + Number(guests?.children || 0);
+    Number(guests?.adults || guests?.Adults || 0) +
+    Number(guests?.children || guests?.Children || 0);
 
-  const formatPrice = (val) =>
-    Math.round(Number(val) || 0).toLocaleString("en-IN");
+  const formatPrice = (val) => formatPriceValue(val);
 
   const roomPrice = Number(
     room?.price || room?.TotalFare || room?.NetAmount || 0,
   );
-
   const tax = Number(room?.tax || room?.TotalTax || room?.Tax || 0);
   const totalAmount = roomPrice + tax;
-
-  const getCancellationCharge = (policy = {}) => {
-    const charge = Number(policy.CancellationCharge || 0);
-    const type = String(policy.ChargeType || "").toLowerCase();
-
-    if (type.includes("percent")) {
-      return (totalAmount * charge) / 100;
-    }
-
-    return charge;
-  };
-
-  const getCancellationTypeText = (policy = {}) => {
-    const type = String(policy.ChargeType || "").toLowerCase();
-
-    if (type.includes("percent")) {
-      return `${policy.CancellationCharge || 0}% of total amount`;
-    }
-
-    return "Fixed charge";
-  };
-
-  const hotelName =
-    hotel?.hotel_name || hotel?.HotelName || hotel?.Name || "Hotel";
 
   const roomName =
     room?.room_name || room?.Name || room?.RoomTypeName || "Standard Room";
@@ -252,6 +342,66 @@ const HotelDetails = () => {
     hotel?.description ||
     hotel?.Description ||
     "This premium hotel offers modern rooms, excellent hospitality, and top-class amenities. Ideal for business and leisure stays with easy access to major attractions.";
+
+  const selectedRoomPolicies = Array.isArray(room?.cancel_policies)
+    ? room.cancel_policies
+    : [];
+
+  const filteredRoomOptions = useMemo(() => {
+    let data = [...roomOptions];
+
+    if (roomSearch.trim()) {
+      data = data.filter((item) =>
+        String(item?.room_name || item?.Name || "")
+          .toLowerCase()
+          .includes(roomSearch.toLowerCase()),
+      );
+    }
+
+    if (sortBy === "price") {
+      data.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    }
+
+    if (sortBy === "priceHigh") {
+      data.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+    }
+
+    return data;
+  }, [roomOptions, roomSearch, sortBy]);
+
+  const getCancellationCharge = (policy = {}, baseAmount = totalAmount) => {
+    const charge = Number(policy.CancellationCharge || 0);
+    const type = String(policy.ChargeType || "").toLowerCase();
+
+    if (type.includes("percent")) {
+      return (baseAmount * charge) / 100;
+    }
+
+    return charge;
+  };
+
+  const getCancellationText = (policy = {}, baseAmount = totalAmount) => {
+    const charge = Number(policy.CancellationCharge || 0);
+    const type = String(policy.ChargeType || "Fixed");
+
+    if (charge === 0) return "Free cancellation";
+
+    if (type.toLowerCase().includes("percent")) {
+      return `${charge}% charge`;
+    }
+
+    return `₹ ${formatPrice(getCancellationCharge(policy, baseAmount))} charge`;
+  };
+
+  const getRoomCountTitle = () => {
+    const adults = Number(guests?.adults || guests?.Adults || 0);
+    const children = Number(guests?.children || guests?.Children || 0);
+    const rooms = Number(guests?.rooms || guests?.Rooms || 1);
+
+    return `Room ${rooms || 1} (${adults || 1} Adult${
+      (adults || 1) > 1 ? "s" : ""
+    } ${children ? `${children} Child${children > 1 ? "ren" : ""}` : ""})`;
+  };
 
   const handlePreBook = () => {
     const bookingCode =
@@ -266,6 +416,8 @@ const HotelDetails = () => {
       ...room,
       booking_code: bookingCode,
       BookingCode: bookingCode,
+      cancel_policies: selectedRoomPolicies,
+      CancelPolicies: selectedRoomPolicies,
     };
 
     const safeRoomGuests = Array.isArray(payload?.roomGuests)
@@ -276,26 +428,28 @@ const HotelDetails = () => {
           ? search.guests.roomGuests
           : [];
 
-    const normalizedRoomGuests = safeRoomGuests.map((room, index) => {
-      const children = Number(room.Children ?? room.children ?? 0);
+    const normalizedRoomGuests = safeRoomGuests.map((roomGuest, index) => {
+      const children = Number(roomGuest.Children ?? roomGuest.children ?? 0);
 
       const ages =
-        room.ChildrenAges ||
-        room.ChildAges ||
-        room.childAges ||
-        room.childrenAges ||
+        roomGuest.ChildrenAges ||
+        roomGuest.ChildAges ||
+        roomGuest.childAges ||
+        roomGuest.childrenAges ||
         [];
 
-      const cleanAges = ages
-        .slice(0, children)
-        .map((age) => Number(age))
-        .filter((age) => age >= 1 && age <= 12);
+      const cleanAges = Array.isArray(ages)
+        ? ages
+            .slice(0, children)
+            .map((age) => Number(age))
+            .filter((age) => age >= 1 && age <= 12)
+        : [];
 
       return {
-        RoomIndex: room.RoomIndex ?? room.roomIndex ?? index + 1,
-        roomIndex: room.roomIndex ?? room.RoomIndex ?? index + 1,
-        Adults: Number(room.Adults ?? room.adults ?? 1),
-        adults: Number(room.adults ?? room.Adults ?? 1),
+        RoomIndex: roomGuest.RoomIndex ?? roomGuest.roomIndex ?? index + 1,
+        roomIndex: roomGuest.roomIndex ?? roomGuest.RoomIndex ?? index + 1,
+        Adults: Number(roomGuest.Adults ?? roomGuest.adults ?? 1),
+        adults: Number(roomGuest.adults ?? roomGuest.Adults ?? 1),
         Children: children,
         children,
         ChildAges: cleanAges,
@@ -305,7 +459,7 @@ const HotelDetails = () => {
     });
 
     const normalizedChildAges = normalizedRoomGuests.flatMap(
-      (room) => room.ChildrenAges,
+      (roomGuest) => roomGuest.ChildrenAges,
     );
 
     setSelectedRoom(finalRoom);
@@ -325,7 +479,7 @@ const HotelDetails = () => {
         childAges: normalizedChildAges,
         roomGuests: normalizedRoomGuests,
         bookingCode,
-        cancellationPolicies: finalRoom.cancel_policies || [],
+        cancellationPolicies: selectedRoomPolicies,
         inclusions: finalRoom.inclusion || "",
         mealType: finalRoom.meal || "",
         refundable: finalRoom.refundable,
@@ -344,7 +498,7 @@ const HotelDetails = () => {
             src={images[0]}
             alt={hotelName}
             onClick={() => setSelectedImage(images[0])}
-            className="w-full h-64 md:h-105 object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
+            className="w-full h-64 md:h-[420px] object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
           />
         </div>
 
@@ -355,7 +509,7 @@ const HotelDetails = () => {
               src={img}
               alt={`${hotelName} ${i + 2}`}
               onClick={() => setSelectedImage(img)}
-              className="w-full h-32 md:h-50 object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
+              className="w-full h-32 md:h-[202px] object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
             />
           ))}
         </div>
@@ -420,105 +574,190 @@ const HotelDetails = () => {
           </div>
 
           {roomOptions.length > 0 && (
-            <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <h2 className="text-lg text-yellow-300">Select Room</h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Choose your preferred room before booking.
-                  </p>
+            <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+              <div className="bg-[#d9d7eb] px-4 py-4 text-black">
+                <div className="mb-3 text-sm font-bold">
+                  {getRoomCountTitle()}
                 </div>
 
-                <span className="text-xs px-3 py-1 rounded-full bg-yellow-400/10 text-yellow-300 border border-yellow-400/20">
-                  {roomOptions.length} Option{roomOptions.length > 1 ? "s" : ""}
-                </span>
+                <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                  <input
+                    value={roomSearch}
+                    onChange={(e) => setRoomSearch(e.target.value)}
+                    placeholder="Search Room Type"
+                    className="h-8 w-full rounded border border-gray-300 bg-white px-3 text-sm outline-none md:w-56"
+                  />
+
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="h-8 rounded border border-gray-300 bg-white px-2 text-sm outline-none"
+                  >
+                    <option value="price">Price</option>
+                    <option value="priceHigh">Price High</option>
+                  </select>
+
+                  <label className="flex h-8 items-center gap-2 rounded bg-white px-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={splitRoom}
+                      onChange={(e) => setSplitRoom(e.target.checked)}
+                    />
+                    Split Room
+                  </label>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {roomOptions.map((roomItem, index) => {
+              <div className="divide-y divide-gray-200 bg-white text-black">
+                {filteredRoomOptions.map((roomItem, index) => {
+                  const roomKey = roomItem.BookingCode || index;
+
                   const isSelected =
                     (room?.BookingCode || room?.booking_code) ===
                     (roomItem?.BookingCode || roomItem?.booking_code);
 
+                  const policies = Array.isArray(roomItem.cancel_policies)
+                    ? roomItem.cancel_policies
+                    : [];
+
+                  const roomTotal =
+                    Number(roomItem?.price || 0) + Number(roomItem?.tax || 0);
+
+                  const roomDesc =
+                    roomItem.room_description ||
+                    "Layout - Bedroom\nInternet - Free WiFi\nEntertainment - LCD television with satellite channels\nFood and Drink - Room service\nBathroom - Free toiletries and shower\nComfort - Air conditioning and daily housekeeping\nNon-Smoking";
+
                   return (
-                    <button
-                      type="button"
-                      key={roomItem.BookingCode || index}
+                    <div
+                      key={roomKey}
                       onClick={() => {
                         setActiveRoom(roomItem);
                         setSelectedRoom(roomItem);
                       }}
-                      className={`w-full text-left rounded-2xl border p-4 transition ${
+                      className={`cursor-pointer px-3 py-3 transition ${
                         isSelected
-                          ? "border-yellow-400 bg-yellow-400/10"
-                          : "border-gray-800 bg-[#0B0B0F] hover:border-yellow-400/40"
+                          ? "bg-[#ffe7a6]"
+                          : "bg-white hover:bg-gray-50"
                       }`}
                     >
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_0.8fr_1fr_0.7fr] md:items-start">
                         <div>
-                          <p className="font-semibold text-white">
-                            {roomItem.room_name ||
-                              roomItem.Name ||
-                              "Standard Room"}
-                          </p>
+                          <div className="flex items-start gap-2">
+                            <input
+                              type="radio"
+                              checked={isSelected}
+                              onChange={() => {
+                                setActiveRoom(roomItem);
+                                setSelectedRoom(roomItem);
+                              }}
+                              className="mt-1"
+                            />
 
-                          {roomItem.inclusion && (
-                            <div className="mt-3 space-y-1">
-                              {roomItem.inclusion
-                                .split(",")
-                                .filter(Boolean)
-                                .map((item, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex items-center gap-2 text-sm text-gray-300"
-                                  >
-                                    <span className="text-green-400">✓</span>
-                                    <span>{item.trim()}</span>
-                                  </div>
-                                ))}
+                            <div>
+                              <p className="text-sm font-bold text-black">
+                                {roomItem.room_name ||
+                                  roomItem.Name ||
+                                  "Standard Room"}
+                              </p>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDescriptions((prev) => ({
+                                    ...prev,
+                                    [roomKey]: !prev[roomKey],
+                                  }));
+                                }}
+                                className="text-sm font-medium text-blue-600 underline"
+                              >
+                                {openDescriptions[roomKey]
+                                  ? "Hide Room Description"
+                                  : "Show Room Description"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {openDescriptions[roomKey] && (
+                            <div className="mt-2 ml-5 max-w-xl whitespace-pre-line border border-gray-300 bg-white p-2 text-sm leading-6 text-gray-800">
+                              {roomDesc}
                             </div>
                           )}
-
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {roomItem.meal && (
-                              <span className="text-[10px] px-2 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                                {String(roomItem.meal).replaceAll("_", " ")}
-                              </span>
-                            )}
-
-                            <span
-                              className={`text-[10px] px-2 py-1 rounded-full border ${
-                                roomItem.refundable
-                                  ? "bg-green-500/10 text-green-300 border-green-500/20"
-                                  : "bg-red-500/10 text-red-300 border-red-500/20"
-                              }`}
-                            >
-                              {roomItem.refundable
-                                ? "Refundable"
-                                : "Non-refundable"}
-                            </span>
-                          </div>
                         </div>
 
-                        <div className="md:text-right">
-                          <p className="text-xl font-bold text-yellow-400">
-                            ₹ {formatPrice(roomItem.price)}
-                          </p>
+                        <div className="text-sm text-black">
+                          {roomItem.inclusion
+                            ? roomItem.inclusion
+                                .split(",")
+                                .filter(Boolean)
+                                .map((item, i) => <p key={i}>{item.trim()}</p>)
+                            : "Room Only"}
+                        </div>
 
-                          <p className="text-xs text-gray-500">
-                            + ₹ {formatPrice(roomItem.tax)} taxes
-                          </p>
+                        <div>
+                          {policies.length > 0 ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenPolicies((prev) => ({
+                                    ...prev,
+                                    [roomKey]: !prev[roomKey],
+                                  }));
+                                }}
+                                className="text-sm font-medium text-blue-600"
+                              >
+                                All Rooms Cancellation Policies.
+                              </button>
 
-                          {isSelected && (
-                            <p className="text-xs text-yellow-300 mt-1">
-                              Selected
-                            </p>
+                              {openPolicies[roomKey] && (
+                                <div className="mt-2 rounded border border-gray-300 bg-white p-2 text-xs text-gray-800">
+                                  {policies.map((policy, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex justify-between gap-3 border-b border-gray-100 py-1 last:border-0"
+                                    >
+                                      <span>
+                                        From {policy.FromDate || "N/A"}
+                                      </span>
+                                      <span
+                                        className={
+                                          Number(
+                                            policy.CancellationCharge || 0,
+                                          ) === 0
+                                            ? "font-semibold text-green-700"
+                                            : "font-semibold text-red-700"
+                                        }
+                                      >
+                                        {getCancellationText(policy, roomTotal)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-sm text-gray-500">
+                              Policy not available
+                            </span>
                           )}
                         </div>
+
+                        <div className="text-right text-sm font-bold text-[#18558a]">
+                          <p>Off : ₹ {formatPrice(roomItem.price)}</p>
+                          <p>Pub : ₹ {formatPrice(roomTotal)}</p>
+                        </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
+
+                {filteredRoomOptions.length === 0 && (
+                  <div className="p-5 text-center text-sm text-gray-500">
+                    No rooms found.
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -532,7 +771,7 @@ const HotelDetails = () => {
 
             {mealPlan && (
               <p className="text-sm mb-2">
-                🍽 {String(mealPlan).replace("_", " ")}
+                🍽 {String(mealPlan).replaceAll("_", " ")}
               </p>
             )}
 
@@ -547,15 +786,16 @@ const HotelDetails = () => {
             )}
           </div>
 
-          {room?.cancel_policies?.length > 0 && (
+          {selectedRoomPolicies.length > 0 && (
             <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800">
               <h2 className="text-lg text-yellow-300 mb-4">
                 Cancellation Policy
               </h2>
 
               <div className="space-y-3">
-                {room.cancel_policies.map((policy, index) => {
+                {selectedRoomPolicies.map((policy, index) => {
                   const calculatedCharge = getCancellationCharge(policy);
+                  const rawCharge = Number(policy.CancellationCharge || 0);
 
                   return (
                     <div
@@ -571,13 +811,23 @@ const HotelDetails = () => {
 
                       <p className="text-sm mt-2">
                         Charge:
-                        <span className="text-red-300 ml-2">
-                          ₹ {formatPrice(calculatedCharge)}
+                        <span
+                          className={`ml-2 ${
+                            rawCharge === 0 ? "text-green-300" : "text-red-300"
+                          }`}
+                        >
+                          {rawCharge === 0
+                            ? "Free cancellation"
+                            : `₹ ${formatPrice(calculatedCharge)}`}
                         </span>
                       </p>
 
                       <p className="text-xs text-gray-500 mt-1">
-                        {getCancellationTypeText(policy)}
+                        {String(policy.ChargeType || "")
+                          .toLowerCase()
+                          .includes("percent")
+                          ? `${policy.CancellationCharge || 0}% of total amount`
+                          : "Fixed charge"}
                       </p>
                     </div>
                   );
@@ -632,6 +882,22 @@ const HotelDetails = () => {
             </div>
           </div>
 
+          {selectedRoomPolicies.length > 0 && (
+            <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-3">
+              <p className="text-xs text-yellow-300 font-semibold">
+                Cancellation
+              </p>
+
+              <p className="mt-1 text-xs text-gray-300">
+                {selectedRoomPolicies.some(
+                  (policy) => Number(policy.CancellationCharge || 0) === 0,
+                )
+                  ? "Free cancellation available as per room policy."
+                  : "Cancellation charges apply as per room policy."}
+              </p>
+            </div>
+          )}
+
           <div className="mt-5 rounded-xl border border-gray-800 bg-black/20 p-3">
             <p className="text-xs text-gray-400">Hotel Type</p>
 
@@ -649,7 +915,7 @@ const HotelDetails = () => {
           <button
             onClick={handlePreBook}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-linear-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 disabled:opacity-60 disabled:hover:scale-100 transition"
+            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-gradient-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 disabled:opacity-60 disabled:hover:scale-100 transition"
           >
             {loading ? "Processing..." : "Book Now"}
           </button>
