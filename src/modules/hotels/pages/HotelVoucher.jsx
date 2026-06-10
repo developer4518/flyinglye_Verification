@@ -1,7 +1,9 @@
 "use client";
 
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const safeJsonParse = (value, fallback = {}) => {
   try {
@@ -86,6 +88,9 @@ const HotelVoucher = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { bookingId } = useParams();
+
+  const voucherRef = useRef(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const savedLocalData = safeJsonParse(
     localStorage.getItem("hotelBookingData"),
@@ -252,7 +257,9 @@ const HotelVoucher = () => {
   const agencyCity = "Delhi";
 
   const handlePrint = () => {
-    window.print();
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   const handleEmail = () => {
@@ -274,12 +281,69 @@ Flyinglyte`,
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
-  const handleGeneratePdf = () => {
-    window.print();
+  const handleGeneratePdf = async () => {
+    if (!voucherRef.current) return;
+
+    try {
+      setPdfLoading(true);
+
+      const voucherElement = voucherRef.current;
+
+      await document.fonts?.ready;
+
+      const canvas = await html2canvas(voucherElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#0b0f14",
+        logging: false,
+        windowWidth: voucherElement.scrollWidth,
+        windowHeight: voucherElement.scrollHeight,
+      });
+
+      const imgData = canvas.toDataURL("image/png", 1.0);
+
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const margin = 6;
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = margin;
+
+      pdf.setFillColor(11, 15, 20);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+
+      heightLeft -= pageHeight - margin * 2;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + margin;
+        pdf.addPage();
+
+        pdf.setFillColor(11, 15, 20);
+        pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight - margin * 2;
+      }
+
+      pdf.save(`Hotel-Voucher-${confirmationNo || "Booking"}.pdf`);
+    } catch (error) {
+      console.error("PDF GENERATE ERROR:", error);
+      alert("Unable to generate PDF. Please try again.");
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-(--bg-main) py-26 px-3 font-(--font-body) text-(--text-main)">
+    <div className="min-h-screen bg-[var(--bg-main)] py-26 px-3 font-[var(--font-body)] text-[var(--text-main)]">
       <style>
         {`
           .voucher-wrapper {
@@ -330,6 +394,11 @@ Flyinglyte`,
 
           .voucher-actions button:hover {
             color: #ffffff;
+          }
+
+          .voucher-actions button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
           }
 
           .voucher-gold {
@@ -494,8 +563,11 @@ Flyinglyte`,
           }
 
           @media print {
+            html,
             body {
-              background: #ffffff !important;
+              background: #0b0f14 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
 
             .no-print {
@@ -506,51 +578,70 @@ Flyinglyte`,
               max-width: 100% !important;
               border-radius: 0 !important;
               box-shadow: none !important;
-              background: #ffffff !important;
-              border: 1px solid #9bb8ca !important;
+              background: var(--bg-card) !important;
+              border: 1px solid rgba(201, 162, 77, 0.28) !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
 
             .voucher-top {
-              background: #0f4c81 !important;
-              color: #ffffff !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-              padding: 6px 8px !important;
+              background: linear-gradient(90deg, var(--bg-primary), var(--bg-via), var(--bg-secondary)) !important;
+              color: var(--text-main) !important;
+              border-bottom: 1px solid rgba(201, 162, 77, 0.25) !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
 
             .voucher-title {
-              color: #ffffff !important;
-              font-family: Arial, sans-serif !important;
-              font-size: 22px !important;
+              color: var(--gold-main) !important;
+              font-family: var(--font-heading) !important;
             }
 
             .voucher-heading,
             .voucher-table th {
-              background: #eeeeff !important;
-              color: #064776 !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
+              background: linear-gradient(90deg, rgba(248, 222, 130, 0.14), rgba(234, 168, 42, 0.08)) !important;
+              color: var(--gold-main) !important;
+              border-color: rgba(201, 162, 77, 0.22) !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
 
             .voucher-cell,
-            .voucher-table td,
-            .voucher-row,
-            .voucher-wrapper * {
-              color: #2d2d2d !important;
-              border-color: #9bb8ca !important;
-              font-family: Arial, sans-serif !important;
+            .voucher-table td {
+              color: var(--text-muted) !important;
+              border-color: rgba(255, 255, 255, 0.08) !important;
+              background: transparent !important;
+            }
+
+            .voucher-row {
+              border-color: rgba(255, 255, 255, 0.08) !important;
             }
 
             .voucher-gold {
-              color: #064776 !important;
+              color: var(--gold-main) !important;
             }
 
-            .red-text {
-              color: red !important;
+            .room-name,
+            .voucher-cell strong,
+            .voucher-cell b,
+            .text-white {
+              color: #ffffff !important;
             }
 
             .gold-link {
-              color: #064776 !important;
+              color: var(--gold-soft) !important;
+            }
+
+            .red-text {
+              color: #ff5c5c !important;
+            }
+
+            .table-scroll {
+              overflow: visible !important;
+            }
+
+            .voucher-table {
+              min-width: 0 !important;
             }
 
             @page {
@@ -561,16 +652,20 @@ Flyinglyte`,
         `}
       </style>
 
-      <div className="voucher-wrapper">
+      <div ref={voucherRef} className="voucher-wrapper">
         <div className="voucher-top">
           <div className="voucher-title">Hotel Voucher</div>
 
           <div className="voucher-actions no-print">
             <button onClick={handleEmail}>Email Voucher</button>
-            <span className="text-(--text-muted)">|</span>
+            <span className="text-[var(--text-muted)]">|</span>
+
             <button onClick={handlePrint}>Print Voucher</button>
-            <span className="text-(--text-muted)">|</span>
-            <button onClick={handleGeneratePdf}>Generate PDF 🧾</button>
+            <span className="text-[var(--text-muted)]">|</span>
+
+            <button onClick={handleGeneratePdf} disabled={pdfLoading}>
+              {pdfLoading ? "Generating..." : "Generate PDF 🧾"}
+            </button>
           </div>
         </div>
 
@@ -748,9 +843,7 @@ Flyinglyte`,
           <div className="voucher-cell">
             <h2 className="voucher-gold text-lg mb-4">Package Details:</h2>
 
-            <div className="voucher-gold text-sm">
-              Special Service Request:
-            </div>
+            <div className="voucher-gold text-sm">Special Service Request:</div>
 
             <div className="mt-2">
               {booking?.SpecialRequest || booking?.SSR || "N.A."}
@@ -779,9 +872,7 @@ Flyinglyte`,
 
         <section className="voucher-row">
           <div className="voucher-cell">
-            <h2 className="voucher-gold text-lg">
-              Booking Terms & Conditions
-            </h2>
+            <h2 className="voucher-gold text-lg">Booking Terms & Conditions</h2>
 
             <ul className="terms-list list-disc">
               <li>
@@ -804,9 +895,9 @@ Flyinglyte`,
               </li>
 
               <li>
-                In case of wrong residency & nationality selected by user at
-                the time of booking; the supplement charges may be applicable
-                and need to be paid to the hotel by guest on check in/check out.
+                In case of wrong residency & nationality selected by user at the
+                time of booking; the supplement charges may be applicable and
+                need to be paid to the hotel by guest on check in/check out.
               </li>
 
               <li>
@@ -860,8 +951,8 @@ Flyinglyte`,
                     </li>
                     <li>
                       Government-issued photo identification and a credit card,
-                      debit card, or cash deposit may be required at check-in for
-                      incidental charges.
+                      debit card, or cash deposit may be required at check-in
+                      for incidental charges.
                     </li>
                     <li>
                       Special requests are subject to availability upon check-in
@@ -951,7 +1042,7 @@ Flyinglyte`,
         </section>
       </div>
 
-      <div className="no-print max-w-262.5 mx-auto mt-5 flex justify-end">
+      <div className="no-print max-w-[1050px] mx-auto mt-5 flex justify-end">
         <button onClick={() => navigate(-1)} className="back-btn">
           Back
         </button>
