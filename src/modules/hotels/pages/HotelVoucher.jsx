@@ -91,6 +91,7 @@ const HotelVoucher = () => {
 
   const voucherRef = useRef(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfCaptureMode, setPdfCaptureMode] = useState(false);
 
   const savedLocalData = safeJsonParse(
     localStorage.getItem("hotelBookingData"),
@@ -257,9 +258,7 @@ const HotelVoucher = () => {
   const agencyCity = "Delhi";
 
   const handlePrint = () => {
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    window.print();
   };
 
   const handleEmail = () => {
@@ -281,15 +280,24 @@ Flyinglyte`,
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
+  const waitForPaint = () =>
+    new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(resolve);
+      });
+    });
+
   const handleGeneratePdf = async () => {
     if (!voucherRef.current) return;
 
     try {
       setPdfLoading(true);
-
-      const voucherElement = voucherRef.current;
+      setPdfCaptureMode(true);
 
       await document.fonts?.ready;
+      await waitForPaint();
+
+      const voucherElement = voucherRef.current;
 
       const canvas = await html2canvas(voucherElement, {
         scale: 2,
@@ -297,6 +305,8 @@ Flyinglyte`,
         allowTaint: true,
         backgroundColor: "#0b0f14",
         logging: false,
+        scrollX: 0,
+        scrollY: 0,
         windowWidth: voucherElement.scrollWidth,
         windowHeight: voucherElement.scrollHeight,
       });
@@ -309,28 +319,30 @@ Flyinglyte`,
       const pageHeight = pdf.internal.pageSize.getHeight();
 
       const margin = 6;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
 
-      let heightLeft = imgHeight;
-      let position = margin;
+      const imgHeight = (canvas.height * usableWidth) / canvas.width;
+
+      let remainingHeight = imgHeight;
+      let yPosition = margin;
 
       pdf.setFillColor(11, 15, 20);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      pdf.addImage(imgData, "PNG", margin, yPosition, usableWidth, imgHeight);
 
-      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      remainingHeight -= usableHeight;
 
-      heightLeft -= pageHeight - margin * 2;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight + margin;
+      while (remainingHeight > 0) {
         pdf.addPage();
+
+        yPosition = margin - (imgHeight - remainingHeight);
 
         pdf.setFillColor(11, 15, 20);
         pdf.rect(0, 0, pageWidth, pageHeight, "F");
+        pdf.addImage(imgData, "PNG", margin, yPosition, usableWidth, imgHeight);
 
-        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight - margin * 2;
+        remainingHeight -= usableHeight;
       }
 
       pdf.save(`Hotel-Voucher-${confirmationNo || "Booking"}.pdf`);
@@ -338,12 +350,13 @@ Flyinglyte`,
       console.error("PDF GENERATE ERROR:", error);
       alert("Unable to generate PDF. Please try again.");
     } finally {
+      setPdfCaptureMode(false);
       setPdfLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] py-26 px-3 font-[var(--font-body)] text-[var(--text-main)]">
+    <div className="min-h-screen bg-[var(--bg-main)] py-10 md:py-24 px-3 font-[var(--font-body)] text-[var(--text-main)]">
       <style>
         {`
           .voucher-wrapper {
@@ -357,13 +370,19 @@ Flyinglyte`,
             box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
           }
 
+          .voucher-wrapper.pdf-capture {
+            border-radius: 0;
+            box-shadow: none;
+          }
+
           .voucher-top {
             background: linear-gradient(90deg, var(--bg-primary), var(--bg-via), var(--bg-secondary));
             color: var(--text-main);
             padding: 16px 20px;
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr auto;
             align-items: center;
-            justify-content: space-between;
+            gap: 16px;
             border-bottom: 1px solid rgba(201, 162, 77, 0.25);
           }
 
@@ -373,11 +392,14 @@ Flyinglyte`,
             line-height: 1.2;
             color: var(--gold-main);
             letter-spacing: 0.5px;
+            white-space: nowrap;
           }
 
           .voucher-actions {
             display: flex;
             align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
             gap: 10px;
             font-size: 14px;
           }
@@ -390,6 +412,7 @@ Flyinglyte`,
             border: none;
             cursor: pointer;
             transition: 0.2s ease;
+            white-space: nowrap;
           }
 
           .voucher-actions button:hover {
@@ -421,6 +444,7 @@ Flyinglyte`,
           .voucher-cell {
             padding: 12px 14px;
             color: var(--text-muted);
+            line-height: 1.55;
           }
 
           .voucher-cell strong,
@@ -431,6 +455,7 @@ Flyinglyte`,
           .voucher-grid-2 {
             display: grid;
             grid-template-columns: 1fr 1.35fr;
+            align-items: stretch;
           }
 
           .voucher-grid-2 > div:first-child {
@@ -439,8 +464,21 @@ Flyinglyte`,
 
           .date-grid {
             display: grid;
-            grid-template-columns: 1.1fr 1.1fr 0.8fr;
-            gap: 12px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            align-items: start;
+          }
+
+          .date-item {
+            display: flex;
+            gap: 6px;
+            align-items: baseline;
+            flex-wrap: wrap;
+          }
+
+          .table-scroll {
+            width: 100%;
+            overflow-x: auto;
           }
 
           .voucher-table {
@@ -456,6 +494,7 @@ Flyinglyte`,
             text-align: left;
             padding: 10px 12px;
             border: 1px solid rgba(201, 162, 77, 0.22);
+            vertical-align: middle;
           }
 
           .voucher-table td {
@@ -463,30 +502,63 @@ Flyinglyte`,
             border: 1px solid rgba(255, 255, 255, 0.08);
             vertical-align: top;
             color: var(--text-muted);
+            line-height: 1.55;
+          }
+
+          .sno-col {
+            width: 64px;
+            text-align: center !important;
+          }
+
+          .guest-col {
+            width: 230px;
+          }
+
+          .sno-cell {
+            text-align: center;
+            vertical-align: middle !important;
+            color: #ffffff !important;
+            font-weight: 700;
+          }
+
+          .guest-cell {
+            vertical-align: middle !important;
+            word-break: break-word;
           }
 
           .voucher-table .room-name {
             color: #ffffff;
             font-weight: 800;
             font-size: 16px;
+            line-height: 1.35;
           }
 
-          .terms-list {
-            padding-left: 75px;
-            padding-right: 20px;
-            margin: 16px 0;
-            line-height: 1.55;
-          }
-
+          .terms-list,
           .policy-list {
-            padding-left: 70px;
-            padding-right: 20px;
-            margin: 16px 0;
+            padding-left: 42px;
+            padding-right: 18px;
+            margin: 14px 0 4px;
             line-height: 1.55;
+          }
+
+          .terms-list li,
+          .policy-list li {
+            padding-left: 4px;
+            margin-bottom: 6px;
+          }
+
+          .nested-list {
+            margin-top: 6px;
+            margin-left: 26px;
+            list-style-type: disc;
+          }
+
+          .room-description {
+            margin-top: 26px;
           }
 
           .room-description p {
-            margin-bottom: 18px;
+            margin-bottom: 16px;
           }
 
           .room-description strong {
@@ -514,15 +586,22 @@ Flyinglyte`,
             box-shadow: 0 12px 30px rgba(0,0,0,0.25);
           }
 
+          .pdf-capture .no-print {
+            display: none !important;
+          }
+
+          .pdf-capture .voucher-top {
+            grid-template-columns: 1fr;
+          }
+
           @media (max-width: 768px) {
             .voucher-wrapper {
               border-radius: 18px;
             }
 
             .voucher-top {
-              flex-direction: column;
+              grid-template-columns: 1fr;
               align-items: flex-start;
-              gap: 10px;
             }
 
             .voucher-title {
@@ -530,7 +609,7 @@ Flyinglyte`,
             }
 
             .voucher-actions {
-              flex-wrap: wrap;
+              justify-content: flex-start;
               font-size: 13px;
             }
 
@@ -545,20 +624,17 @@ Flyinglyte`,
 
             .date-grid {
               grid-template-columns: 1fr;
+              gap: 8px;
             }
 
             .voucher-table {
               min-width: 850px;
             }
 
-            .table-scroll {
-              overflow-x: auto;
-            }
-
             .terms-list,
             .policy-list {
-              padding-left: 26px;
-              padding-right: 8px;
+              padding-left: 24px;
+              padding-right: 6px;
             }
           }
 
@@ -585,6 +661,7 @@ Flyinglyte`,
             }
 
             .voucher-top {
+              grid-template-columns: 1fr !important;
               background: linear-gradient(90deg, var(--bg-primary), var(--bg-via), var(--bg-secondary)) !important;
               color: var(--text-main) !important;
               border-bottom: 1px solid rgba(201, 162, 77, 0.25) !important;
@@ -652,7 +729,10 @@ Flyinglyte`,
         `}
       </style>
 
-      <div ref={voucherRef} className="voucher-wrapper">
+      <div
+        ref={voucherRef}
+        className={`voucher-wrapper ${pdfCaptureMode ? "pdf-capture" : ""}`}
+      >
         <div className="voucher-top">
           <div className="voucher-title">Hotel Voucher</div>
 
@@ -724,18 +804,18 @@ Flyinglyte`,
           </div>
 
           <div className="date-grid mt-5">
-            <div>
-              <span className="voucher-gold">Check In Date:</span>{" "}
+            <div className="date-item">
+              <span className="voucher-gold">Check In Date:</span>
               <span className="text-white">{formatDate(checkIn)}</span>
             </div>
 
-            <div>
-              <span className="voucher-gold">Check Out Date:</span>{" "}
+            <div className="date-item">
+              <span className="voucher-gold">Check Out Date:</span>
               <span className="text-white">{formatDate(checkOut)}</span>
             </div>
 
-            <div>
-              <span className="voucher-gold">No of Nights:</span>{" "}
+            <div className="date-item">
+              <span className="voucher-gold">No of Nights:</span>
               <span className="text-white">{nights}</span>
             </div>
           </div>
@@ -745,15 +825,15 @@ Flyinglyte`,
           <table className="voucher-table">
             <thead>
               <tr>
-                <th style={{ width: "64px" }}>S.No</th>
+                <th className="sno-col">S.No</th>
                 <th>Room Type</th>
-                <th style={{ width: "220px" }}>Guests Type</th>
+                <th className="guest-col">Guests Type</th>
               </tr>
             </thead>
 
             <tbody>
               <tr>
-                <td className="text-center align-middle">1</td>
+                <td className="sno-cell">1</td>
 
                 <td>
                   <div className="room-name">{roomName}</div>
@@ -763,7 +843,7 @@ Flyinglyte`,
                     <div className="red-text mt-1">{roomPromotion}</div>
                   )}
 
-                  <div className="room-description mt-7">
+                  <div className="room-description">
                     <p>
                       <strong>Room Description:</strong>
                     </p>
@@ -825,7 +905,7 @@ Flyinglyte`,
                   </div>
                 </td>
 
-                <td className="align-middle">
+                <td className="guest-cell">
                   <div className="text-white font-semibold">
                     {adults.length || 1} Adult(s)
                     {children.length > 0 ? `, ${children.length} Child` : ""}
@@ -944,7 +1024,7 @@ Flyinglyte`,
 
                 <li>
                   CheckIn Instructions:
-                  <ul className="list-disc ml-8 mt-1">
+                  <ul className="nested-list">
                     <li>
                       Extra-person charges may apply and vary depending on
                       property policy.
@@ -983,7 +1063,7 @@ Flyinglyte`,
 
                 <li>
                   Optional Fees:
-                  <ul className="list-disc ml-8 mt-1">
+                  <ul className="nested-list">
                     <li>
                       Fee for cooked-to-order breakfast: approximately INR 250
                       to 350 for adults, and INR 200 to 300 for children.

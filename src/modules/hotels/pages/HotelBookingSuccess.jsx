@@ -762,7 +762,7 @@ const HotelBookingSuccess = () => {
 
                 {tax > 0 && <SummaryRow label="Tax" value={formatMoney(tax)} />}
 
-                <div className="bg-[var(--bg-secondary)] -mx-4 px-4 py-3 border-y border-[var(--border-soft)]">
+                <div className="bg-(--bg-secondary) -mx-4 px-4 py-3 border-y border-(--border-soft)">
                   <SummaryRow label="Total GST" value={formatMoney(gst)} bold />
                 </div>
 
