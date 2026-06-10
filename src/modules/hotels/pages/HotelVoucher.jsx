@@ -279,7 +279,7 @@ Flyinglyte`,
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] py-6 px-3 font-[var(--font-body)] text-[var(--text-main)]">
+    <div className="min-h-screen bg-(--bg-main) py-16 px-3 font-(--font-body) text-(--text-main)">
       <style>
         {`
           .voucher-wrapper {
@@ -567,9 +567,9 @@ Flyinglyte`,
 
           <div className="voucher-actions no-print">
             <button onClick={handleEmail}>Email Voucher</button>
-            <span className="text-[var(--text-muted)]">|</span>
+            <span className="text-(--text-muted)">|</span>
             <button onClick={handlePrint}>Print Voucher</button>
-            <span className="text-[var(--text-muted)]">|</span>
+            <span className="text-(--text-muted)">|</span>
             <button onClick={handleGeneratePdf}>Generate PDF 🧾</button>
           </div>
         </div>

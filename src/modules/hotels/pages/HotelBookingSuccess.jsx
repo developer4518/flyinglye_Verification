@@ -766,7 +766,7 @@ const HotelBookingSuccess = () => {
                   <SummaryRow label="Total GST" value={formatMoney(gst)} bold />
                 </div>
 
-                <div className="bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] -mx-4 px-4 py-4 text-black">
+                <div className="bg-linear-to-r from-start to-end -mx-4 px-4 py-4 text-black">
                   <SummaryRow
                     label="Grand Total"
                     value={formatMoney(netAmount)}
@@ -775,7 +775,7 @@ const HotelBookingSuccess = () => {
                   />
                 </div>
 
-                <button className="text-[var(--gold-main)] font-bold">
+                <button className="text-(--gold-main) font-bold">
                   + Show Details
                 </button>
               </div>
