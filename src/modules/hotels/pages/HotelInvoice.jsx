@@ -26,10 +26,16 @@ const formatDate = (dateValue) => {
   });
 };
 
-const formatMoney = (value) => {
+const formatMoney = (value, currency = "INR") => {
   const amount = Number(value || 0);
 
-  return `₹ ${amount.toLocaleString("en-IN", {
+  if (currency === "INR") {
+    return `₹ ${amount.toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
+  return `${currency} ${amount.toLocaleString("en-IN", {
     maximumFractionDigits: 2,
   })}`;
 };
@@ -91,31 +97,6 @@ const getHotelData = (saved, booking, locationHotel) => {
   );
 };
 
-const getAgencyData = (booking, saved) => {
-  return (
-    booking?.AgencyDetails ||
-    booking?.AgencyDetail ||
-    booking?.AgentDetails ||
-    booking?.AgentDetail ||
-    booking?.InvoiceTo ||
-    booking?.CustomerDetails ||
-    saved?.agencyDetails ||
-    saved?.agentDetails ||
-    {}
-  );
-};
-
-const getSupplierData = (booking) => {
-  return (
-    booking?.SupplierDetails ||
-    booking?.SupplierDetail ||
-    booking?.TboDetails ||
-    booking?.TBOInvoiceDetails ||
-    booking?.InvoiceFrom ||
-    {}
-  );
-};
-
 const getFullName = (guest = {}) => {
   return `${guest?.Title ? `${guest.Title}. ` : ""}${
     guest?.FirstName || guest?.firstName || ""
@@ -131,13 +112,13 @@ const HotelInvoice = () => {
   const saved = safeJsonParse(localStorage.getItem("hotelBookingData"), {});
 
   const rawBookingData =
+    location.state?.fullResponse ||
     location.state?.booking ||
     saved?.bookingResponse ||
     saved?.bookingData ||
     {};
 
   const booking = getNestedBooking(rawBookingData);
-
   const savedData = location.state?.savedData || saved || {};
 
   const hotel = getHotelData(savedData, booking, location.state?.hotel);
@@ -156,12 +137,26 @@ const HotelInvoice = () => {
     [savedData, booking],
   );
 
-  const agencyData = useMemo(
-    () => getAgencyData(booking, savedData),
-    [booking, savedData],
+  const responseData = useMemo(
+    () => ({
+      rawBookingData,
+      booking,
+      hotel,
+      guestDetails,
+      roomData,
+      savedData,
+      locationState: location.state || {},
+    }),
+    [
+      rawBookingData,
+      booking,
+      hotel,
+      guestDetails,
+      roomData,
+      savedData,
+      location.state,
+    ],
   );
-
-  const supplierData = useMemo(() => getSupplierData(booking), [booking]);
 
   const roomName = useMemo(() => {
     const name =
@@ -235,7 +230,7 @@ const HotelInvoice = () => {
     booking?.InvoiceId ||
     booking?.InvoiceID ||
     booking?.HotelInvoiceNo ||
-    `MW/2627/${booking?.BookingId || bookingId || "INV"}`;
+    `FL/INV/${booking?.BookingId || bookingId || "HOTEL"}`;
 
   const invoiceDate =
     booking?.InvoiceDate ||
@@ -368,113 +363,84 @@ const HotelInvoice = () => {
     booking?.GstDetails?.SAC ||
     "9985";
 
-  const supplierName =
-    supplierData?.CompanyName ||
-    supplierData?.Name ||
-    supplierData?.SupplierName ||
-    booking?.SupplierName ||
-    "TBO Tek Limited";
+  const companyName = "FLYINGLYTE";
+  const companyEmail = "info@flyinglyte.com";
+  const companyMobile = "9667455591";
+  const companyWebsite = "https://www.flyinglyte.com";
+  const companyAddress =
+    "316, Basement, Gagan Vihar, Near Preet Vihar Metro Station, Delhi-110051";
+  const companyPan = "AALFF0579Q";
 
-  const supplierAddress =
-    supplierData?.Address ||
-    booking?.SupplierAddress ||
-    "Regd Office: E-78, South Extn Part-I, New Delhi 110049";
-
-  const supplierCorpAddress =
-    supplierData?.CorporateAddress ||
-    booking?.SupplierCorporateAddress ||
-    "Corp Off: Plot No 728, Udyog Vihar, Phase-V, Gurgaon 122016";
-
-  const supplierEmail =
-    supplierData?.Email ||
-    booking?.SupplierEmail ||
-    "info@travelboutiqueonline.com";
-
-  const supplierWebsite =
-    supplierData?.Website ||
-    booking?.SupplierWebsite ||
-    "www.travelboutiqueonline.com";
-
-  const supplierPhone =
-    supplierData?.Phone ||
-    supplierData?.Mobile ||
-    booking?.SupplierPhone ||
-    "0124-4998999";
-
-  const supplierState =
-    supplierData?.State || booking?.SupplierState || "Haryana";
-
-  const supplierGstin =
-    supplierData?.GSTIN ||
-    supplierData?.GSTNumber ||
-    booking?.SupplierGSTIN ||
-    "06AACCT6259K1ZZ";
-
-  const supplierCin =
-    supplierData?.CIN ||
-    supplierData?.CINNumber ||
-    booking?.SupplierCIN ||
-    "L74999DL2006PLC155233";
-
-  const supplierPan =
-    supplierData?.PAN ||
-    supplierData?.PanNumber ||
-    booking?.SupplierPAN ||
-    "AACCT6259K";
-
-  const agencyName =
-    agencyData?.AgencyName ||
-    agencyData?.CompanyName ||
-    agencyData?.Name ||
-    booking?.AgencyName ||
-    booking?.IssuedBy ||
-    "FLYINGLYTE1";
-
-  const ownerName =
-    agencyData?.OwnerName ||
-    agencyData?.ContactPerson ||
-    booking?.OwnerName ||
+  const invoiceToName =
     booking?.CustomerName ||
+    booking?.GuestName ||
+    booking?.LeadPassengerName ||
+    guestName ||
+    "Guest";
+
+  const invoiceToEmail =
+    leadGuest?.Email ||
+    leadGuest?.EmailId ||
+    leadGuest?.email ||
+    booking?.CustomerEmail ||
+    booking?.GuestEmail ||
+    booking?.Email ||
+    "N/A";
+
+  const invoiceToPhone =
+    leadGuest?.Phoneno ||
+    leadGuest?.PhoneNo ||
+    leadGuest?.Phone ||
+    leadGuest?.Mobile ||
+    booking?.CustomerPhone ||
+    booking?.CustomerMobile ||
+    booking?.GuestPhone ||
+    booking?.Phone ||
+    "N/A";
+
+  const invoiceToAddress =
+    booking?.CustomerAddress ||
+    booking?.GuestAddress ||
+    booking?.Address ||
+    booking?.HotelAddress ||
+    hotel?.Address ||
+    hotel?.address ||
+    "N/A";
+
+  const invoiceToCity =
+    booking?.CustomerCity ||
+    booking?.GuestCity ||
+    booking?.CityName ||
+    booking?.HotelCity ||
+    hotel?.CityName ||
+    hotel?.city ||
+    "N/A";
+
+  const invoiceToState =
+    booking?.CustomerState ||
+    booking?.GuestState ||
+    booking?.State ||
+    hotel?.State ||
     "";
 
-  const agencyCity =
-    agencyData?.City || agencyData?.city || booking?.AgencyCity || "Delhi";
+  const invoiceToPin =
+    booking?.CustomerPinCode ||
+    booking?.CustomerPIN ||
+    booking?.GuestPinCode ||
+    booking?.PinCode ||
+    "";
 
-  const agencyState =
-    agencyData?.State || agencyData?.state || booking?.AgencyState || "Delhi";
+  const invoiceToPan =
+    leadGuest?.PAN ||
+    leadGuest?.Pan ||
+    leadGuest?.PanNumber ||
+    booking?.CustomerPAN ||
+    booking?.GuestPAN ||
+    booking?.PAN ||
+    "N/A";
 
-  const agencyPin =
-    agencyData?.PinCode ||
-    agencyData?.PIN ||
-    agencyData?.Pincode ||
-    booking?.AgencyPinCode ||
-    "110021";
-
-  const agencyPhone =
-    agencyData?.Phone ||
-    agencyData?.Mobile ||
-    agencyData?.PhoneNumber ||
-    booking?.AgencyPhone ||
-    booking?.AgencyMobile ||
-    "9999055591";
-
-  const agencyEmail =
-    agencyData?.Email ||
-    agencyData?.EmailId ||
-    booking?.AgencyEmail ||
-    "flyinglyte@outlook.com";
-
-  const agencyPan =
-    agencyData?.PAN ||
-    agencyData?.PanNumber ||
-    booking?.AgencyPAN ||
-    "AALFF0579Q";
-
-  const billedBy =
-    booking?.BilledBy || booking?.BillingCompany || "Travelboutique Online";
-
-  const issuedBy =
-    booking?.IssuedBy || booking?.AgentCode || agencyName || "FLYINGLYTE1";
+  const billedBy = booking?.BilledBy || booking?.BillingCompany || companyName;
+  const issuedBy = booking?.IssuedBy || booking?.AgentCode || companyName;
 
   const handleGeneratePdf = async () => {
     if (!invoiceRef.current) return;
@@ -603,9 +569,8 @@ const HotelInvoice = () => {
           <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-5 border-b border-[var(--border-soft)] flex flex-col md:flex-row justify-between gap-4">
             <div>
               <h1 className="font-[var(--font-logo)] text-3xl md:text-4xl tracking-wide">
-                <span className="text-[var(--gold-main)]">travel</span>
-                <span className="text-[var(--gold-soft)]">boutique</span>
-                <span className="text-white">online</span>
+                <span className="text-[var(--gold-main)]">FLYING</span>
+                <span className="text-[var(--gold-soft)]">LYTE</span>
               </h1>
 
               <p className="text-[var(--text-muted)] text-sm mt-1">
@@ -647,23 +612,45 @@ const HotelInvoice = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-[var(--border-soft)] pb-6">
               <div>
                 <h3 className="text-xl font-bold text-[var(--gold-main)] mb-3">
-                  {supplierName}
+                  {companyName}
                 </h3>
 
                 <div className="text-sm text-[var(--text-muted)] leading-relaxed">
-                  <p>{supplierAddress}</p>
-                  <p>{supplierCorpAddress}</p>
-                  <p>Email: {supplierEmail}</p>
-                  <p>Web: {supplierWebsite}</p>
-                  <p>Phone: {supplierPhone}</p>
-                  <p>State: {supplierState}</p>
-                  <p className="text-white font-semibold">
-                    GSTIN: {supplierGstin}
+                  <p>{companyAddress}</p>
+
+                  <p>
+                    <span className="font-bold text-white">Email:</span>{" "}
+                    <a
+                      href={`mailto:${companyEmail}`}
+                      className="hover:text-[var(--gold-main)]"
+                    >
+                      {companyEmail}
+                    </a>
                   </p>
-                  <p className="text-white font-semibold">
-                    CIN Number: {supplierCin}
+
+                  <p>
+                    <span className="font-bold text-white">Mobile:</span>{" "}
+                    <a
+                      href={`tel:+91${companyMobile}`}
+                      className="hover:text-[var(--gold-main)]"
+                    >
+                      {companyMobile}
+                    </a>
                   </p>
-                  <p className="text-white font-semibold">PAN: {supplierPan}</p>
+
+                  <p>
+                    <span className="font-bold text-white">Website:</span>{" "}
+                    <a
+                      href={companyWebsite}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:text-[var(--gold-main)]"
+                    >
+                      {companyWebsite}
+                    </a>
+                  </p>
+
+                  <p className="text-white font-semibold">PAN: {companyPan}</p>
                 </div>
               </div>
 
@@ -673,34 +660,26 @@ const HotelInvoice = () => {
                 </h3>
 
                 <div className="text-sm text-[var(--text-muted)] leading-relaxed">
-                  <p className="text-white font-bold">{agencyName}</p>
+                  <p className="text-white font-bold">{invoiceToName}</p>
 
-                  {ownerName && (
-                    <p>
-                      <span className="font-bold text-white">
-                        Owner's Name:
-                      </span>{" "}
-                      {ownerName}
-                    </p>
-                  )}
-
-                  <p>{agencyCity}</p>
-                  <p>{agencyState}</p>
-                  <p>PIN - {agencyPin}</p>
+                  {invoiceToAddress !== "N/A" && <p>{invoiceToAddress}</p>}
+                  {invoiceToCity !== "N/A" && <p>{invoiceToCity}</p>}
+                  {invoiceToState && <p>{invoiceToState}</p>}
+                  {invoiceToPin && <p>PIN - {invoiceToPin}</p>}
 
                   <p>
                     <span className="font-bold text-white">Phone:</span>{" "}
-                    {agencyPhone}
+                    {invoiceToPhone}
                   </p>
 
                   <p>
                     <span className="font-bold text-white">Email:</span>{" "}
-                    {agencyEmail}
+                    {invoiceToEmail}
                   </p>
 
                   <p>
                     <span className="font-bold text-white">PAN:</span>{" "}
-                    {agencyPan}
+                    {invoiceToPan}
                   </p>
                 </div>
               </div>
@@ -802,23 +781,51 @@ const HotelInvoice = () => {
               </div>
 
               <div className="bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-5 text-sm space-y-3">
-                <AmountRow label="Gross" value={gross} highlight />
-                <AmountRow label="Less Commission Earned" value={commission} />
-                <AmountRow label="Add TDS" value={tds} />
-                <AmountRow label="Add CGST @0%" value={cgst} />
-                <AmountRow label="Add SGST @0%" value={sgst} />
-                <AmountRow label="Add IGST @18%" value={igst} />
+                <AmountRow
+                  label="Gross"
+                  value={gross}
+                  currency={currency}
+                  highlight
+                />
+
+                <AmountRow
+                  label="Less Commission Earned"
+                  value={commission}
+                  currency={currency}
+                />
+
+                <AmountRow label="Add TDS" value={tds} currency={currency} />
+                <AmountRow
+                  label="Add CGST @0%"
+                  value={cgst}
+                  currency={currency}
+                />
+                <AmountRow
+                  label="Add SGST @0%"
+                  value={sgst}
+                  currency={currency}
+                />
+                <AmountRow
+                  label="Add IGST @18%"
+                  value={igst}
+                  currency={currency}
+                />
 
                 <div className="border-t border-[var(--border-soft)] pt-3">
-                  <AmountRow label="Net Amount" value={netAmount} highlight />
+                  <AmountRow
+                    label="Net Amount"
+                    value={netAmount}
+                    currency={currency}
+                    highlight
+                  />
 
                   <div className="flex justify-between gap-4 text-lg font-bold text-[var(--gold-main)] mt-2">
                     <span>Net Receivable</span>
-                    <span>{formatMoney(netReceivable)}</span>
+                    <span>{formatMoney(netReceivable, currency)}</span>
                   </div>
 
                   <p className="text-xs text-[var(--text-muted)] text-right mt-1">
-                    Amount in ₹
+                    Amount in {currency}
                   </p>
                 </div>
               </div>
@@ -924,6 +931,11 @@ const HotelInvoice = () => {
             </div>
           </div>
         </div>
+
+        <ResponseDataBox
+          title="Full Hotel Booking Response Data"
+          data={responseData}
+        />
       </div>
     </div>
   );
@@ -949,7 +961,7 @@ const InfoBox = ({ label, value }) => {
   );
 };
 
-const AmountRow = ({ label, value, highlight = false }) => {
+const AmountRow = ({ label, value, currency = "INR", highlight = false }) => {
   return (
     <div
       className={`flex justify-between gap-4 ${
@@ -957,8 +969,24 @@ const AmountRow = ({ label, value, highlight = false }) => {
       }`}
     >
       <span>{label}</span>
-      <span>{formatMoney(value)}</span>
+      <span>{formatMoney(value, currency)}</span>
     </div>
+  );
+};
+
+const ResponseDataBox = ({ title = "Response Data", data }) => {
+  return (
+    <details className="no-print mt-8 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-xl shadow-black/20">
+      <summary className="cursor-pointer px-5 py-4 text-[var(--gold-main)] font-bold bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)]">
+        {title}
+      </summary>
+
+      <div className="border-t border-[var(--border-soft)] p-4">
+        <pre className="max-h-[600px] overflow-auto rounded-2xl bg-black/50 p-4 text-xs leading-relaxed text-green-300 whitespace-pre-wrap">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </div>
+    </details>
   );
 };
 

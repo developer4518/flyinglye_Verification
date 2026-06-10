@@ -232,6 +232,8 @@ const HotelBookingSuccess = () => {
         hotel,
         guestDetails,
         savedData,
+        fullResponse: savedData?.bookingResponse || booking,
+        prebookData: savedData?.prebookData,
       },
     });
   };
