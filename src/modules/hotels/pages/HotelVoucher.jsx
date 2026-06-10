@@ -38,6 +38,23 @@ const getNights = (checkIn, checkOut) => {
   return diff > 0 ? diff : 1;
 };
 
+const normalizeArray = (value) => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.flat(Infinity).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split("|")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 const getRoomData = (saved, bookingData) => {
   return (
     saved?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
@@ -59,21 +76,10 @@ const getHotelResult = (saved) => {
   );
 };
 
-const normalizeList = (value) => {
-  if (!value) return [];
-
-  if (Array.isArray(value)) {
-    return value.flat(Infinity).filter(Boolean);
-  }
-
-  if (typeof value === "string") {
-    return value
-      .split("|")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  return [];
+const getGuestName = (guest) => {
+  return `${guest?.Title ? `${guest.Title}. ` : ""}${
+    guest?.FirstName || guest?.firstName || ""
+  } ${guest?.LastName || guest?.lastName || ""}`.trim();
 };
 
 const HotelVoucher = () => {
@@ -87,7 +93,6 @@ const HotelVoucher = () => {
   );
 
   const state = location.state || {};
-
   const savedData = state.savedData || savedLocalData;
 
   const rawBooking =
@@ -139,6 +144,7 @@ const HotelVoucher = () => {
     booking?.ConfirmationNo ||
     booking?.TBOConfirmationNo ||
     booking?.BookingRefNo ||
+    booking?.BookingId ||
     bookingId ||
     "N/A";
 
@@ -176,9 +182,7 @@ const HotelVoucher = () => {
   const leadGuest =
     guestDetails.find((g) => g.LeadPassenger) || guestDetails[0] || {};
 
-  const leadGuestName = `${leadGuest?.Title ? `${leadGuest.Title}. ` : ""}${
-    leadGuest?.FirstName || leadGuest?.firstName || ""
-  } ${leadGuest?.LastName || leadGuest?.lastName || ""}`.trim();
+  const leadGuestName = getGuestName(leadGuest);
 
   const adults = guestDetails.filter(
     (g) => Number(g.PaxType) === 1 || Number(g.Age) >= 12,
@@ -187,6 +191,9 @@ const HotelVoucher = () => {
   const children = guestDetails.filter(
     (g) => Number(g.PaxType) === 2 || Number(g.Age) < 12,
   );
+
+  const adultNames = adults.map(getGuestName).filter(Boolean).join(", ");
+  const childNames = children.map(getGuestName).filter(Boolean).join(", ");
 
   const inclusion =
     roomData?.Inclusion ||
@@ -215,6 +222,7 @@ const HotelVoucher = () => {
       [];
 
     if (Array.isArray(list)) return list;
+
     if (typeof list === "string") {
       return list
         .split("|")
@@ -235,12 +243,11 @@ const HotelVoucher = () => {
       roomData?.HotelNorms ||
       [];
 
-    return normalizeList(norms);
+    return normalizeArray(norms);
   }, [hotelResult, hotel, roomData]);
 
   const contactPhone = "9999055591";
   const contactEmail = "flyinglyte@outlook.com";
-
   const agencyName = "FLYINGLYTE1";
   const agencyCity = "Delhi";
 
@@ -251,9 +258,17 @@ const HotelVoucher = () => {
   const handleEmail = () => {
     const subject = encodeURIComponent(`Hotel Voucher - ${confirmationNo}`);
     const body = encodeURIComponent(
-      `Dear Guest,\n\nYour hotel voucher is ready.\n\nHotel: ${hotelName}\nConfirmation No: ${confirmationNo}\nCheck In: ${formatDate(
-        checkIn,
-      )}\nCheck Out: ${formatDate(checkOut)}\n\nRegards,\nFlyinglyte`,
+      `Dear Guest,
+
+Your hotel voucher is ready.
+
+Hotel: ${hotelName}
+Confirmation No: ${confirmationNo}
+Check In: ${formatDate(checkIn)}
+Check Out: ${formatDate(checkOut)}
+
+Regards,
+Flyinglyte`,
     );
 
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -264,511 +279,684 @@ const HotelVoucher = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-8 px-3 md:px-8 font-[var(--font-body)]">
+    <div className="min-h-screen bg-[var(--bg-main)] py-6 px-3 font-[var(--font-body)] text-[var(--text-main)]">
       <style>
         {`
+          .voucher-wrapper {
+            width: 100%;
+            max-width: 1050px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border: 1px solid rgba(201, 162, 77, 0.28);
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
+          }
+
+          .voucher-top {
+            background: linear-gradient(90deg, var(--bg-primary), var(--bg-via), var(--bg-secondary));
+            color: var(--text-main);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(201, 162, 77, 0.25);
+          }
+
+          .voucher-title {
+            font-family: var(--font-heading);
+            font-size: 28px;
+            line-height: 1.2;
+            color: var(--gold-main);
+            letter-spacing: 0.5px;
+          }
+
+          .voucher-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+          }
+
+          .voucher-actions button {
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            color: var(--gold-soft);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s ease;
+          }
+
+          .voucher-actions button:hover {
+            color: #ffffff;
+          }
+
+          .voucher-gold {
+            color: var(--gold-main);
+            font-weight: 700;
+          }
+
+          .voucher-row {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          }
+
+          .voucher-heading {
+            background: linear-gradient(90deg, rgba(248, 222, 130, 0.14), rgba(234, 168, 42, 0.08));
+            color: var(--gold-main);
+            font-weight: 800;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(201, 162, 77, 0.22);
+          }
+
+          .voucher-cell {
+            padding: 12px 14px;
+            color: var(--text-muted);
+          }
+
+          .voucher-cell strong,
+          .voucher-cell b {
+            color: var(--text-main);
+          }
+
+          .voucher-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1.35fr;
+          }
+
+          .voucher-grid-2 > div:first-child {
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+          }
+
+          .date-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 1.1fr 0.8fr;
+            gap: 12px;
+          }
+
+          .voucher-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+
+          .voucher-table th {
+            background: linear-gradient(90deg, rgba(248, 222, 130, 0.14), rgba(234, 168, 42, 0.08));
+            color: var(--gold-main);
+            font-weight: 800;
+            text-align: left;
+            padding: 10px 12px;
+            border: 1px solid rgba(201, 162, 77, 0.22);
+          }
+
+          .voucher-table td {
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            vertical-align: top;
+            color: var(--text-muted);
+          }
+
+          .voucher-table .room-name {
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 16px;
+          }
+
+          .terms-list {
+            padding-left: 75px;
+            padding-right: 20px;
+            margin: 16px 0;
+            line-height: 1.55;
+          }
+
+          .policy-list {
+            padding-left: 70px;
+            padding-right: 20px;
+            margin: 16px 0;
+            line-height: 1.55;
+          }
+
+          .room-description p {
+            margin-bottom: 18px;
+          }
+
+          .room-description strong {
+            font-weight: 800;
+            color: #ffffff;
+          }
+
+          .red-text {
+            color: #ff5c5c;
+            font-weight: 800;
+          }
+
+          .gold-link {
+            color: var(--gold-soft);
+            text-decoration: underline;
+            text-underline-offset: 4px;
+          }
+
+          .back-btn {
+            background: linear-gradient(90deg, var(--color-start), var(--color-end));
+            color: #000000;
+            border-radius: 14px;
+            padding: 10px 22px;
+            font-weight: 800;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+          }
+
+          @media (max-width: 768px) {
+            .voucher-wrapper {
+              border-radius: 18px;
+            }
+
+            .voucher-top {
+              flex-direction: column;
+              align-items: flex-start;
+              gap: 10px;
+            }
+
+            .voucher-title {
+              font-size: 24px;
+            }
+
+            .voucher-actions {
+              flex-wrap: wrap;
+              font-size: 13px;
+            }
+
+            .voucher-grid-2 {
+              grid-template-columns: 1fr;
+            }
+
+            .voucher-grid-2 > div:first-child {
+              border-right: none;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .date-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .voucher-table {
+              min-width: 850px;
+            }
+
+            .table-scroll {
+              overflow-x: auto;
+            }
+
+            .terms-list,
+            .policy-list {
+              padding-left: 26px;
+              padding-right: 8px;
+            }
+          }
+
           @media print {
             body {
-              background: white !important;
+              background: #ffffff !important;
             }
 
             .no-print {
               display: none !important;
             }
 
-            .voucher-print-area {
-              box-shadow: none !important;
-              border-radius: 0 !important;
+            .voucher-wrapper {
               max-width: 100% !important;
-              background: white !important;
-              color: #111827 !important;
+              border-radius: 0 !important;
+              box-shadow: none !important;
+              background: #ffffff !important;
+              border: 1px solid #9bb8ca !important;
             }
 
-            .voucher-print-area * {
-              color: #111827 !important;
-              border-color: #cbd5e1 !important;
-            }
-
-            .voucher-print-header {
+            .voucher-top {
               background: #0f4c81 !important;
-              color: white !important;
+              color: #ffffff !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+              padding: 6px 8px !important;
+            }
+
+            .voucher-title {
+              color: #ffffff !important;
+              font-family: Arial, sans-serif !important;
+              font-size: 22px !important;
+            }
+
+            .voucher-heading,
+            .voucher-table th {
+              background: #eeeeff !important;
+              color: #064776 !important;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
             }
 
-            .voucher-print-header * {
-              color: white !important;
+            .voucher-cell,
+            .voucher-table td,
+            .voucher-row,
+            .voucher-wrapper * {
+              color: #2d2d2d !important;
+              border-color: #9bb8ca !important;
+              font-family: Arial, sans-serif !important;
             }
 
-            .voucher-section-heading {
-              background: #eef2ff !important;
-              color: #0f4c81 !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
+            .voucher-gold {
+              color: #064776 !important;
             }
 
-            .print-red {
+            .red-text {
               color: red !important;
             }
 
+            .gold-link {
+              color: #064776 !important;
+            }
+
             @page {
-              margin: 12mm;
               size: A4;
+              margin: 8mm;
             }
           }
         `}
       </style>
 
-      <div className="max-w-6xl mx-auto">
-        <div className="no-print mb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-fit px-5 py-2 rounded-xl border border-[var(--border-soft)] text-[var(--gold-soft)] hover:bg-white/5 transition"
-          >
-            ← Back
-          </button>
+      <div className="voucher-wrapper">
+        <div className="voucher-top">
+          <div className="voucher-title">Hotel Voucher</div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={handleEmail}
-              className="px-4 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-soft)] text-[var(--gold-soft)] hover:text-white transition"
-            >
-              Email Voucher
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-soft)] text-[var(--gold-soft)] hover:text-white transition"
-            >
-              Print Voucher
-            </button>
-
-            <button
-              onClick={handleGeneratePdf}
-              className="px-4 py-2 rounded-xl bg-linear-to-r from-start to-end text-black font-bold shadow-lg shadow-black/20 hover:scale-[1.02] transition"
-            >
-              Generate PDF
-            </button>
+          <div className="voucher-actions no-print">
+            <button onClick={handleEmail}>Email Voucher</button>
+            <span className="text-[var(--text-muted)]">|</span>
+            <button onClick={handlePrint}>Print Voucher</button>
+            <span className="text-[var(--text-muted)]">|</span>
+            <button onClick={handleGeneratePdf}>Generate PDF 🧾</button>
           </div>
         </div>
 
-        <div className="voucher-print-area bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-2xl shadow-black/30">
-          {/* HEADER */}
-          <div className="voucher-print-header bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-[var(--border-soft)]">
-            <h1 className="text-2xl md:text-3xl font-bold text-[var(--gold-main)] font-[var(--font-heading)] tracking-wide">
-              Hotel Voucher
-            </h1>
+        <section className="voucher-row">
+          <div className="voucher-heading">Confirmation No</div>
+          <div className="voucher-cell font-semibold text-white">
+            {confirmationNo}
+          </div>
+        </section>
 
-            <div className="no-print flex gap-3 text-sm">
-              <button
-                onClick={handleEmail}
-                className="text-[var(--gold-soft)] underline underline-offset-4"
-              >
-                Email Voucher
-              </button>
-              <span className="text-[var(--text-muted)]">|</span>
-              <button
-                onClick={handlePrint}
-                className="text-[var(--gold-soft)] underline underline-offset-4"
-              >
-                Print Voucher
-              </button>
-              <span className="text-[var(--text-muted)]">|</span>
-              <button
-                onClick={handleGeneratePdf}
-                className="text-[var(--gold-soft)] underline underline-offset-4"
-              >
-                Generate PDF
-              </button>
+        <section className="voucher-row voucher-grid-2">
+          <div className="voucher-cell">
+            <div className="voucher-gold">Hotel Address Details</div>
+            <div className="text-white font-semibold mt-1">{hotelName}</div>
+            <div>
+              {hotelAddress}
+              {hotelCity ? `, ${hotelCity}` : ""}
             </div>
+
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                `${hotelName} ${hotelAddress}`,
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="gold-link inline-block mt-1"
+            >
+              View Map
+            </a>
           </div>
 
-          {/* CONFIRMATION */}
-          <VoucherBlock>
-            <VoucherHeading>Confirmation No</VoucherHeading>
-            <p className="px-4 py-3 text-[var(--text-main)] font-semibold">
-              {confirmationNo}
-            </p>
-          </VoucherBlock>
-
-          {/* ADDRESS DETAILS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 border-b border-[var(--border-soft)]">
-            <div className="p-4 md:border-r border-[var(--border-soft)]">
-              <h3 className="font-bold text-[var(--gold-main)] mb-2">
-                Hotel Address Details
-              </h3>
-
-              <p className="font-semibold text-white">{hotelName}</p>
-              <p className="text-[var(--text-muted)] leading-relaxed">
-                {hotelAddress}
-                {hotelCity ? `, ${hotelCity}` : ""}
-              </p>
-
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  `${hotelName} ${hotelAddress}`,
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block mt-2 text-[var(--gold-soft)] underline underline-offset-4"
-              >
-                View Map
-              </a>
-            </div>
-
-            <div className="p-4">
-              <h3 className="font-bold text-[var(--gold-main)] mb-2">
-                Agency Address Details
-              </h3>
-
-              <p className="font-semibold text-white">{agencyName}</p>
-              <p className="text-[var(--text-muted)]">Delhi</p>
-              <p className="text-[var(--text-muted)]">City : {agencyCity}</p>
-
-              <p className="text-[var(--text-muted)]">
-                Phone :{" "}
-                <a
-                  href={`tel:${contactPhone}`}
-                  className="text-[var(--gold-soft)] hover:underline"
-                >
-                  {contactPhone}
-                </a>
-              </p>
-
-              <p className="text-[var(--text-muted)]">
-                Email :{" "}
-                <a
-                  href={`mailto:${contactEmail}`}
-                  className="text-[var(--gold-soft)] hover:underline"
-                >
-                  {contactEmail}
-                </a>
-              </p>
-            </div>
-          </div>
-
-          {/* LEAD + DATES */}
-          <div className="p-4 border-b border-[var(--border-soft)]">
-            <p className="text-[var(--text-muted)]">
-              <span className="font-bold text-[var(--gold-main)]">
-                Lead Passenger Name:
-              </span>{" "}
-              <span className="text-white">{leadGuestName || "N/A"}</span>
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-5">
-              <p>
-                <span className="font-bold text-[var(--gold-main)]">
-                  Check In Date:
-                </span>{" "}
-                <span className="text-white">{formatDate(checkIn)}</span>
-              </p>
-
-              <p>
-                <span className="font-bold text-[var(--gold-main)]">
-                  Check Out Date:
-                </span>{" "}
-                <span className="text-white">{formatDate(checkOut)}</span>
-              </p>
-
-              <p>
-                <span className="font-bold text-[var(--gold-main)]">
-                  No of Nights:
-                </span>{" "}
-                <span className="text-white">{nights}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* ROOM TABLE */}
-          <div className="overflow-x-auto border-b border-[var(--border-soft)]">
-            <table className="w-full min-w-[800px] text-sm">
-              <thead>
-                <tr className="voucher-section-heading bg-[var(--bg-secondary)] text-[var(--gold-soft)]">
-                  <th className="w-16 text-left p-3 border-r border-[var(--border-soft)]">
-                    S.No
-                  </th>
-                  <th className="text-left p-3 border-r border-[var(--border-soft)]">
-                    Room Type
-                  </th>
-                  <th className="w-60 text-left p-3">Guests Type</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                <tr>
-                  <td className="p-3 text-center border-r border-[var(--border-soft)] align-middle">
-                    1
-                  </td>
-
-                  <td className="p-4 border-r border-[var(--border-soft)] align-top">
-                    <p className="font-bold text-white text-base">{roomName}</p>
-                    <p className="text-[var(--text-muted)]">
-                      Incl : {inclusion}
-                    </p>
-
-                    {roomPromotion && (
-                      <p className="print-red mt-2 font-bold text-red-400">
-                        {roomPromotion}
-                      </p>
-                    )}
-
-                    <div className="mt-8 space-y-4 text-[var(--text-muted)] leading-relaxed">
-                      <p>
-                        <span className="font-bold text-white">
-                          Room Description:
-                        </span>
-                      </p>
-
-                      {roomDescription ? (
-                        <p>{roomDescription}</p>
-                      ) : (
-                        <>
-                          <p>Comfortable room with modern facilities.</p>
-                          <p>
-                            <span className="font-bold text-white">
-                              Internet
-                            </span>{" "}
-                            - Free WiFi
-                          </p>
-                          <p>
-                            <span className="font-bold text-white">
-                              Entertainment
-                            </span>{" "}
-                            - Television with satellite channels
-                          </p>
-                          <p>
-                            <span className="font-bold text-white">
-                              Food and Drink
-                            </span>{" "}
-                            - Room service as per hotel policy
-                          </p>
-                          <p>
-                            <span className="font-bold text-white">
-                              Bathroom
-                            </span>{" "}
-                            - Private bathroom and toiletries
-                          </p>
-                          <p>
-                            <span className="font-bold text-white">
-                              Comfort
-                            </span>{" "}
-                            - Air conditioning and daily housekeeping
-                          </p>
-                        </>
-                      )}
-
-                      {amenities.length > 0 && (
-                        <div>
-                          <p className="font-bold text-white mb-1">
-                            Amenities:
-                          </p>
-                          <p>{amenities.join(", ")}</p>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-
-                  <td className="p-4 align-middle text-[var(--text-muted)]">
-                    <p className="font-semibold text-white">
-                      {adults.length || 1} Adult(s)
-                      {children.length > 0 ? `, ${children.length} Child` : ""}
-                    </p>
-
-                    {adults.length > 0 && (
-                      <p>
-                        Adults:
-                        {adults
-                          .map((g) =>
-                            `${g.FirstName || g.firstName || ""} ${
-                              g.LastName || g.lastName || ""
-                            }`.trim(),
-                          )
-                          .join(", ")}
-                      </p>
-                    )}
-
-                    {children.length > 0 && (
-                      <p>
-                        Children:
-                        {children
-                          .map((g) =>
-                            `${g.FirstName || g.firstName || ""} ${
-                              g.LastName || g.lastName || ""
-                            }`.trim(),
-                          )
-                          .join(", ")}
-                      </p>
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* PACKAGE */}
-          <VoucherBlock>
-            <VoucherTitle>Package Details:</VoucherTitle>
-
-            <div className="p-4">
-              <p className="font-bold text-[var(--gold-soft)]">
-                Special Service Request:
-              </p>
-              <p className="text-[var(--text-muted)] mt-1">
-                {booking?.SpecialRequest || booking?.SSR || "N.A."}
-              </p>
-            </div>
-          </VoucherBlock>
-
-          {/* REMARKS */}
-          <VoucherBlock>
-            <VoucherTitle>Remarks</VoucherTitle>
-            <p className="p-4 text-[var(--text-muted)] leading-relaxed">
-              {booking?.Remark ||
-                booking?.Remarks ||
-                "Please note that while your booking has been confirmed and is guaranteed, the rooming list with your name may not be adjusted in the hotel's reservation system until closer to arrival."}
-            </p>
-          </VoucherBlock>
-
-          <VoucherBlock>
-            <VoucherTitle>Agent Remarks</VoucherTitle>
-            <p className="p-4 text-[var(--text-muted)]">N.a.</p>
-          </VoucherBlock>
-
-          {/* TERMS */}
-          <VoucherBlock>
-            <VoucherTitle>Booking Terms & Conditions</VoucherTitle>
-
-            <div className="p-4 text-[var(--text-muted)] leading-relaxed">
-              <ul className="list-disc pl-6 space-y-2">
-                <li>
-                  You must present a photo ID at the time of check in. Hotel may
-                  ask for credit card or cash deposit for extra services.
-                </li>
-                <li>
-                  All extra charges should be collected directly from clients,
-                  such as parking, phone calls, room service, city tax, etc.
-                </li>
-                <li>
-                  We do not accept responsibility for additional expenses due to
-                  changes or delays in air, road, rail, sea or other causes.
-                </li>
-                <li>
-                  In case of wrong residency or nationality selected at the time
-                  of booking, supplement charges may apply and need to be paid
-                  directly at hotel.
-                </li>
-                <li>
-                  Special requests for bed type, early check in, late check out,
-                  smoking rooms, etc. are subject to availability.
-                </li>
-                <li>
-                  Early check out will attract full cancellation charges unless
-                  otherwise specified.
-                </li>
-                <li>
-                  In case of late check-in, guest should inform the hotel or TBO
-                  in advance to avoid no-show marking.
-                </li>
-              </ul>
-            </div>
-          </VoucherBlock>
-
-          {/* HOTEL POLICIES */}
-          <VoucherBlock>
-            <VoucherTitle>Hotel Policies</VoucherTitle>
-
-            <div className="p-4 text-[var(--text-muted)] leading-relaxed">
-              {hotelNorms.length > 0 ? (
-                <ul className="list-disc pl-6 space-y-2">
-                  {hotelNorms.map((norm, index) => (
-                    <li key={index}>{norm}</li>
-                  ))}
-                </ul>
-              ) : (
-                <ul className="list-disc pl-6 space-y-2">
-                  <li>{hotelCity || "India"} hotel policy applies.</li>
-                  <li>
-                    <span className="font-bold text-white">{roomName}</span>
-                  </li>
-                  <li>CheckIn Time-Begin: 12:00 PM</li>
-                  <li>CheckIn Time-End: anytime</li>
-                  <li>CheckOut Time: 12:00 PM</li>
-                  <li>Minimum CheckIn Age : 18</li>
-                  <li>
-                    Government-issued photo identification may be required at
-                    check-in.
-                  </li>
-                  <li>
-                    Special requests are subject to availability and may incur
-                    additional charges.
-                  </li>
-                  <li>
-                    City tax and resort fee are to be paid directly at hotel if
-                    applicable.
-                  </li>
-                  <li>
-                    Extra person charges may apply at check-in, as per the
-                    property&apos;s policy.
-                  </li>
-                </ul>
-              )}
-            </div>
-          </VoucherBlock>
-
-          {/* CONTACT */}
-          <div className="p-4">
-            <h3 className="font-bold text-[var(--gold-main)] text-lg mb-2">
-              Contact Details:
-            </h3>
-
-            <p className="text-[var(--text-muted)]">
+          <div className="voucher-cell">
+            <div className="voucher-gold">Agency Address Details</div>
+            <div className="text-white font-semibold mt-1">{agencyName}</div>
+            <div>Delhi</div>
+            <div>City : {agencyCity}</div>
+            <div>
               Phone :{" "}
-              <a
-                href={`tel:${contactPhone}`}
-                className="text-[var(--gold-soft)] hover:underline"
-              >
+              <a href={`tel:${contactPhone}`} className="gold-link">
                 {contactPhone}
               </a>
-            </p>
-
-            <p className="text-[var(--text-muted)]">
+            </div>
+            <div>
               Email :{" "}
-              <a
-                href={`mailto:${contactEmail}`}
-                className="text-[var(--gold-soft)] hover:underline"
-              >
+              <a href={`mailto:${contactEmail}`} className="gold-link">
                 {contactEmail}
               </a>
+            </div>
+          </div>
+        </section>
+
+        <section className="voucher-row voucher-cell">
+          <div>
+            <span className="voucher-gold">Lead Passenger Name:</span>{" "}
+            <span className="text-white">{leadGuestName || "N.A."}</span>
+          </div>
+
+          <div className="date-grid mt-5">
+            <div>
+              <span className="voucher-gold">Check In Date:</span>{" "}
+              <span className="text-white">{formatDate(checkIn)}</span>
+            </div>
+
+            <div>
+              <span className="voucher-gold">Check Out Date:</span>{" "}
+              <span className="text-white">{formatDate(checkOut)}</span>
+            </div>
+
+            <div>
+              <span className="voucher-gold">No of Nights:</span>{" "}
+              <span className="text-white">{nights}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="table-scroll">
+          <table className="voucher-table">
+            <thead>
+              <tr>
+                <th style={{ width: "64px" }}>S.No</th>
+                <th>Room Type</th>
+                <th style={{ width: "220px" }}>Guests Type</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr>
+                <td className="text-center align-middle">1</td>
+
+                <td>
+                  <div className="room-name">{roomName}</div>
+                  <div>Incl : {inclusion}</div>
+
+                  {roomPromotion && (
+                    <div className="red-text mt-1">{roomPromotion}</div>
+                  )}
+
+                  <div className="room-description mt-7">
+                    <p>
+                      <strong>Room Description:</strong>
+                    </p>
+
+                    {roomDescription ? (
+                      <p>{roomDescription}</p>
+                    ) : (
+                      <>
+                        <p>150 sq feet</p>
+
+                        <p>
+                          <strong>Layout</strong> - Bedroom
+                        </p>
+
+                        <p>
+                          <strong>Internet</strong> - Free WiFi
+                        </p>
+
+                        <p>
+                          <strong>Entertainment</strong> - LED television with
+                          satellite channels
+                        </p>
+
+                        <p>
+                          <strong>Food and Drink</strong> - Refrigerator and
+                          24-hour room service
+                        </p>
+
+                        <p>
+                          <strong>Sleep</strong> - Bed sheets
+                        </p>
+
+                        <p>
+                          <strong>Bathroom</strong> - Private bathroom, shower,
+                          free toiletries, and towels
+                        </p>
+
+                        <p>
+                          <strong>Practical</strong> - Desk and desk chair;
+                          rollaway beds surcharge available on request
+                        </p>
+
+                        <p>
+                          <strong>Comfort</strong> - Air conditioning and daily
+                          housekeeping
+                        </p>
+
+                        <p>
+                          <strong>Accessibility</strong> - Wheelchair accessible
+                        </p>
+                      </>
+                    )}
+
+                    {amenities.length > 0 && (
+                      <p>
+                        <strong>Amenities</strong> - {amenities.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                </td>
+
+                <td className="align-middle">
+                  <div className="text-white font-semibold">
+                    {adults.length || 1} Adult(s)
+                    {children.length > 0 ? `, ${children.length} Child` : ""}
+                  </div>
+
+                  {adultNames && <div>Adults: {adultNames}</div>}
+                  {childNames && <div>Children: {childNames}</div>}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section className="voucher-row">
+          <div className="voucher-cell">
+            <h2 className="voucher-gold text-lg mb-4">Package Details:</h2>
+
+            <div className="voucher-gold text-sm">
+              Special Service Request:
+            </div>
+
+            <div className="mt-2">
+              {booking?.SpecialRequest || booking?.SSR || "N.A."}
+            </div>
+          </div>
+        </section>
+
+        <section className="voucher-row">
+          <div className="voucher-cell">
+            <h2 className="voucher-gold text-lg mb-2">Remarks</h2>
+
+            <p>
+              {booking?.Remark ||
+                booking?.Remarks ||
+                "Please note that while your booking had been confirmed and is guaranteed, the rooming list with your name may not be adjusted in the hotel's reservation system until closer to arrival."}
             </p>
           </div>
-        </div>
+        </section>
+
+        <section className="voucher-row">
+          <div className="voucher-cell">
+            <h2 className="voucher-gold text-lg mb-2">Agent Remarks</h2>
+            <p>N.a.</p>
+          </div>
+        </section>
+
+        <section className="voucher-row">
+          <div className="voucher-cell">
+            <h2 className="voucher-gold text-lg">
+              Booking Terms & Conditions
+            </h2>
+
+            <ul className="terms-list list-disc">
+              <li>
+                You must present a photo ID at the time of check in. Hotel may
+                ask for credit card or cash deposit for the extra services at
+                the time of check in.
+              </li>
+
+              <li>
+                All extra charges should be collected directly from clients
+                prior to departure such as parking, phone calls, room service,
+                city tax, etc.
+              </li>
+
+              <li>
+                We don&apos;t accept any responsibility for additional expenses
+                due to the changes or delays in air, road, rail, sea or indeed
+                of any other causes, all such expenses will have to be borne by
+                passengers.
+              </li>
+
+              <li>
+                In case of wrong residency & nationality selected by user at
+                the time of booking; the supplement charges may be applicable
+                and need to be paid to the hotel by guest on check in/check out.
+              </li>
+
+              <li>
+                Any special request for bed type, early check in, late check
+                out, smoking rooms, etc are not guaranteed as subject to
+                availability at the time of check in.
+              </li>
+
+              <li>
+                Early check out will attract full cancellation charges unless
+                otherwise specified.
+              </li>
+
+              <li>
+                In case of a late check-in by the guest, it is essential to
+                inform TBO in advance to avoid the booking being marked as a no
+                show.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section className="voucher-row">
+          <div className="voucher-cell">
+            <h2 className="voucher-gold text-lg">Hotel Policies</h2>
+
+            {hotelNorms.length > 0 ? (
+              <ul className="policy-list list-disc">
+                {hotelNorms.map((norm, index) => (
+                  <li key={index}>{norm}</li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="policy-list list-disc">
+                <li>{hotelCity || "India"} hotel policy applies.</li>
+
+                <li>
+                  <strong>{roomName}</strong>
+                </li>
+
+                <li>CheckIn Time-Begin: 12:00 PM</li>
+                <li>CheckIn Time-End: anytime</li>
+                <li>CheckOut Time: 12:00 PM</li>
+
+                <li>
+                  CheckIn Instructions:
+                  <ul className="list-disc ml-8 mt-1">
+                    <li>
+                      Extra-person charges may apply and vary depending on
+                      property policy.
+                    </li>
+                    <li>
+                      Government-issued photo identification and a credit card,
+                      debit card, or cash deposit may be required at check-in for
+                      incidental charges.
+                    </li>
+                    <li>
+                      Special requests are subject to availability upon check-in
+                      and may incur additional charges.
+                    </li>
+                    <li>
+                      This property accepts credit cards, debit cards, mobile
+                      payments, and cash.
+                    </li>
+                    <li>
+                      Mobile payment options include Google Pay, Paytm, PhonePe,
+                      Amazon Pay, and Cash App.
+                    </li>
+                    <li>
+                      Safety features at this property include a fire
+                      extinguisher, a smoke detector, a security system, and a
+                      first aid kit.
+                    </li>
+                  </ul>
+                </li>
+
+                <li>
+                  Special Instructions: Front desk staff will greet guests on
+                  arrival at the property.
+                </li>
+
+                <li>Minimum CheckIn Age : 18</li>
+
+                <li>
+                  Optional Fees:
+                  <ul className="list-disc ml-8 mt-1">
+                    <li>
+                      Fee for cooked-to-order breakfast: approximately INR 250
+                      to 350 for adults, and INR 200 to 300 for children.
+                    </li>
+                    <li>Pet fee: INR 1200 per pet, per day.</li>
+                    <li>Rollaway bed fee: INR 600 per night.</li>
+                  </ul>
+                </li>
+
+                <li>
+                  Cards Accepted: Amazon Pay, Visa, Debit cards, Cash App, Cash,
+                  Google Pay, Mastercard, PhonePe, Paytm.
+                </li>
+
+                <li>
+                  Only dogs and cats are allowed, service animals not allowed,
+                  pets allowed, professional property host/manager, no cribs
+                  infant beds available.
+                </li>
+
+                <li>
+                  <strong>
+                    City tax and resort fee are to be paid directly at hotel if
+                    applicable. Most hotels do not allow unmarried / unrelated
+                    couples to check-in. This is at full discretion of the hotel
+                    management. No refund would be applicable in case the hotel
+                    denies check-in under such circumstances.
+                  </strong>
+                </li>
+
+                <li>
+                  Extra person charges may apply at check-in, as per the
+                  property&apos;s policy.
+                </li>
+              </ul>
+            )}
+          </div>
+        </section>
+
+        <section className="voucher-cell">
+          <h2 className="voucher-gold text-lg mb-2">Contact Details:</h2>
+
+          <div>
+            Phone :{" "}
+            <a href={`tel:${contactPhone}`} className="gold-link">
+              {contactPhone}
+            </a>
+          </div>
+
+          <div>
+            Email :{" "}
+            <a href={`mailto:${contactEmail}`} className="gold-link">
+              {contactEmail}
+            </a>
+          </div>
+        </section>
+      </div>
+
+      <div className="no-print max-w-262.5 mx-auto mt-5 flex justify-end">
+        <button onClick={() => navigate(-1)} className="back-btn">
+          Back
+        </button>
       </div>
     </div>
-  );
-};
-
-const VoucherBlock = ({ children }) => {
-  return (
-    <section className="border-b border-[var(--border-soft)]">
-      {children}
-    </section>
-  );
-};
-
-const VoucherHeading = ({ children }) => {
-  return (
-    <div className="voucher-section-heading bg-[var(--bg-secondary)] px-4 py-3 font-bold text-[var(--gold-main)] border-b border-[var(--border-soft)]">
-      {children}
-    </div>
-  );
-};
-
-const VoucherTitle = ({ children }) => {
-  return (
-    <h2 className="voucher-section-heading bg-[var(--bg-secondary)] px-4 py-3 font-bold text-[var(--gold-main)] text-lg border-b border-[var(--border-soft)]">
-      {children}
-    </h2>
   );
 };
 
