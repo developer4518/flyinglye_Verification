@@ -931,11 +931,6 @@ const HotelInvoice = () => {
             </div>
           </div>
         </div>
-
-        <ResponseDataBox
-          title="Full Hotel Booking Response Data"
-          data={responseData}
-        />
       </div>
     </div>
   );
