@@ -512,13 +512,11 @@ const HotelBooking = () => {
     };
   };
 
-  const handleBookHotel = async () => {
+  const handleReviewBooking = () => {
     const error = validateGuests();
     if (error) return alert(error);
 
     try {
-      setLoading(true);
-
       const finalPAN = corporatePAN.trim().toUpperCase();
 
       const cleanedGuests = guestList.map((g, i) => {
@@ -611,50 +609,41 @@ const HotelBooking = () => {
         }
       });
 
-      console.log(
-        "FINAL HOTEL PAYLOAD:",
-        JSON.stringify(finalPayload, null, 2),
-      );
-
-      const res = await privateApi.post(
-        "/api/hotels/hotels/book/",
-        finalPayload,
-      );
-
       const guestsForStorage = cleanedGuests.map(
         ({ RoomIndex, ...guest }) => guest,
       );
 
+      const reviewBookingData = {
+        finalPayload,
+        guestList: guestsForStorage,
+        bookingCode,
+        hotel,
+        roomData,
+        hotelResult,
+        checkIn,
+        checkOut,
+        net,
+        isPANRequired,
+        corporatePAN: finalPAN,
+        cancellationPolicies,
+        roomPromotions,
+        supplements,
+        roomAmenities,
+        rateConditions,
+      };
+
       localStorage.setItem(
-        "hotelBookingData",
-        JSON.stringify({
-          guestList: guestsForStorage,
-          bookingCode,
-          hotel,
-          checkIn,
-          checkOut,
-          net,
-          isPANRequired,
-          bookingResponse: res.data,
-        }),
+        "reviewBookingData",
+        JSON.stringify(reviewBookingData),
       );
 
       setGuestDetails(guestsForStorage);
 
-      navigate("/hotel-booking-success", {
-        state: { booking: res.data },
+      navigate("/review-booking", {
+        state: reviewBookingData,
       });
     } catch (err) {
-      console.log("BOOK ERROR:", err?.response?.data || err);
-
-      alert(
-        err?.response?.data?.message ||
-          err?.response?.data?.Error?.ErrorMessage ||
-          err?.message ||
-          "Booking failed",
-      );
-    } finally {
-      setLoading(false);
+      alert(err?.message || "Unable to prepare review booking");
     }
   };
 
@@ -1052,11 +1041,10 @@ const HotelBooking = () => {
           </div>
 
           <button
-            onClick={handleBookHotel}
-            disabled={loading}
-            className="mt-6 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 py-3 font-semibold text-black disabled:opacity-60"
+            onClick={handleReviewBooking}
+            className="mt-6 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 py-3 font-semibold text-black"
           >
-            {loading ? "Processing..." : "Proceed to Payment"}
+            Review Booking
           </button>
         </div>
       </div>
