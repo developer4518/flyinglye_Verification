@@ -226,12 +226,14 @@ const HotelBookingSuccess = () => {
   ).length;
 
   const handleInvoiceClick = () => {
-    if (booking?.InvoiceNumber) {
-      alert(`Invoice No: ${booking.InvoiceNumber}`);
-      return;
-    }
-
-    alert("Invoice number not available");
+    navigate(`/hotel-invoice/${booking.BookingId}`, {
+      state: {
+        booking,
+        hotel,
+        guestDetails,
+        savedData,
+      },
+    });
   };
 
   const handleVoucherClick = () => {

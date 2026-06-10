@@ -34,6 +34,7 @@ import BlogDetails from "./Pages/BlogDetails";
 import HotelBookingSuccess from "./modules/hotels/pages/HotelBookingSuccess";
 import HotelReviewBooking from "./modules/hotels/pages/HotelReviewBooking";
 import HotelVoucher from "./modules/hotels/pages/HotelVoucher";
+import HotelInvoice from "./modules/hotels/pages/HotelInvoice";
 
 const App = () => {
   return (
@@ -61,6 +62,7 @@ const App = () => {
         <Route path="/hotel-booking" element={<HotelBooking />} />
         <Route path="/hotel-review-booking" element={<HotelReviewBooking />} />
         <Route path="/booking-details/:bookingId" element={<HotelVoucher />} />
+        <Route path="/hotel-invoice/:bookingId" element={<HotelInvoice />} />
         <Route
           path="/hotel-booking-success"
           element={<HotelBookingSuccess />}
