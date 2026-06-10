@@ -510,7 +510,7 @@ const HotelInvoice = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-10 px-3 md:px-8 font-[var(--font-body)]">
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-24 px-3 md:px-8 font-[var(--font-body)]">
       <style>
         {`
           @media print {

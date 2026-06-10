@@ -27,17 +27,17 @@ const formatDate = (dateValue) => {
 };
 
 const getNights = (checkIn, checkOut) => {
-  if (!checkIn || !checkOut) return 1;
+  if (!checkIn || !checkOut) return "N/A";
 
   const inDate = new Date(checkIn);
   const outDate = new Date(checkOut);
 
   if (Number.isNaN(inDate.getTime()) || Number.isNaN(outDate.getTime())) {
-    return 1;
+    return "N/A";
   }
 
   const diff = Math.ceil((outDate - inDate) / (1000 * 60 * 60 * 24));
-  return diff > 0 ? diff : 1;
+  return diff > 0 ? diff : "N/A";
 };
 
 const normalizeArray = (value) => {
@@ -50,11 +50,20 @@ const normalizeArray = (value) => {
   if (typeof value === "string") {
     return value
       .split("|")
+      .join("\n")
+      .split("\n")
       .map((item) => item.trim())
       .filter(Boolean);
   }
 
   return [];
+};
+
+const cleanText = (value) => {
+  if (!value) return "";
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
+  if (typeof value === "object") return "";
+  return String(value).trim();
 };
 
 const getRoomData = (saved, bookingData) => {
@@ -65,23 +74,34 @@ const getRoomData = (saved, bookingData) => {
     saved?.selectedRoom ||
     saved?.room ||
     bookingData?.HotelRoomsDetails?.[0] ||
+    bookingData?.Rooms?.[0] ||
     {}
   );
 };
 
-const getHotelResult = (saved) => {
+const getHotelResult = (saved, bookingData) => {
   return (
     saved?.prebookData?.raw?.HotelResult?.[0] ||
     saved?.prebookData?.raw?.Response?.HotelResult?.[0] ||
     saved?.hotel?.hotel_raw ||
+    bookingData?.HotelResult?.[0] ||
+    bookingData?.Response?.HotelResult?.[0] ||
     {}
   );
 };
 
 const getGuestName = (guest) => {
   return `${guest?.Title ? `${guest.Title}. ` : ""}${
-    guest?.FirstName || guest?.firstName || ""
-  } ${guest?.LastName || guest?.lastName || ""}`.trim();
+    guest?.FirstName || guest?.firstName || guest?.First || ""
+  } ${guest?.LastName || guest?.lastName || guest?.Last || ""}`.trim();
+};
+
+const getFirstValue = (...values) => {
+  for (const value of values) {
+    const cleaned = cleanText(value);
+    if (cleaned) return cleaned;
+  }
+  return "";
 };
 
 const HotelVoucher = () => {
@@ -117,6 +137,7 @@ const HotelVoucher = () => {
     savedData?.hotel ||
     booking?.HotelDetails ||
     booking?.HotelDetail ||
+    booking?.Hotel ||
     {};
 
   const guestDetails =
@@ -124,6 +145,7 @@ const HotelVoucher = () => {
     savedData?.guestList ||
     booking?.HotelPassenger ||
     booking?.Passengers ||
+    booking?.GuestDetails ||
     [];
 
   const roomData = useMemo(
@@ -131,7 +153,10 @@ const HotelVoucher = () => {
     [savedData, booking],
   );
 
-  const hotelResult = useMemo(() => getHotelResult(savedData), [savedData]);
+  const hotelResult = useMemo(
+    () => getHotelResult(savedData, booking),
+    [savedData, booking],
+  );
 
   const roomName = useMemo(() => {
     const name =
@@ -140,84 +165,93 @@ const HotelVoucher = () => {
       roomData?.RoomTypeName ||
       roomData?.RoomType ||
       roomData?.Name ||
-      booking?.HotelRoomsDetails?.[0]?.RoomTypeName ||
-      "Room";
+      booking?.HotelRoomsDetails?.[0]?.RoomTypeName;
 
-    return Array.isArray(name) ? name[0] : name;
+    return Array.isArray(name) ? name[0] : name || "N/A";
   }, [roomData, booking]);
 
-  const confirmationNo =
-    booking?.ConfirmationNo ||
-    booking?.TBOConfirmationNo ||
-    booking?.BookingRefNo ||
-    booking?.BookingId ||
-    bookingId ||
-    "N/A";
+  const confirmationNo = getFirstValue(
+    booking?.ConfirmationNo,
+    booking?.TBOConfirmationNo,
+    booking?.BookingRefNo,
+    booking?.BookingId,
+    bookingId,
+  );
 
-  const hotelName =
-    hotel?.hotel_name || hotel?.HotelName || booking?.HotelName || "Hotel";
+  const hotelName = getFirstValue(
+    hotel?.hotel_name,
+    hotel?.HotelName,
+    booking?.HotelName,
+    hotelResult?.HotelName,
+  );
 
-  const hotelAddress =
-    hotel?.address ||
-    hotel?.Address ||
-    booking?.HotelAddress ||
-    hotelResult?.HotelAddress ||
-    "Hotel address not available";
+  const hotelAddress = getFirstValue(
+    hotel?.address,
+    hotel?.Address,
+    booking?.HotelAddress,
+    hotelResult?.HotelAddress,
+    hotelResult?.Address,
+  );
 
-  const hotelCity =
-    hotel?.city_name ||
-    hotel?.CityName ||
-    hotel?.city ||
-    booking?.CityName ||
-    "";
+  const hotelCity = getFirstValue(
+    hotel?.city_name,
+    hotel?.CityName,
+    hotel?.city,
+    booking?.CityName,
+    hotelResult?.CityName,
+  );
 
   const checkIn =
     savedData?.checkIn ||
     booking?.CheckInDate ||
     booking?.HotelCheckIn ||
-    booking?.CheckIn;
+    booking?.CheckIn ||
+    roomData?.CheckInDate;
 
   const checkOut =
     savedData?.checkOut ||
     booking?.CheckOutDate ||
     booking?.HotelCheckOut ||
-    booking?.CheckOut;
+    booking?.CheckOut ||
+    roomData?.CheckOutDate;
 
   const nights = getNights(checkIn, checkOut);
 
   const leadGuest =
-    guestDetails.find((g) => g.LeadPassenger) || guestDetails[0] || {};
+    guestDetails.find((g) => g?.LeadPassenger) || guestDetails[0] || {};
 
   const leadGuestName = getGuestName(leadGuest);
 
   const adults = guestDetails.filter(
-    (g) => Number(g.PaxType) === 1 || Number(g.Age) >= 12,
+    (g) => Number(g?.PaxType) === 1 || Number(g?.Age) >= 12,
   );
 
   const children = guestDetails.filter(
-    (g) => Number(g.PaxType) === 2 || Number(g.Age) < 12,
+    (g) => Number(g?.PaxType) === 2 || Number(g?.Age) < 12,
   );
 
   const adultNames = adults.map(getGuestName).filter(Boolean).join(", ");
   const childNames = children.map(getGuestName).filter(Boolean).join(", ");
 
-  const inclusion =
-    roomData?.Inclusion ||
-    roomData?.MealType ||
-    booking?.HotelRoomsDetails?.[0]?.MealType ||
-    "Room Only";
+  const inclusion = getFirstValue(
+    roomData?.Inclusion,
+    roomData?.MealType,
+    booking?.HotelRoomsDetails?.[0]?.MealType,
+  );
 
-  const roomPromotion =
-    roomData?.RoomPromotion?.[0] ||
-    roomData?.RoomPromotions?.[0] ||
-    roomData?.Promotion ||
-    "";
+  const roomPromotion = getFirstValue(
+    roomData?.RoomPromotion?.[0],
+    roomData?.RoomPromotions?.[0],
+    roomData?.Promotion,
+  );
 
-  const roomDescription =
-    roomData?.RoomDescription ||
-    roomData?.Description ||
-    roomData?.RoomInfo ||
-    "";
+  const roomDescription = getFirstValue(
+    roomData?.RoomDescription,
+    roomData?.Description,
+    roomData?.RoomInfo,
+    booking?.HotelRoomsDetails?.[0]?.RoomDescription,
+    booking?.HotelRoomsDetails?.[0]?.Description,
+  );
 
   const amenities = useMemo(() => {
     const list =
@@ -225,9 +259,11 @@ const HotelVoucher = () => {
       roomData?.RoomAmenities ||
       roomData?.amenities ||
       hotel?.amenities ||
+      hotel?.HotelFacilities ||
+      hotelResult?.HotelFacilities ||
       [];
 
-    if (Array.isArray(list)) return list;
+    if (Array.isArray(list)) return list.filter(Boolean);
 
     if (typeof list === "string") {
       return list
@@ -239,7 +275,7 @@ const HotelVoucher = () => {
     }
 
     return [];
-  }, [roomData, hotel]);
+  }, [roomData, hotel, hotelResult]);
 
   const hotelNorms = useMemo(() => {
     const norms =
@@ -247,38 +283,86 @@ const HotelVoucher = () => {
       hotel?.HotelNorms ||
       hotel?.hotel_norms ||
       roomData?.HotelNorms ||
+      booking?.HotelNorms ||
       [];
 
     return normalizeArray(norms);
-  }, [hotelResult, hotel, roomData]);
+  }, [hotelResult, hotel, roomData, booking]);
 
-  const contactPhone = "9999055591";
-  const contactEmail = "flyinglyte@outlook.com";
-  const agencyName = "FLYINGLYTE1";
-  const agencyCity = "Delhi";
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleEmail = () => {
-    const subject = encodeURIComponent(`Hotel Voucher - ${confirmationNo}`);
-    const body = encodeURIComponent(
-      `Dear Guest,
-
-Your hotel voucher is ready.
-
-Hotel: ${hotelName}
-Confirmation No: ${confirmationNo}
-Check In: ${formatDate(checkIn)}
-Check Out: ${formatDate(checkOut)}
-
-Regards,
-Flyinglyte`,
+  const bookingTerms = useMemo(() => {
+    return normalizeArray(
+      booking?.TermsAndConditions ||
+        booking?.BookingTermsAndConditions ||
+        booking?.TermsConditions ||
+        booking?.Terms ||
+        roomData?.TermsAndConditions ||
+        hotelResult?.TermsAndConditions,
     );
+  }, [booking, roomData, hotelResult]);
 
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
+  const specialRequest = getFirstValue(
+    booking?.SpecialRequest,
+    booking?.SpecialServiceRequest,
+    booking?.SSR,
+    savedData?.specialRequest,
+  );
+
+  const remarks = getFirstValue(
+    booking?.Remark,
+    booking?.Remarks,
+    booking?.HotelRemarks,
+    roomData?.Remarks,
+  );
+
+  const agentRemarks = getFirstValue(
+    booking?.AgentRemark,
+    booking?.AgentRemarks,
+    savedData?.agentRemarks,
+  );
+
+  const agencyName = getFirstValue(
+    booking?.AgencyName,
+    booking?.AgentName,
+    booking?.AgencyDetails?.Name,
+    savedData?.agency?.name,
+    state?.agency?.name,
+  );
+
+  const agencyAddress = getFirstValue(
+    booking?.AgencyAddress,
+    booking?.AgencyDetails?.Address,
+    savedData?.agency?.address,
+    state?.agency?.address,
+  );
+
+  const agencyCity = getFirstValue(
+    booking?.AgencyCity,
+    booking?.AgencyDetails?.City,
+    savedData?.agency?.city,
+    state?.agency?.city,
+  );
+
+  const contactPhone = getFirstValue(
+    booking?.AgencyPhone,
+    booking?.Phone,
+    booking?.ContactNo,
+    booking?.AgencyDetails?.Phone,
+    savedData?.agency?.phone,
+    state?.agency?.phone,
+  );
+
+  const contactEmail = getFirstValue(
+    booking?.AgencyEmail,
+    booking?.Email,
+    booking?.AgencyDetails?.Email,
+    savedData?.agency?.email,
+    state?.agency?.email,
+  );
+
+  const hasAgencyData =
+    agencyName || agencyAddress || agencyCity || contactPhone || contactEmail;
+
+  const hasHotelData = hotelName || hotelAddress || hotelCity;
 
   const waitForPaint = () =>
     new Promise((resolve) => {
@@ -286,6 +370,27 @@ Flyinglyte`,
         requestAnimationFrame(resolve);
       });
     });
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleEmail = () => {
+    const subject = encodeURIComponent(
+      `Hotel Voucher - ${confirmationNo || "Booking"}`,
+    );
+
+    const body = encodeURIComponent(
+      `Hotel Voucher
+
+Hotel: ${hotelName || "N/A"}
+Confirmation No: ${confirmationNo || "N/A"}
+Check In: ${formatDate(checkIn)}
+Check Out: ${formatDate(checkOut)}`,
+    );
+
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
 
   const handleGeneratePdf = async () => {
     if (!voucherRef.current) return;
@@ -312,7 +417,6 @@ Flyinglyte`,
       });
 
       const imgData = canvas.toDataURL("image/png", 1.0);
-
       const pdf = new jsPDF("p", "mm", "a4");
 
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -335,7 +439,6 @@ Flyinglyte`,
 
       while (remainingHeight > 0) {
         pdf.addPage();
-
         yPosition = margin - (imgHeight - remainingHeight);
 
         pdf.setFillColor(11, 15, 20);
@@ -356,7 +459,7 @@ Flyinglyte`,
   };
 
   return (
-    <div className="min-h-screen bg-(--bg-main) py-10 md:py-24 px-3 font-(--font-body) text-(--text-main)">
+    <div className="min-h-screen bg-[var(--bg-main)] py-10 md:py-24 px-3 font-[var(--font-body)] text-[var(--text-main)]">
       <style>
         {`
           .voucher-wrapper {
@@ -526,7 +629,7 @@ Flyinglyte`,
             word-break: break-word;
           }
 
-          .voucher-table .room-name {
+          .room-name {
             color: #ffffff;
             font-weight: 800;
             font-size: 16px;
@@ -547,23 +650,12 @@ Flyinglyte`,
             margin-bottom: 6px;
           }
 
-          .nested-list {
-            margin-top: 6px;
-            margin-left: 26px;
-            list-style-type: disc;
-          }
-
           .room-description {
-            margin-top: 26px;
+            margin-top: 20px;
           }
 
           .room-description p {
-            margin-bottom: 16px;
-          }
-
-          .room-description strong {
-            font-weight: 800;
-            color: #ffffff;
+            margin-bottom: 10px;
           }
 
           .red-text {
@@ -669,11 +761,6 @@ Flyinglyte`,
               print-color-adjust: exact !important;
             }
 
-            .voucher-title {
-              color: var(--gold-main) !important;
-              font-family: var(--font-heading) !important;
-            }
-
             .voucher-heading,
             .voucher-table th {
               background: linear-gradient(90deg, rgba(248, 222, 130, 0.14), rgba(234, 168, 42, 0.08)) !important;
@@ -688,29 +775,6 @@ Flyinglyte`,
               color: var(--text-muted) !important;
               border-color: rgba(255, 255, 255, 0.08) !important;
               background: transparent !important;
-            }
-
-            .voucher-row {
-              border-color: rgba(255, 255, 255, 0.08) !important;
-            }
-
-            .voucher-gold {
-              color: var(--gold-main) !important;
-            }
-
-            .room-name,
-            .voucher-cell strong,
-            .voucher-cell b,
-            .text-white {
-              color: #ffffff !important;
-            }
-
-            .gold-link {
-              color: var(--gold-soft) !important;
-            }
-
-            .red-text {
-              color: #ff5c5c !important;
             }
 
             .table-scroll {
@@ -738,10 +802,10 @@ Flyinglyte`,
 
           <div className="voucher-actions no-print">
             <button onClick={handleEmail}>Email Voucher</button>
-            <span className="text-(--text-muted)">|</span>
+            <span className="text-[var(--text-muted)]">|</span>
 
             <button onClick={handlePrint}>Print Voucher</button>
-            <span className="text-(--text-muted)">|</span>
+            <span className="text-[var(--text-muted)]">|</span>
 
             <button onClick={handleGeneratePdf} disabled={pdfLoading}>
               {pdfLoading ? "Generating..." : "Generate PDF 🧾"}
@@ -749,75 +813,109 @@ Flyinglyte`,
           </div>
         </div>
 
-        <section className="voucher-row">
-          <div className="voucher-heading">Confirmation No</div>
-          <div className="voucher-cell font-semibold text-white">
-            {confirmationNo}
-          </div>
-        </section>
+        {confirmationNo && (
+          <section className="voucher-row">
+            <div className="voucher-heading">Confirmation No</div>
+            <div className="voucher-cell font-semibold text-white">
+              {confirmationNo}
+            </div>
+          </section>
+        )}
 
-        <section className="voucher-row voucher-grid-2">
-          <div className="voucher-cell">
-            <div className="voucher-gold">Hotel Address Details</div>
-            <div className="text-white font-semibold mt-1">{hotelName}</div>
-            <div>
-              {hotelAddress}
-              {hotelCity ? `, ${hotelCity}` : ""}
+        {(hasHotelData || hasAgencyData) && (
+          <section className="voucher-row voucher-grid-2">
+            <div className="voucher-cell">
+              <div className="voucher-gold">Hotel Address Details</div>
+
+              {hotelName && (
+                <div className="text-white font-semibold mt-1">{hotelName}</div>
+              )}
+
+              {(hotelAddress || hotelCity) && (
+                <div>
+                  {hotelAddress}
+                  {hotelCity ? `, ${hotelCity}` : ""}
+                </div>
+              )}
+
+              {(hotelName || hotelAddress) && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    `${hotelName} ${hotelAddress}`,
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="gold-link inline-block mt-1"
+                >
+                  View Map
+                </a>
+              )}
             </div>
 
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                `${hotelName} ${hotelAddress}`,
-              )}`}
-              target="_blank"
-              rel="noreferrer"
-              className="gold-link inline-block mt-1"
-            >
-              View Map
-            </a>
-          </div>
+            {hasAgencyData && (
+              <div className="voucher-cell">
+                <div className="voucher-gold">Agency Address Details</div>
 
-          <div className="voucher-cell">
-            <div className="voucher-gold">Agency Address Details</div>
-            <div className="text-white font-semibold mt-1">{agencyName}</div>
-            <div>Delhi</div>
-            <div>City : {agencyCity}</div>
-            <div>
-              Phone :{" "}
-              <a href={`tel:${contactPhone}`} className="gold-link">
-                {contactPhone}
-              </a>
-            </div>
-            <div>
-              Email :{" "}
-              <a href={`mailto:${contactEmail}`} className="gold-link">
-                {contactEmail}
-              </a>
-            </div>
-          </div>
-        </section>
+                {agencyName && (
+                  <div className="text-white font-semibold mt-1">
+                    {agencyName}
+                  </div>
+                )}
+
+                {agencyAddress && <div>{agencyAddress}</div>}
+                {agencyCity && <div>City : {agencyCity}</div>}
+
+                {contactPhone && (
+                  <div>
+                    Phone :{" "}
+                    <a href={`tel:${contactPhone}`} className="gold-link">
+                      {contactPhone}
+                    </a>
+                  </div>
+                )}
+
+                {contactEmail && (
+                  <div>
+                    Email :{" "}
+                    <a href={`mailto:${contactEmail}`} className="gold-link">
+                      {contactEmail}
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="voucher-row voucher-cell">
-          <div>
-            <span className="voucher-gold">Lead Passenger Name:</span>{" "}
-            <span className="text-white">{leadGuestName || "N.A."}</span>
-          </div>
+          {leadGuestName && (
+            <div>
+              <span className="voucher-gold">Lead Passenger Name:</span>{" "}
+              <span className="text-white">{leadGuestName}</span>
+            </div>
+          )}
 
           <div className="date-grid mt-5">
-            <div className="date-item">
-              <span className="voucher-gold">Check In Date:</span>
-              <span className="text-white">{formatDate(checkIn)}</span>
-            </div>
+            {checkIn && (
+              <div className="date-item">
+                <span className="voucher-gold">Check In Date:</span>
+                <span className="text-white">{formatDate(checkIn)}</span>
+              </div>
+            )}
 
-            <div className="date-item">
-              <span className="voucher-gold">Check Out Date:</span>
-              <span className="text-white">{formatDate(checkOut)}</span>
-            </div>
+            {checkOut && (
+              <div className="date-item">
+                <span className="voucher-gold">Check Out Date:</span>
+                <span className="text-white">{formatDate(checkOut)}</span>
+              </div>
+            )}
 
-            <div className="date-item">
-              <span className="voucher-gold">No of Nights:</span>
-              <span className="text-white">{nights}</span>
-            </div>
+            {nights !== "N/A" && (
+              <div className="date-item">
+                <span className="voucher-gold">No of Nights:</span>
+                <span className="text-white">{nights}</span>
+              </div>
+            )}
           </div>
         </section>
 
@@ -837,79 +935,44 @@ Flyinglyte`,
 
                 <td>
                   <div className="room-name">{roomName}</div>
-                  <div>Incl : {inclusion}</div>
+
+                  {inclusion && <div>Incl : {inclusion}</div>}
 
                   {roomPromotion && (
                     <div className="red-text mt-1">{roomPromotion}</div>
                   )}
 
-                  <div className="room-description">
-                    <p>
-                      <strong>Room Description:</strong>
-                    </p>
+                  {(roomDescription || amenities.length > 0) && (
+                    <div className="room-description">
+                      {roomDescription && (
+                        <>
+                          <p>
+                            <strong>Room Description:</strong>
+                          </p>
+                          <p>{roomDescription}</p>
+                        </>
+                      )}
 
-                    {roomDescription ? (
-                      <p>{roomDescription}</p>
-                    ) : (
-                      <>
-                        <p>150 sq feet</p>
-
+                      {amenities.length > 0 && (
                         <p>
-                          <strong>Layout</strong> - Bedroom
+                          <strong>Amenities</strong> - {amenities.join(", ")}
                         </p>
-
-                        <p>
-                          <strong>Internet</strong> - Free WiFi
-                        </p>
-
-                        <p>
-                          <strong>Entertainment</strong> - LED television with
-                          satellite channels
-                        </p>
-
-                        <p>
-                          <strong>Food and Drink</strong> - Refrigerator and
-                          24-hour room service
-                        </p>
-
-                        <p>
-                          <strong>Sleep</strong> - Bed sheets
-                        </p>
-
-                        <p>
-                          <strong>Bathroom</strong> - Private bathroom, shower,
-                          free toiletries, and towels
-                        </p>
-
-                        <p>
-                          <strong>Practical</strong> - Desk and desk chair;
-                          rollaway beds surcharge available on request
-                        </p>
-
-                        <p>
-                          <strong>Comfort</strong> - Air conditioning and daily
-                          housekeeping
-                        </p>
-
-                        <p>
-                          <strong>Accessibility</strong> - Wheelchair accessible
-                        </p>
-                      </>
-                    )}
-
-                    {amenities.length > 0 && (
-                      <p>
-                        <strong>Amenities</strong> - {amenities.join(", ")}
-                      </p>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </td>
 
                 <td className="guest-cell">
-                  <div className="text-white font-semibold">
-                    {adults.length || 1} Adult(s)
-                    {children.length > 0 ? `, ${children.length} Child` : ""}
-                  </div>
+                  {(adults.length > 0 || children.length > 0) && (
+                    <div className="text-white font-semibold">
+                      {adults.length > 0 ? `${adults.length} Adult(s)` : ""}
+                      {children.length > 0
+                        ? `${adults.length > 0 ? ", " : ""}${
+                            children.length
+                          } Child`
+                        : ""}
+                    </div>
+                  )}
 
                   {adultNames && <div>Adults: {adultNames}</div>}
                   {childNames && <div>Children: {childNames}</div>}
@@ -919,210 +982,94 @@ Flyinglyte`,
           </table>
         </section>
 
-        <section className="voucher-row">
-          <div className="voucher-cell">
-            <h2 className="voucher-gold text-lg mb-4">Package Details:</h2>
+        {specialRequest && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold text-lg mb-4">Package Details:</h2>
 
-            <div className="voucher-gold text-sm">Special Service Request:</div>
+              <div className="voucher-gold text-sm">
+                Special Service Request:
+              </div>
 
-            <div className="mt-2">
-              {booking?.SpecialRequest || booking?.SSR || "N.A."}
+              <div className="mt-2">{specialRequest}</div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
-        <section className="voucher-row">
-          <div className="voucher-cell">
-            <h2 className="voucher-gold text-lg mb-2">Remarks</h2>
+        {remarks && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold text-lg mb-2">Remarks</h2>
+              <p>{remarks}</p>
+            </div>
+          </section>
+        )}
 
-            <p>
-              {booking?.Remark ||
-                booking?.Remarks ||
-                "Please note that while your booking had been confirmed and is guaranteed, the rooming list with your name may not be adjusted in the hotel's reservation system until closer to arrival."}
-            </p>
-          </div>
-        </section>
+        {agentRemarks && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold text-lg mb-2">Agent Remarks</h2>
+              <p>{agentRemarks}</p>
+            </div>
+          </section>
+        )}
 
-        <section className="voucher-row">
-          <div className="voucher-cell">
-            <h2 className="voucher-gold text-lg mb-2">Agent Remarks</h2>
-            <p>N.a.</p>
-          </div>
-        </section>
+        {bookingTerms.length > 0 && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold text-lg">
+                Booking Terms & Conditions
+              </h2>
 
-        <section className="voucher-row">
-          <div className="voucher-cell">
-            <h2 className="voucher-gold text-lg">Booking Terms & Conditions</h2>
+              <ul className="terms-list list-disc">
+                {bookingTerms.map((term, index) => (
+                  <li key={index}>{term}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
 
-            <ul className="terms-list list-disc">
-              <li>
-                You must present a photo ID at the time of check in. Hotel may
-                ask for credit card or cash deposit for the extra services at
-                the time of check in.
-              </li>
+        {hotelNorms.length > 0 && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold text-lg">Hotel Policies</h2>
 
-              <li>
-                All extra charges should be collected directly from clients
-                prior to departure such as parking, phone calls, room service,
-                city tax, etc.
-              </li>
-
-              <li>
-                We don&apos;t accept any responsibility for additional expenses
-                due to the changes or delays in air, road, rail, sea or indeed
-                of any other causes, all such expenses will have to be borne by
-                passengers.
-              </li>
-
-              <li>
-                In case of wrong residency & nationality selected by user at the
-                time of booking; the supplement charges may be applicable and
-                need to be paid to the hotel by guest on check in/check out.
-              </li>
-
-              <li>
-                Any special request for bed type, early check in, late check
-                out, smoking rooms, etc are not guaranteed as subject to
-                availability at the time of check in.
-              </li>
-
-              <li>
-                Early check out will attract full cancellation charges unless
-                otherwise specified.
-              </li>
-
-              <li>
-                In case of a late check-in by the guest, it is essential to
-                inform TBO in advance to avoid the booking being marked as a no
-                show.
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section className="voucher-row">
-          <div className="voucher-cell">
-            <h2 className="voucher-gold text-lg">Hotel Policies</h2>
-
-            {hotelNorms.length > 0 ? (
               <ul className="policy-list list-disc">
                 {hotelNorms.map((norm, index) => (
                   <li key={index}>{norm}</li>
                 ))}
               </ul>
-            ) : (
-              <ul className="policy-list list-disc">
-                <li>{hotelCity || "India"} hotel policy applies.</li>
+            </div>
+          </section>
+        )}
 
-                <li>
-                  <strong>{roomName}</strong>
-                </li>
+        {(contactPhone || contactEmail) && (
+          <section className="voucher-cell">
+            <h2 className="voucher-gold text-lg mb-2">Contact Details:</h2>
 
-                <li>CheckIn Time-Begin: 12:00 PM</li>
-                <li>CheckIn Time-End: anytime</li>
-                <li>CheckOut Time: 12:00 PM</li>
-
-                <li>
-                  CheckIn Instructions:
-                  <ul className="nested-list">
-                    <li>
-                      Extra-person charges may apply and vary depending on
-                      property policy.
-                    </li>
-                    <li>
-                      Government-issued photo identification and a credit card,
-                      debit card, or cash deposit may be required at check-in
-                      for incidental charges.
-                    </li>
-                    <li>
-                      Special requests are subject to availability upon check-in
-                      and may incur additional charges.
-                    </li>
-                    <li>
-                      This property accepts credit cards, debit cards, mobile
-                      payments, and cash.
-                    </li>
-                    <li>
-                      Mobile payment options include Google Pay, Paytm, PhonePe,
-                      Amazon Pay, and Cash App.
-                    </li>
-                    <li>
-                      Safety features at this property include a fire
-                      extinguisher, a smoke detector, a security system, and a
-                      first aid kit.
-                    </li>
-                  </ul>
-                </li>
-
-                <li>
-                  Special Instructions: Front desk staff will greet guests on
-                  arrival at the property.
-                </li>
-
-                <li>Minimum CheckIn Age : 18</li>
-
-                <li>
-                  Optional Fees:
-                  <ul className="nested-list">
-                    <li>
-                      Fee for cooked-to-order breakfast: approximately INR 250
-                      to 350 for adults, and INR 200 to 300 for children.
-                    </li>
-                    <li>Pet fee: INR 1200 per pet, per day.</li>
-                    <li>Rollaway bed fee: INR 600 per night.</li>
-                  </ul>
-                </li>
-
-                <li>
-                  Cards Accepted: Amazon Pay, Visa, Debit cards, Cash App, Cash,
-                  Google Pay, Mastercard, PhonePe, Paytm.
-                </li>
-
-                <li>
-                  Only dogs and cats are allowed, service animals not allowed,
-                  pets allowed, professional property host/manager, no cribs
-                  infant beds available.
-                </li>
-
-                <li>
-                  <strong>
-                    City tax and resort fee are to be paid directly at hotel if
-                    applicable. Most hotels do not allow unmarried / unrelated
-                    couples to check-in. This is at full discretion of the hotel
-                    management. No refund would be applicable in case the hotel
-                    denies check-in under such circumstances.
-                  </strong>
-                </li>
-
-                <li>
-                  Extra person charges may apply at check-in, as per the
-                  property&apos;s policy.
-                </li>
-              </ul>
+            {contactPhone && (
+              <div>
+                Phone :{" "}
+                <a href={`tel:${contactPhone}`} className="gold-link">
+                  {contactPhone}
+                </a>
+              </div>
             )}
-          </div>
-        </section>
 
-        <section className="voucher-cell">
-          <h2 className="voucher-gold text-lg mb-2">Contact Details:</h2>
-
-          <div>
-            Phone :{" "}
-            <a href={`tel:${contactPhone}`} className="gold-link">
-              {contactPhone}
-            </a>
-          </div>
-
-          <div>
-            Email :{" "}
-            <a href={`mailto:${contactEmail}`} className="gold-link">
-              {contactEmail}
-            </a>
-          </div>
-        </section>
+            {contactEmail && (
+              <div>
+                Email :{" "}
+                <a href={`mailto:${contactEmail}`} className="gold-link">
+                  {contactEmail}
+                </a>
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
-      <div className="no-print max-w-262.5 mx-auto mt-5 flex justify-end">
+      <div className="no-print max-w-[1050px] mx-auto mt-5 flex justify-end">
         <button onClick={() => navigate(-1)} className="back-btn">
           Back
         </button>
