@@ -110,10 +110,10 @@ const HotelBookingSuccess = () => {
     }
   }, [location.state]);
 
-  const roomData = useMemo(() => getRoomData(savedData, booking), [
-    savedData,
-    booking,
-  ]);
+  const roomData = useMemo(
+    () => getRoomData(savedData, booking),
+    [savedData, booking],
+  );
 
   const hotelResult = useMemo(() => getHotelResult(savedData), [savedData]);
 
@@ -235,7 +235,14 @@ const HotelBookingSuccess = () => {
   };
 
   const handleVoucherClick = () => {
-    navigate(`/booking-details/${booking.BookingId}`);
+    navigate(`/booking-details/${booking.BookingId}`, {
+      state: {
+        booking,
+        hotel,
+        guestDetails,
+        savedData,
+      },
+    });
   };
 
   const handleChangeRequest = async () => {
@@ -313,7 +320,14 @@ const HotelBookingSuccess = () => {
                 &lt;&lt; Back To Queue
               </GoldButton>
 
-              <GoldButton onClick={handleVoucherClick}>View Voucher</GoldButton>
+              <GoldButton
+                onClick={() => {
+                  setViewLoading(true);
+                  handleVoucherClick();
+                }}
+              >
+                {viewLoading ? "Loading..." : "View Voucher"}
+              </GoldButton>
 
               <button className="px-4 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 transition">
                 WhatsApp
@@ -324,7 +338,7 @@ const HotelBookingSuccess = () => {
           <div className="px-5 py-6 flex flex-col md:flex-row justify-between gap-4">
             <div>
               <p className="inline-block bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black px-3 py-1.5 font-bold rounded-xl text-sm shadow-lg">
-                FLYINGLYTE1 (Delhi)
+                FLYINGLYTE (Delhi)
               </p>
               <br />
               <p className="inline-block mt-2 border border-[var(--gold-dark)] text-[var(--gold-soft)] px-3 py-1.5 font-bold rounded-xl text-sm">
@@ -334,18 +348,11 @@ const HotelBookingSuccess = () => {
 
             <div className="text-sm md:text-right text-[var(--text-muted)]">
               <p>
-                TBO Confirmation No :{" "}
+                Confirmation No :{" "}
                 <span className="text-[var(--gold-soft)] font-bold">
                   {booking?.ConfirmationNo || "N/A"}
                 </span>
               </p>
-
-              <button
-                onClick={() => navigate("/")}
-                className="mt-2 text-[var(--gold-main)] underline underline-offset-4"
-              >
-                Add Another Item
-              </button>
             </div>
           </div>
         </div>
@@ -381,11 +388,15 @@ const HotelBookingSuccess = () => {
           <div className="lg:col-span-3 text-sm lg:text-right text-[var(--text-muted)] space-y-1">
             <p>
               Check In :{" "}
-              <span className="font-bold text-white">{formatDate(checkIn)}</span>
+              <span className="font-bold text-white">
+                {formatDate(checkIn)}
+              </span>
             </p>
             <p>
               Check Out :{" "}
-              <span className="font-bold text-white">{formatDate(checkOut)}</span>
+              <span className="font-bold text-white">
+                {formatDate(checkOut)}
+              </span>
             </p>
             <p>
               No. of Nights:{" "}
@@ -696,10 +707,10 @@ const HotelBookingSuccess = () => {
             <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl p-4 font-semibold text-white shadow-xl shadow-black/20">
               📞 Call us at:{" "}
               <a
-                href="tel:+919876543210"
+                href="tel:+919667455591"
                 className="text-[var(--gold-main)] hover:underline"
               >
-                +919876543210
+                +919667455591
               </a>
             </div>
 
@@ -792,7 +803,7 @@ const HotelBookingSuccess = () => {
           <GoldButton
             onClick={() => {
               setViewLoading(true);
-              navigate(`/booking-details/${booking.BookingId}`);
+              handleVoucherClick();
             }}
           >
             {viewLoading ? "Loading..." : "View Voucher"}
