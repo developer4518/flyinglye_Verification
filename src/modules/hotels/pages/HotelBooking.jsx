@@ -142,27 +142,32 @@ const HotelBooking = () => {
         .map((item) => item.trim())
         .filter(Boolean);
 
-  const hotelNormsRaw =
-    hotel?.HotelNorms ||
-    hotel?.hotelNorms ||
-    hotel?.norms ||
-    hotel?.HotelPolicy ||
-    hotelResult?.HotelNorms ||
-    preBook?.raw?.HotelResult?.[0]?.HotelNorms ||
-    preBook?.raw?.Response?.HotelResult?.[0]?.HotelNorms ||
-    [];
+  const rateConditions =
+    preBook?.rate_conditions?.length > 0
+      ? preBook.rate_conditions
+      : preBook?.raw?.HotelResult?.[0]?.RateConditions || [];
 
-  const hotelNorms = Array.isArray(hotelNormsRaw)
-    ? hotelNormsRaw
-        .flatMap((item) =>
-          typeof item === "string" ? item.split("|") : String(item).split("|"),
-        )
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : String(hotelNormsRaw || "")
-        .split("|")
-        .map((item) => item.trim())
-        .filter(Boolean);
+  // const hotelNormsRaw =
+  //   hotel?.HotelNorms ||
+  //   hotel?.hotelNorms ||
+  //   hotel?.norms ||
+  //   hotel?.HotelPolicy ||
+  //   hotelResult?.HotelNorms ||
+  //   preBook?.raw?.HotelResult?.[0]?.HotelNorms ||
+  //   preBook?.raw?.Response?.HotelResult?.[0]?.HotelNorms ||
+  //   [];
+
+  // const hotelNorms = Array.isArray(hotelNormsRaw)
+  //   ? hotelNormsRaw
+  //       .flatMap((item) =>
+  //         typeof item === "string" ? item.split("|") : String(item).split("|"),
+  //       )
+  //       .map((item) => item.trim())
+  //       .filter(Boolean)
+  //   : String(hotelNormsRaw || "")
+  //       .split("|")
+  //       .map((item) => item.trim())
+  //       .filter(Boolean);
 
   const getCancellationChargeText = (policy) => {
     const charge = Number(policy?.CancellationCharge ?? 0);
@@ -742,10 +747,10 @@ const HotelBooking = () => {
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">📋</span>
-              <h3 className="font-semibold text-yellow-300">Hotel Norms</h3>
+              <h3 className="font-semibold text-yellow-300">Rate Condition</h3>
             </div>
 
-            <div className="p-5">
+            {/* <div className="p-5">
               {hotelNorms.length > 0 ? (
                 <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-gray-300">
                   {hotelNorms.map((norm, index) => (
@@ -755,6 +760,30 @@ const HotelBooking = () => {
               ) : (
                 <p className="text-sm text-gray-400">
                   Hotel norms are not available.
+                </p>
+              )}
+            </div> */}
+
+            <div className="p-5">
+              {rateConditions.length > 0 ? (
+                <ol className="list-decimal space-y-3 pl-5 text-sm leading-6 text-gray-300">
+                  {rateConditions.map((condition, index) => (
+                    <li
+                      key={index}
+                      className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300"
+                      dangerouslySetInnerHTML={{
+                        __html: condition
+                          ?.replaceAll("&lt;", "<")
+                          ?.replaceAll("&gt;", ">")
+                          ?.replaceAll("&amp;", "&")
+                          ?.replaceAll(",", ", "),
+                      }}
+                    />
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  Rate conditions are not available.
                 </p>
               )}
             </div>
