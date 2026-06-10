@@ -279,7 +279,7 @@ Flyinglyte`,
   };
 
   return (
-    <div className="min-h-screen bg-(--bg-main) py-16 px-3 font-(--font-body) text-(--text-main)">
+    <div className="min-h-screen bg-(--bg-main) py-26 px-3 font-(--font-body) text-(--text-main)">
       <style>
         {`
           .voucher-wrapper {
