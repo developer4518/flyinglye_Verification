@@ -47,13 +47,11 @@ const HotelBooking = () => {
     if (parts.length === 3) {
       const [a, b, c] = parts;
 
-      // YYYY-MM-DD
       if (a.length === 4) {
         const date = new Date(Number(a), Number(b) - 1, Number(c));
         return Number.isNaN(date.getTime()) ? null : date;
       }
 
-      // DD-MM-YYYY
       if (c.length === 4) {
         const date = new Date(Number(c), Number(b) - 1, Number(a));
         return Number.isNaN(date.getTime()) ? null : date;
@@ -82,6 +80,31 @@ const HotelBooking = () => {
     const updatedDate = new Date(date);
     updatedDate.setDate(updatedDate.getDate() + days);
     return updatedDate;
+  };
+
+  const normalizeList = (value, separator = ",") => {
+    if (Array.isArray(value)) {
+      return value
+        .flatMap((item) => {
+          if (item === null || item === undefined) return [];
+
+          if (typeof item === "string") {
+            return item.split(separator);
+          }
+
+          return [item];
+        })
+        .map((item) => {
+          if (typeof item === "string") return item.trim();
+          return item;
+        })
+        .filter(Boolean);
+    }
+
+    return String(value || "")
+      .split(separator)
+      .map((item) => item.trim())
+      .filter(Boolean);
   };
 
   const cancellationPoliciesRaw =
@@ -121,53 +144,82 @@ const HotelBooking = () => {
     return checkOut || policy?.FromDate;
   };
 
+  const roomPromotionsRaw =
+    preBook?.room_promotions ||
+    preBook?.RoomPromotion ||
+    preBook?.room?.RoomPromotion ||
+    roomData?.RoomPromotion ||
+    roomData?.RoomPromotions ||
+    hotelResult?.RoomPromotion ||
+    [];
+
+  const roomPromotions = normalizeList(roomPromotionsRaw);
+
+  const supplementsRaw =
+    preBook?.supplements ||
+    preBook?.Supplements ||
+    preBook?.room?.Supplements ||
+    roomData?.Supplements ||
+    roomData?.Supplement ||
+    hotelResult?.Supplements ||
+    [];
+
+  const supplements = Array.isArray(supplementsRaw)
+    ? supplementsRaw.filter(Boolean)
+    : normalizeList(supplementsRaw);
+
+  const formatSupplementText = (supplement) => {
+    if (!supplement) return "";
+
+    if (typeof supplement === "string") return supplement;
+
+    const title =
+      supplement?.Description ||
+      supplement?.Name ||
+      supplement?.SupplementName ||
+      supplement?.Type ||
+      supplement?.ChargeType ||
+      "Supplement";
+
+    const amount =
+      supplement?.Price ||
+      supplement?.Amount ||
+      supplement?.Charge ||
+      supplement?.SupplementPrice ||
+      supplement?.SupplementCharge;
+
+    const currency =
+      supplement?.Currency ||
+      supplement?.currency ||
+      preBook?.currency ||
+      preBook?.Currency ||
+      "INR";
+
+    if (amount !== undefined && amount !== null && amount !== "") {
+      return `${title} - ${currency === "INR" ? "₹" : currency} ${Math.round(
+        Number(amount),
+      )}`;
+    }
+
+    return title;
+  };
+
   const roomAmenitiesRaw =
     roomData?.Amenities ||
     roomData?.RoomAmenities ||
-    roomData?.RoomPromotion ||
     hotelResult?.Amenities ||
     hotel?.amenities ||
     hotel?.Amenities ||
     [];
 
-  const roomAmenities = Array.isArray(roomAmenitiesRaw)
-    ? roomAmenitiesRaw
-        .flatMap((item) =>
-          typeof item === "string" ? item.split(",") : String(item).split(","),
-        )
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : String(roomAmenitiesRaw || "")
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
+  const roomAmenities = normalizeList(roomAmenitiesRaw);
 
   const rateConditions =
     preBook?.rate_conditions?.length > 0
       ? preBook.rate_conditions
-      : preBook?.raw?.HotelResult?.[0]?.RateConditions || [];
-
-  // const hotelNormsRaw =
-  //   hotel?.HotelNorms ||
-  //   hotel?.hotelNorms ||
-  //   hotel?.norms ||
-  //   hotel?.HotelPolicy ||
-  //   hotelResult?.HotelNorms ||
-  //   preBook?.raw?.HotelResult?.[0]?.HotelNorms ||
-  //   preBook?.raw?.Response?.HotelResult?.[0]?.HotelNorms ||
-  //   [];
-
-  // const hotelNorms = Array.isArray(hotelNormsRaw)
-  //   ? hotelNormsRaw
-  //       .flatMap((item) =>
-  //         typeof item === "string" ? item.split("|") : String(item).split("|"),
-  //       )
-  //       .map((item) => item.trim())
-  //       .filter(Boolean)
-  //   : String(hotelNormsRaw || "")
-  //       .split("|")
-  //       .map((item) => item.trim())
-  //       .filter(Boolean);
+      : preBook?.raw?.HotelResult?.[0]?.RateConditions ||
+        preBook?.raw?.Response?.HotelResult?.[0]?.RateConditions ||
+        [];
 
   const getCancellationChargeText = (policy) => {
     const charge = Number(policy?.CancellationCharge ?? 0);
@@ -550,7 +602,11 @@ const HotelBooking = () => {
           JSON.stringify(finalAges.map(Number))
         ) {
           throw new Error(
-            `Child age mismatch before booking. Room ${index + 1}: searched age ${searchAges.join(", ")} but booking age ${finalAges.join(", ")}`,
+            `Child age mismatch before booking. Room ${
+              index + 1
+            }: searched age ${searchAges.join(", ")} but booking age ${finalAges.join(
+              ", ",
+            )}`,
           );
         }
       });
@@ -698,6 +754,78 @@ const HotelBooking = () => {
             </div>
           </div>
 
+          {/* Room Promotions */}
+          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+            <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
+              <span className="text-yellow-300">🏷️</span>
+              <h3 className="font-semibold text-yellow-300">Room Promotions</h3>
+            </div>
+
+            <div className="p-5">
+              {roomPromotions.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {roomPromotions.map((promotion, index) => (
+                    <div
+                      key={index}
+                      className="rounded-xl border border-green-400/20 bg-green-400/10 px-4 py-3 text-sm font-medium text-green-200"
+                    >
+                      {typeof promotion === "string"
+                        ? promotion
+                        : promotion?.Description ||
+                          promotion?.Name ||
+                          promotion?.PromotionName ||
+                          "Promotion available"}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  Room promotions are not available.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Supplements */}
+          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+            <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
+              <span className="text-yellow-300">➕</span>
+              <h3 className="font-semibold text-yellow-300">
+                Supplements / Extra Charges
+              </h3>
+            </div>
+
+            <div className="p-5">
+              {supplements.length > 0 ? (
+                <div className="space-y-3">
+                  {supplements.map((supplement, index) => (
+                    <div
+                      key={index}
+                      className="rounded-xl border border-orange-400/20 bg-orange-400/10 p-4 text-sm text-orange-100"
+                    >
+                      <div className="font-semibold">
+                        {formatSupplementText(supplement)}
+                      </div>
+
+                      {typeof supplement === "object" &&
+                        supplement?.IsMandatory !== undefined && (
+                          <p className="mt-1 text-xs text-orange-200/80">
+                            {supplement.IsMandatory
+                              ? "Mandatory supplement"
+                              : "Optional supplement"}
+                          </p>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  No supplements or extra charges are available for this room.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Room Amenities */}
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
@@ -743,26 +871,12 @@ const HotelBooking = () => {
             </div>
           </div>
 
-          {/* Hotel Norms */}
+          {/* Hotel Rate Condition */}
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">📋</span>
               <h3 className="font-semibold text-yellow-300">Rate Condition</h3>
             </div>
-
-            {/* <div className="p-5">
-              {hotelNorms.length > 0 ? (
-                <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-gray-300">
-                  {hotelNorms.map((norm, index) => (
-                    <li key={index}>{norm}</li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="text-sm text-gray-400">
-                  Hotel norms are not available.
-                </p>
-              )}
-            </div> */}
 
             <div className="p-5">
               {rateConditions.length > 0 ? (
@@ -772,11 +886,11 @@ const HotelBooking = () => {
                       key={index}
                       className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300"
                       dangerouslySetInnerHTML={{
-                        __html: condition
-                          ?.replaceAll("&lt;", "<")
-                          ?.replaceAll("&gt;", ">")
-                          ?.replaceAll("&amp;", "&")
-                          ?.replaceAll(",", ", "),
+                        __html: String(condition || "")
+                          .replaceAll("&lt;", "<")
+                          .replaceAll("&gt;", ">")
+                          .replaceAll("&amp;", "&")
+                          .replaceAll(",", ", "),
                       }}
                     />
                   ))}
