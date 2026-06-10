@@ -301,7 +301,7 @@ const HotelBookingSuccess = () => {
 
         <button
           onClick={() => navigate("/")}
-          className="px-6 py-3 rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black font-bold shadow-lg"
+          className="px-6 py-3 rounded-xl bg-linear-to-r from-start to-end text-black font-bold shadow-lg"
         >
           Go Home
         </button>

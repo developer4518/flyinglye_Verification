@@ -58,6 +58,334 @@ const getSafeText = (...values) =>
 const formatPriceValue = (val) =>
   Math.round(Number(val) || 0).toLocaleString("en-IN");
 
+const cleanText = (value) => {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const uniqueTextArray = (items = []) => {
+  const seen = new Set();
+
+  return items
+    .map(cleanText)
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+};
+
+const parseMaybeJson = (value) => {
+  if (typeof value !== "string") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
+const getFirstNonEmptyArray = (...values) => {
+  return values.find((value) => Array.isArray(value) && value.length > 0) || [];
+};
+
+const findDeepValueByKeys = (source, keys = []) => {
+  if (!source || typeof source !== "object") return null;
+
+  const targetKeys = keys.map((key) => key.toLowerCase());
+  const visited = new WeakSet();
+  const queue = [source];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (!current || typeof current !== "object") continue;
+    if (visited.has(current)) continue;
+
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      current.forEach((item) => {
+        if (item && typeof item === "object") queue.push(item);
+      });
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(current)) {
+      const parsedValue = parseMaybeJson(value);
+
+      if (targetKeys.includes(key.toLowerCase())) {
+        if (Array.isArray(parsedValue) && parsedValue.length > 0) {
+          return parsedValue;
+        }
+
+        if (
+          parsedValue &&
+          typeof parsedValue === "object" &&
+          Object.keys(parsedValue).length > 0
+        ) {
+          return parsedValue;
+        }
+
+        if (typeof parsedValue === "string" && parsedValue.trim()) {
+          return parsedValue;
+        }
+      }
+
+      if (parsedValue && typeof parsedValue === "object") {
+        queue.push(parsedValue);
+      }
+    }
+  }
+
+  return null;
+};
+
+const normalizeFacilities = (value) => {
+  const parsedValue = parseMaybeJson(value);
+
+  if (!parsedValue) return [];
+
+  if (Array.isArray(parsedValue)) {
+    return uniqueTextArray(
+      parsedValue.map((item) => {
+        if (typeof item === "string") return item;
+
+        if (typeof item === "object") {
+          return (
+            item.name ||
+            item.Name ||
+            item.title ||
+            item.Title ||
+            item.FacilityName ||
+            item.facilityName ||
+            item.Facility ||
+            item.facility ||
+            ""
+          );
+        }
+
+        return "";
+      }),
+    );
+  }
+
+  if (typeof parsedValue === "object") {
+    return uniqueTextArray(Object.values(parsedValue));
+  }
+
+  if (typeof parsedValue === "string") {
+    return uniqueTextArray(parsedValue.split(","));
+  }
+
+  return [];
+};
+
+const normalizeAttractions = (value) => {
+  const parsedValue = parseMaybeJson(value);
+
+  if (!parsedValue) return [];
+
+  if (Array.isArray(parsedValue)) {
+    return uniqueTextArray(
+      parsedValue.map((item) => {
+        if (typeof item === "string") return item;
+
+        if (typeof item === "object") {
+          return (
+            item.name ||
+            item.Name ||
+            item.title ||
+            item.Title ||
+            item.AttractionName ||
+            item.attractionName ||
+            item.PlaceName ||
+            item.placeName ||
+            ""
+          );
+        }
+
+        return "";
+      }),
+    );
+  }
+
+  if (typeof parsedValue === "object") {
+    return uniqueTextArray(Object.values(parsedValue));
+  }
+
+  if (typeof parsedValue === "string") {
+    return uniqueTextArray(parsedValue.split(","));
+  }
+
+  return [];
+};
+
+const getHotelFacilities = (payload = {}, hotel = {}) => {
+  const rawHotel = hotel?.hotel_raw || hotel?.rawHotel || hotel;
+
+  const directFacilities = getFirstNonEmptyArray(
+    payload?.hotelFacilities,
+    payload?.HotelFacilities,
+    payload?.facilities,
+
+    payload?.hotel?.HotelFacilities,
+    payload?.hotel?.hotel_facilities,
+    payload?.hotel?.facilities,
+    payload?.hotel?.Facilities,
+
+    hotel?.HotelFacilities,
+    hotel?.hotel_facilities,
+    hotel?.facilities,
+    hotel?.Facilities,
+
+    rawHotel?.HotelFacilities,
+    rawHotel?.hotel_facilities,
+    rawHotel?.facilities,
+    rawHotel?.Facilities,
+
+    rawHotel?.Response?.HotelResult?.[0]?.HotelFacilities,
+    rawHotel?.HotelResult?.[0]?.HotelFacilities,
+    rawHotel?.Response?.HotelDetails?.HotelFacilities,
+    rawHotel?.HotelDetails?.HotelFacilities,
+  );
+
+  if (directFacilities.length > 0) {
+    return normalizeFacilities(directFacilities);
+  }
+
+  const deepFacilities = findDeepValueByKeys(
+    {
+      payload,
+      hotel,
+      rawHotel,
+    },
+    ["HotelFacilities", "hotel_facilities", "Facilities", "facilities"],
+  );
+
+  return normalizeFacilities(deepFacilities);
+};
+
+const getHotelAttractions = (payload = {}, hotel = {}) => {
+  const rawHotel = hotel?.hotel_raw || hotel?.rawHotel || hotel;
+
+  const directAttractions =
+    payload?.attractions ||
+    payload?.Attractions ||
+    payload?.hotel?.Attractions ||
+    payload?.hotel?.attractions ||
+    hotel?.Attractions ||
+    hotel?.attractions ||
+    rawHotel?.Attractions ||
+    rawHotel?.attractions ||
+    rawHotel?.Response?.HotelResult?.[0]?.Attractions ||
+    rawHotel?.HotelResult?.[0]?.Attractions ||
+    rawHotel?.Response?.HotelDetails?.Attractions ||
+    rawHotel?.HotelDetails?.Attractions;
+
+  const normalizedDirectAttractions = normalizeAttractions(directAttractions);
+
+  if (normalizedDirectAttractions.length > 0) {
+    return normalizedDirectAttractions;
+  }
+
+  const deepAttractions = findDeepValueByKeys(
+    {
+      payload,
+      hotel,
+      rawHotel,
+    },
+    ["Attractions", "attractions"],
+  );
+
+  return normalizeAttractions(deepAttractions);
+};
+
+const getFacilityIcon = (facility = "") => {
+  const text = facility.toLowerCase();
+
+  if (text.includes("wifi") || text.includes("internet")) return "📶";
+  if (text.includes("parking") || text.includes("valet")) return "🅿️";
+  if (text.includes("pool") || text.includes("swimming")) return "🏊";
+
+  if (
+    text.includes("spa") ||
+    text.includes("massage") ||
+    text.includes("sauna") ||
+    text.includes("wellness")
+  )
+    return "💆";
+
+  if (text.includes("fitness") || text.includes("gym") || text.includes("yoga"))
+    return "🏋️";
+
+  if (text.includes("airport") || text.includes("shuttle")) return "🚕";
+
+  if (
+    text.includes("restaurant") ||
+    text.includes("breakfast") ||
+    text.includes("bar") ||
+    text.includes("coffee") ||
+    text.includes("food") ||
+    text.includes("meals")
+  )
+    return "🍽️";
+
+  if (
+    text.includes("business") ||
+    text.includes("meeting") ||
+    text.includes("conference") ||
+    text.includes("banquet")
+  )
+    return "💼";
+
+  if (text.includes("wheelchair") || text.includes("accessible")) return "♿";
+  if (text.includes("laundry") || text.includes("dry cleaning")) return "🧺";
+
+  if (
+    text.includes("security") ||
+    text.includes("cctv") ||
+    text.includes("safe") ||
+    text.includes("fire")
+  )
+    return "🛡️";
+
+  if (text.includes("garden") || text.includes("terrace")) return "🌿";
+  if (text.includes("room service") || text.includes("front desk")) return "🛎️";
+
+  if (
+    text.includes("beauty") ||
+    text.includes("hair") ||
+    text.includes("salon") ||
+    text.includes("barber")
+  )
+    return "💇";
+
+  if (
+    text.includes("child") ||
+    text.includes("kids") ||
+    text.includes("babysitting")
+  )
+    return "👶";
+
+  if (
+    text.includes("currency") ||
+    text.includes("atm") ||
+    text.includes("cash")
+  )
+    return "💳";
+
+  if (text.includes("smoking")) return "🚬";
+  if (text.includes("housekeeping") || text.includes("cleaning")) return "🧹";
+
+  return "✨";
+};
+
 const getDayRateBaseTotal = (room = {}) => {
   const dayRates = room?.DayRates || room?.day_rates || [];
 
@@ -282,6 +610,16 @@ const HotelDetails = () => {
   const payload = state || {};
   const hotel = payload.hotel || selectedHotel;
 
+  const hotelFacilities = useMemo(
+    () => getHotelFacilities(payload, hotel),
+    [payload, hotel],
+  );
+
+  const hotelAttractions = useMemo(
+    () => getHotelAttractions(payload, hotel),
+    [payload, hotel],
+  );
+
   const availableRooms =
     hotel?.rooms ||
     hotel?.Rooms ||
@@ -289,6 +627,7 @@ const HotelDetails = () => {
     hotel?.rawHotel?.Rooms ||
     hotel?.HotelResult?.[0]?.Rooms ||
     hotel?.raw?.HotelResult?.[0]?.Rooms ||
+    hotel?.raw?.Response?.HotelResult?.[0]?.Rooms ||
     [];
 
   const roomOptions = useMemo(() => {
@@ -308,6 +647,8 @@ const HotelDetails = () => {
   );
 
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [showAllFacilities, setShowAllFacilities] = useState(false);
+  const [showAllAttractions, setShowAllAttractions] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -447,6 +788,14 @@ const HotelDetails = () => {
     ? room.cancel_policies
     : [];
 
+  const visibleFacilities = showAllFacilities
+    ? hotelFacilities
+    : hotelFacilities.slice(0, 18);
+
+  const visibleAttractions = showAllAttractions
+    ? hotelAttractions
+    : hotelAttractions.slice(0, 12);
+
   const getCancellationCharge = (policy = {}, baseAmount = totalAmount) => {
     const charge = Number(policy.CancellationCharge || 0);
     const type = String(policy.ChargeType || "").toLowerCase();
@@ -505,6 +854,14 @@ const HotelDetails = () => {
       CancelPolicies: selectedRoomPolicies,
     };
 
+    const finalHotel = {
+      ...hotel,
+      HotelFacilities: hotelFacilities,
+      hotel_facilities: hotelFacilities,
+      Attractions: hotelAttractions,
+      attractions: hotelAttractions,
+    };
+
     const safeRoomGuests = Array.isArray(payload?.roomGuests)
       ? payload.roomGuests
       : Array.isArray(payload?.guests?.roomGuests)
@@ -552,7 +909,7 @@ const HotelDetails = () => {
 
     navigate("/prebook", {
       state: {
-        hotel,
+        hotel: finalHotel,
         room: finalRoom,
         checkIn,
         checkOut,
@@ -571,6 +928,8 @@ const HotelDetails = () => {
         isDomesticHotel,
         isInternationalHotel,
         hotelType: isInternationalHotel ? "international" : "domestic",
+        hotelFacilities,
+        attractions: hotelAttractions,
       },
     });
   };
@@ -646,10 +1005,22 @@ const HotelDetails = () => {
               </span>
             </div>
 
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex flex-wrap items-center gap-3 mt-3">
               <span className="text-yellow-300 text-sm">
                 ⭐ {hotel?.rating || hotel?.Rating || "4.2"}
               </span>
+
+              {hotelFacilities.length > 0 && (
+                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-xs text-yellow-300">
+                  {hotelFacilities.length} facilities
+                </span>
+              )}
+
+              {hotelAttractions.length > 0 && (
+                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-300">
+                  {hotelAttractions.length} nearby places
+                </span>
+              )}
             </div>
 
             <p className="mt-3 text-sm text-gray-400">
@@ -659,41 +1030,70 @@ const HotelDetails = () => {
           </div>
 
           {roomOptions.length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
-              <div className="bg-[#d9d7eb] px-4 py-4 text-black">
-                <div className="mb-3 text-sm font-bold">
-                  {getRoomCountTitle()}
-                </div>
+            <div className="overflow-hidden rounded-3xl border border-yellow-400/20 bg-[#15151C] shadow-xl shadow-black/30">
+              <div className="relative overflow-hidden bg-linear-to-r from-[#fff7cc] via-[#e8e5ff] to-[#d8f5ff] px-4 py-5 text-black">
+                <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-yellow-400/30 blur-2xl" />
+                <div className="absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-cyan-400/20 blur-2xl" />
 
-                <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                  <input
-                    value={roomSearch}
-                    onChange={(e) => setRoomSearch(e.target.value)}
-                    placeholder="Search Room Type"
-                    className="h-8 w-full rounded border border-gray-300 bg-white px-3 text-sm outline-none md:w-56"
-                  />
+                <div className="relative flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-600">
+                        Select Room
+                      </p>
 
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="h-8 rounded border border-gray-300 bg-white px-2 text-sm outline-none"
-                  >
-                    <option value="price">Price Low to High</option>
-                    <option value="priceHigh">Price High to Low</option>
-                  </select>
+                      <h2 className="mt-1 text-xl font-black text-[#111827]">
+                        {getRoomCountTitle()}
+                      </h2>
+                    </div>
 
-                  <label className="flex h-8 items-center gap-2 rounded bg-white px-3 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={splitRoom}
-                      onChange={(e) => setSplitRoom(e.target.checked)}
-                    />
-                    Split Room
-                  </label>
+                    <div className="rounded-2xl bg-white/70 px-4 py-2 text-right shadow-sm ring-1 ring-black/5">
+                      <p className="text-lg font-black text-[#111827]">
+                        {filteredRoomOptions.length}
+                      </p>
+                      <p className="text-[11px] font-semibold text-gray-500">
+                        Available Rooms
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px_170px]">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        🔍
+                      </span>
+
+                      <input
+                        value={roomSearch}
+                        onChange={(e) => setRoomSearch(e.target.value)}
+                        placeholder="Search room type..."
+                        className="h-12 w-full rounded-2xl border border-white/70 bg-white/90 pl-10 pr-4 text-sm font-medium text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/20"
+                      />
+                    </div>
+
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="h-12 rounded-2xl border border-white/70 bg-white/90 px-4 text-sm font-semibold text-gray-900 shadow-sm outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/20"
+                    >
+                      <option value="price">Price Low to High</option>
+                      <option value="priceHigh">Price High to Low</option>
+                    </select>
+
+                    <label className="flex h-12 items-center justify-center gap-3 rounded-2xl border border-white/70 bg-white/90 px-4 text-sm font-bold text-gray-900 shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={splitRoom}
+                        onChange={(e) => setSplitRoom(e.target.checked)}
+                        className="h-4 w-4 accent-yellow-500"
+                      />
+                      Split Room
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <div className="divide-y divide-gray-200 bg-white text-black">
+              <div className="divide-y divide-gray-800 bg-[#0B0B0F]">
                 {filteredRoomOptions.map((roomItem, index) => {
                   const roomKey = roomItem.BookingCode || index;
 
@@ -726,6 +1126,10 @@ const HotelDetails = () => {
                     roomItem.room_description ||
                     "Layout - Bedroom\nInternet - Free WiFi\nEntertainment - LCD television with satellite channels\nFood and Drink - Room service\nBathroom - Free toiletries and shower\nComfort - Air conditioning and daily housekeeping\nNon-Smoking";
 
+                  const inclusions = roomItem.inclusion
+                    ? roomItem.inclusion.split(",").filter(Boolean)
+                    : [];
+
                   return (
                     <div
                       key={roomKey}
@@ -733,123 +1137,192 @@ const HotelDetails = () => {
                         setActiveRoom(roomItem);
                         setSelectedRoom(roomItem);
                       }}
-                      className={`cursor-pointer px-3 py-3 transition ${
+                      className={`group cursor-pointer px-4 py-4 transition ${
                         isSelected
-                          ? "bg-[#ffe7a6]"
-                          : "bg-white hover:bg-gray-50"
+                          ? "bg-linear-to-r from-yellow-400/20 via-yellow-300/10 to-transparent"
+                          : "bg-[#0B0B0F] hover:bg-white/[0.03]"
                       }`}
                     >
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.35fr_0.75fr_1fr_0.9fr] md:items-start">
-                        <div>
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="radio"
-                              checked={isSelected}
-                              onChange={() => {
-                                setActiveRoom(roomItem);
-                                setSelectedRoom(roomItem);
-                              }}
-                              className="mt-1"
-                            />
+                      <div
+                        className={`rounded-3xl border p-4 transition ${
+                          isSelected
+                            ? "border-yellow-400/50 bg-yellow-400/10 shadow-lg shadow-yellow-400/10"
+                            : "border-gray-800 bg-[#15151C] hover:border-yellow-400/25"
+                        }`}
+                      >
+                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_0.8fr_0.85fr_0.75fr] lg:items-start">
+                          <div>
+                            <div className="flex items-start gap-3">
+                              <div className="pt-1">
+                                <input
+                                  type="radio"
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    setActiveRoom(roomItem);
+                                    setSelectedRoom(roomItem);
+                                  }}
+                                  className="h-5 w-5 accent-yellow-400"
+                                />
+                              </div>
 
-                            <div>
-                              <p className="text-sm font-bold text-black">
-                                {roomItem.room_name ||
-                                  roomItem.Name ||
-                                  "Standard Room"}
-                              </p>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="text-base font-black leading-6 text-white">
+                                    {roomItem.room_name ||
+                                      roomItem.Name ||
+                                      "Standard Room"}
+                                  </h3>
 
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenDescriptions((prev) => ({
-                                    ...prev,
-                                    [roomKey]: !prev[roomKey],
-                                  }));
-                                }}
-                                className="text-sm font-medium text-blue-600 underline"
-                              >
-                                {openDescriptions[roomKey]
-                                  ? "Hide Room Description"
-                                  : "Show Room Description"}
-                              </button>
+                                  {isSelected && (
+                                    <span className="rounded-full border border-yellow-400/30 bg-yellow-400/15 px-2.5 py-1 text-[11px] font-bold text-yellow-300">
+                                      Selected
+                                    </span>
+                                  )}
+                                </div>
+
+                                <p className="mt-2 text-xs text-gray-500 break-all">
+                                  Code:{" "}
+                                  {roomItem.BookingCode ||
+                                    roomItem.booking_code ||
+                                    "N/A"}
+                                </p>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenDescriptions((prev) => ({
+                                      ...prev,
+                                      [roomKey]: !prev[roomKey],
+                                    }));
+                                  }}
+                                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1.5 text-xs font-bold text-blue-300 transition hover:bg-blue-400 hover:text-black"
+                                >
+                                  {openDescriptions[roomKey]
+                                    ? "Hide Room Description"
+                                    : "Show Room Description"}
+                                  <span>
+                                    {openDescriptions[roomKey] ? "↑" : "↓"}
+                                  </span>
+                                </button>
+                              </div>
                             </div>
+
+                            {openDescriptions[roomKey] && (
+                              <div className="mt-4 rounded-2xl border border-gray-800 bg-black/30 p-4 text-sm leading-6 text-gray-300 whitespace-pre-line">
+                                {roomDesc}
+                              </div>
+                            )}
                           </div>
 
-                          {openDescriptions[roomKey] && (
-                            <div className="mt-2 ml-5 max-w-xl whitespace-pre-line border border-gray-300 bg-white p-2 text-sm leading-6 text-gray-800">
-                              {roomDesc}
-                            </div>
-                          )}
-                        </div>
+                          <div>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-500">
+                              Inclusions
+                            </p>
 
-                        <div className="text-sm text-black">
-                          {roomItem.inclusion
-                            ? roomItem.inclusion
-                                .split(",")
-                                .filter(Boolean)
-                                .map((item, i) => <p key={i}>{item.trim()}</p>)
-                            : "Room Only"}
-                        </div>
+                            {inclusions.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {inclusions.map((item, i) => (
+                                  <span
+                                    key={i}
+                                    className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"
+                                  >
+                                    ✓ {item.trim()}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="rounded-full border border-gray-700 bg-gray-800/60 px-3 py-1.5 text-xs font-semibold text-gray-300">
+                                Room Only
+                              </span>
+                            )}
+                          </div>
 
-                        <div>
-                          {policies.length > 0 ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenPolicies((prev) => ({
-                                    ...prev,
-                                    [roomKey]: !prev[roomKey],
-                                  }));
-                                }}
-                                className="text-sm font-medium text-blue-600"
-                              >
-                                All Rooms Cancellation Policies.
-                              </button>
+                          <div>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-500">
+                              Cancellation
+                            </p>
 
-                              {openPolicies[roomKey] && (
-                                <div className="mt-2 rounded border border-gray-300 bg-white p-2 text-xs text-gray-800">
-                                  {policies.map((policy, i) => (
-                                    <div
-                                      key={i}
-                                      className="flex justify-between gap-3 border-b border-gray-100 py-1 last:border-0"
-                                    >
-                                      <span>
-                                        From {policy.FromDate || "N/A"}
-                                      </span>
+                            {policies.length > 0 ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenPolicies((prev) => ({
+                                      ...prev,
+                                      [roomKey]: !prev[roomKey],
+                                    }));
+                                  }}
+                                  className="inline-flex items-center gap-2 rounded-full border border-purple-400/20 bg-purple-400/10 px-3 py-1.5 text-xs font-bold text-purple-300 transition hover:bg-purple-400 hover:text-black"
+                                >
+                                  View Policies
+                                  <span>
+                                    {openPolicies[roomKey] ? "↑" : "↓"}
+                                  </span>
+                                </button>
 
-                                      <span
-                                        className={
-                                          Number(
-                                            policy.CancellationCharge || 0,
-                                          ) === 0
-                                            ? "font-semibold text-green-700"
-                                            : "font-semibold text-red-700"
-                                        }
+                                {openPolicies[roomKey] && (
+                                  <div className="mt-3 space-y-2 rounded-2xl border border-gray-800 bg-black/30 p-3 text-xs text-gray-300">
+                                    {policies.map((policy, i) => (
+                                      <div
+                                        key={i}
+                                        className="flex justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
                                       >
-                                        {getCancellationText(policy, roomTotal)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-sm text-gray-500">
-                              Policy not available
-                            </span>
-                          )}
-                        </div>
+                                        <span>
+                                          From {policy.FromDate || "N/A"}
+                                        </span>
 
-                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-right text-sm font-bold text-[#18558a]">
-                          <p>Base: ₹ {formatPrice(itemBasePrice)}</p>
-                          <p>Tax: ₹ {formatPrice(itemTax)}</p>
-                          <p className="mt-1 text-base text-[#0f3d66]">
-                            Total: ₹ {formatPrice(roomTotal)}
-                          </p>
+                                        <span
+                                          className={
+                                            Number(
+                                              policy.CancellationCharge || 0,
+                                            ) === 0
+                                              ? "font-bold text-green-300"
+                                              : "font-bold text-red-300"
+                                          }
+                                        >
+                                          {getCancellationText(
+                                            policy,
+                                            roomTotal,
+                                          )}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-sm text-gray-500">
+                                Policy not available
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="rounded-3xl border border-yellow-400/20 bg-linear-to-br from-yellow-400/15 to-orange-400/10 p-4 text-right">
+                            <p className="text-xs font-semibold text-gray-400">
+                              Base Fare
+                            </p>
+                            <p className="text-lg font-black text-white">
+                              ₹ {formatPrice(itemBasePrice)}
+                            </p>
+
+                            <p className="mt-2 text-xs font-semibold text-gray-400">
+                              Taxes
+                            </p>
+                            <p className="text-sm font-bold text-gray-200">
+                              ₹ {formatPrice(itemTax)}
+                            </p>
+
+                            <div className="my-3 border-t border-yellow-400/20" />
+
+                            <p className="text-xs font-semibold text-yellow-300">
+                              Total Price
+                            </p>
+                            <p className="text-2xl font-black text-yellow-300">
+                              ₹ {formatPrice(roomTotal)}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -857,8 +1330,18 @@ const HotelDetails = () => {
                 })}
 
                 {filteredRoomOptions.length === 0 && (
-                  <div className="p-5 text-center text-sm text-gray-500">
-                    No rooms found.
+                  <div className="p-8 text-center">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-2xl">
+                      🔍
+                    </div>
+
+                    <p className="mt-3 text-base font-bold text-gray-300">
+                      No rooms found
+                    </p>
+
+                    <p className="mt-1 text-sm text-gray-500">
+                      Try another room name or clear your search.
+                    </p>
                   </div>
                 )}
               </div>
@@ -959,6 +1442,132 @@ const HotelDetails = () => {
               </button>
             )}
           </div>
+
+          {hotelFacilities.length > 0 && (
+            <div className="relative overflow-hidden rounded-3xl border border-yellow-400/20 bg-linear-to-br from-[#17171f] via-[#12121a] to-[#0B0B0F] p-5 shadow-xl shadow-black/30">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-yellow-400/10 blur-3xl" />
+              <div className="absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-orange-500/10 blur-3xl" />
+
+              <div className="relative flex flex-wrap items-start justify-between gap-4 mb-5">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-yellow-300/80">
+                    Amenities
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-bold text-yellow-300">
+                    Hotel Facilities
+                  </h2>
+
+                  <p className="mt-1 text-sm text-gray-400">
+                    Popular amenities and services available at this property.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-2 text-right">
+                  <p className="text-xl font-bold text-yellow-300">
+                    {hotelFacilities.length}
+                  </p>
+                  <p className="text-[11px] text-gray-400">Facilities</p>
+                </div>
+              </div>
+
+              <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {visibleFacilities.map((facility, index) => (
+                  <div
+                    key={`${facility}-${index}`}
+                    className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/4 px-4 py-3 transition hover:-translate-y-0.5 hover:border-yellow-400/30 hover:bg-yellow-400/10"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/30 text-lg ring-1 ring-white/10 group-hover:bg-yellow-400/20">
+                      {getFacilityIcon(facility)}
+                    </span>
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-5 text-gray-200">
+                        {facility}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {hotelFacilities.length > 18 && (
+                <button
+                  onClick={() => setShowAllFacilities(!showAllFacilities)}
+                  className="relative mt-5 inline-flex items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-5 py-2 text-sm font-semibold text-yellow-300 transition hover:bg-yellow-400 hover:text-black"
+                >
+                  {showAllFacilities
+                    ? "Show Less Facilities"
+                    : `Show All ${hotelFacilities.length} Facilities`}
+                  <span>{showAllFacilities ? "↑" : "↓"}</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {hotelAttractions.length > 0 && (
+            <div className="relative overflow-hidden rounded-3xl border border-cyan-400/20 bg-linear-to-br from-[#151923] via-[#111820] to-[#0B0B0F] p-5 shadow-xl shadow-black/30">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
+              <div className="absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-blue-500/10 blur-3xl" />
+
+              <div className="relative flex flex-wrap items-start justify-between gap-4 mb-5">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">
+                    Around the hotel
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-bold text-cyan-300">
+                    Nearby Attractions
+                  </h2>
+
+                  <p className="mt-1 text-sm text-gray-400">
+                    Important places and landmarks close to this hotel.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-right">
+                  <p className="text-xl font-bold text-cyan-300">
+                    {hotelAttractions.length}
+                  </p>
+                  <p className="text-[11px] text-gray-400">Places</p>
+                </div>
+              </div>
+
+              <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {visibleAttractions.map((attraction, index) => (
+                  <div
+                    key={`${attraction}-${index}`}
+                    className="group flex items-center gap-3 rounded-2xl border border-cyan-400/10 bg-cyan-400/6 px-4 py-3 transition hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-cyan-400/10"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-sm font-bold text-cyan-200 ring-1 ring-cyan-300/20">
+                      {index + 1}
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-cyan-100">
+                        {attraction}
+                      </p>
+                    </div>
+
+                    <span className="text-lg opacity-80 transition group-hover:scale-110">
+                      📍
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {hotelAttractions.length > 12 && (
+                <button
+                  onClick={() => setShowAllAttractions(!showAllAttractions)}
+                  className="relative mt-5 inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-5 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400 hover:text-black"
+                >
+                  {showAllAttractions
+                    ? "Show Less Attractions"
+                    : `Show All ${hotelAttractions.length} Attractions`}
+                  <span>{showAllAttractions ? "↑" : "↓"}</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="bg-[#15151C] p-5 rounded-2xl border border-gray-800 md:sticky md:top-24 h-fit">
@@ -1014,6 +1623,30 @@ const HotelDetails = () => {
                 : "Passport details are not required for Indian domestic hotels."}
             </p>
           </div>
+
+          {hotelFacilities.length > 0 && (
+            <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-3">
+              <p className="text-xs text-yellow-300 font-semibold">
+                Facilities
+              </p>
+
+              <p className="mt-1 text-sm font-semibold text-white">
+                {hotelFacilities.length} amenities available
+              </p>
+            </div>
+          )}
+
+          {hotelAttractions.length > 0 && (
+            <div className="mt-5 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3">
+              <p className="text-xs text-cyan-300 font-semibold">
+                Nearby Attractions
+              </p>
+
+              <p className="mt-1 text-sm font-semibold text-white">
+                {hotelAttractions.length} places nearby
+              </p>
+            </div>
+          )}
 
           <button
             onClick={handlePreBook}
