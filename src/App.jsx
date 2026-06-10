@@ -33,6 +33,7 @@ import Blogs from "./Pages/Blogs";
 import BlogDetails from "./Pages/BlogDetails";
 import HotelBookingSuccess from "./modules/hotels/pages/HotelBookingSuccess";
 import HotelReviewBooking from "./modules/hotels/pages/HotelReviewBooking";
+import HotelVoucher from "./modules/hotels/pages/HotelVoucher";
 
 const App = () => {
   return (
@@ -59,6 +60,7 @@ const App = () => {
         <Route path="/prebook" element={<PrebookLoader />} />
         <Route path="/hotel-booking" element={<HotelBooking />} />
         <Route path="/hotel-review-booking" element={<HotelReviewBooking />} />
+        <Route path="/booking-details/:bookingId" element={<HotelVoucher />} />
         <Route
           path="/hotel-booking-success"
           element={<HotelBookingSuccess />}
