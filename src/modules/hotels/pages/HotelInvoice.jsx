@@ -573,9 +573,7 @@ const HotelInvoice = () => {
                 <span className="text-(--gold-soft)">LYTE</span>
               </h1>
 
-              <p className="text-(--text-muted) text-sm mt-1">
-                Hotel Invoice
-              </p>
+              <p className="text-(--text-muted) text-sm mt-1">Hotel Invoice</p>
             </div>
 
             <div className="text-sm md:text-right space-y-1">
@@ -594,9 +592,7 @@ const HotelInvoice = () => {
               </p>
 
               <p>
-                <span className="text-(--text-muted)">
-                Confirmation No:
-                </span>{" "}
+                <span className="text-(--text-muted)">Confirmation No:</span>{" "}
                 <span className="font-bold text-white">{confirmationNo}</span>
               </p>
             </div>
@@ -687,7 +683,7 @@ const HotelInvoice = () => {
 
             <div className="mt-6 overflow-x-auto rounded-2xl border border-(--border-soft)">
               <table className="w-full text-sm min-w-225">
-                <thead className="bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-[var(--bg-secondary)] text-(--gold-soft)">
+                <thead className="bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-(--bg-secondary) text-(--gold-soft)">
                   <tr>
                     <th className="p-3 text-left border border-(--border-soft)">
                       Hotel Name
@@ -768,7 +764,7 @@ const HotelInvoice = () => {
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="text-sm text-[var(--text-muted)] space-y-2">
+              <div className="text-sm text-(--text-muted) space-y-2">
                 <p>
                   <span className="text-white font-bold">Billed By:</span>{" "}
                   {billedBy}
@@ -780,7 +776,7 @@ const HotelInvoice = () => {
                 </p>
               </div>
 
-              <div className="bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-5 text-sm space-y-3">
+              <div className="bg-(--bg-secondary) border border-(--border-soft) rounded-2xl p-5 text-sm space-y-3">
                 <AmountRow
                   label="Gross"
                   value={gross}
@@ -811,7 +807,7 @@ const HotelInvoice = () => {
                   currency={currency}
                 />
 
-                <div className="border-t border-[var(--border-soft)] pt-3">
+                <div className="border-t border-(--border-soft) pt-3">
                   <AmountRow
                     label="Net Amount"
                     value={netAmount}
@@ -819,12 +815,12 @@ const HotelInvoice = () => {
                     highlight
                   />
 
-                  <div className="flex justify-between gap-4 text-lg font-bold text-[var(--gold-main)] mt-2">
+                  <div className="flex justify-between gap-4 text-lg font-bold text-(--gold-main) mt-2">
                     <span>Net Receivable</span>
                     <span>{formatMoney(netReceivable, currency)}</span>
                   </div>
 
-                  <p className="text-xs text-[var(--text-muted)] text-right mt-1">
+                  <p className="text-xs text-(--text-muted) text-right mt-1">
                     Amount in {currency}
                   </p>
                 </div>
@@ -832,33 +828,33 @@ const HotelInvoice = () => {
             </div>
 
             <div className="mt-8">
-              <h3 className="text-lg font-bold text-[var(--gold-main)] mb-3">
+              <h3 className="text-lg font-bold text-(--gold-main) mb-3">
                 GST Details
               </h3>
 
-              <div className="overflow-x-auto rounded-2xl border border-[var(--border-soft)]">
-                <table className="w-full text-sm min-w-[750px]">
-                  <thead className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] text-[var(--gold-soft)]">
+              <div className="overflow-x-auto rounded-2xl border border-(--border-soft)">
+                <table className="w-full text-sm min-w-187.5">
+                  <thead className="bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-(--bg-secondary) text-(--gold-soft)">
                     <tr>
-                      <th className="p-3 text-left border border-[var(--border-soft)]">
+                      <th className="p-3 text-left border border-(--border-soft)">
                         Service Description
                       </th>
-                      <th className="p-3 text-left border border-[var(--border-soft)]">
+                      <th className="p-3 text-left border border-(--border-soft)">
                         SAC
                       </th>
-                      <th className="p-3 text-right border border-[var(--border-soft)]">
+                      <th className="p-3 text-right border border-(--border-soft)">
                         Taxable Value
                       </th>
-                      <th className="p-3 text-right border border-[var(--border-soft)]">
+                      <th className="p-3 text-right border border-(--border-soft)">
                         CGST @ 0%
                       </th>
-                      <th className="p-3 text-right border border-[var(--border-soft)]">
+                      <th className="p-3 text-right border border-(--border-soft)">
                         SGST @ 0%
                       </th>
-                      <th className="p-3 text-right border border-[var(--border-soft)]">
-                        IGST @ 18%
+                      <th className="p-3 text-right border border-(--border-soft)">
+                        IGST @ 18
                       </th>
-                      <th className="p-3 text-right border border-[var(--border-soft)]">
+                      <th className="p-3 text-right border border-(--border-soft)">
                         Total
                       </th>
                     </tr>
@@ -866,31 +862,31 @@ const HotelInvoice = () => {
 
                   <tbody>
                     <tr className="text-white">
-                      <td className="p-3 border border-[var(--border-soft)]">
+                      <td className="p-3 border border-(--border-soft)">
                         Transaction Fees
                       </td>
 
-                      <td className="p-3 border border-[var(--border-soft)]">
+                      <td className="p-3 border border-(--border-soft)">
                         {sacCode}
                       </td>
 
-                      <td className="p-3 text-right border border-[var(--border-soft)]">
+                      <td className="p-3 text-right border border-(--border-soft)">
                         {formatAmount(taxableValue)}
                       </td>
 
-                      <td className="p-3 text-right border border-[var(--border-soft)]">
+                      <td className="p-3 text-right border border-(--border-soft)">
                         {formatAmount(cgst)}
                       </td>
 
-                      <td className="p-3 text-right border border-[var(--border-soft)]">
+                      <td className="p-3 text-right border border-(--border-soft)">
                         {formatAmount(sgst)}
                       </td>
 
-                      <td className="p-3 text-right border border-[var(--border-soft)]">
+                      <td className="p-3 text-right border border-(--border-soft)">
                         {formatAmount(igst)}
                       </td>
 
-                      <td className="p-3 text-right border border-[var(--border-soft)]">
+                      <td className="p-3 text-right border border-(--border-soft)">
                         {formatAmount(gstTotal)}
                       </td>
                     </tr>
@@ -910,21 +906,21 @@ const HotelInvoice = () => {
             <div className="no-print mt-6 flex flex-wrap justify-end gap-4">
               <button
                 onClick={handleGeneratePdf}
-                className="text-[var(--gold-main)] underline underline-offset-4 font-bold"
+                className="text-(--gold-main) underline underline-offset-4 font-bold"
               >
                 Generate PDF
               </button>
 
               <button
                 onClick={handleEmail}
-                className="text-[var(--gold-main)] underline underline-offset-4 font-bold"
+                className="text-(--gold-main) underline underline-offset-4 font-bold"
               >
                 Email
               </button>
 
               <button
                 onClick={handlePrint}
-                className="text-[var(--gold-main)] underline underline-offset-4 font-bold"
+                className="text-(--gold-main) underline underline-offset-4 font-bold"
               >
                 Print
               </button>
@@ -940,7 +936,7 @@ const InvoiceActionButton = ({ children, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="px-4 py-2 rounded-xl bg-linear-to-r from-[var(--color-start)] to-[var(--color-end)] text-black font-bold text-sm shadow-lg shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition"
+      className="px-4 py-2 rounded-xl bg-linear-to-r from-start to-end text-black font-bold text-sm shadow-lg shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition"
     >
       {children}
     </button>
@@ -949,8 +945,8 @@ const InvoiceActionButton = ({ children, onClick }) => {
 
 const InfoBox = ({ label, value }) => {
   return (
-    <div className="bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-4">
-      <span className="font-bold text-[var(--gold-soft)]">{label}:</span>{" "}
+    <div className="bg-(--bg-secondary) border border-(--border-soft) rounded-2xl p-4">
+      <span className="font-bold text-(--gold-soft)">{label}:</span>{" "}
       <span className="text-white">{value || "N/A"}</span>
     </div>
   );
@@ -960,7 +956,7 @@ const AmountRow = ({ label, value, currency = "INR", highlight = false }) => {
   return (
     <div
       className={`flex justify-between gap-4 ${
-        highlight ? "text-white font-bold" : "text-[var(--text-muted)]"
+        highlight ? "text-white font-bold" : "text-(--text-muted)"
       }`}
     >
       <span>{label}</span>
@@ -971,13 +967,13 @@ const AmountRow = ({ label, value, currency = "INR", highlight = false }) => {
 
 const ResponseDataBox = ({ title = "Response Data", data }) => {
   return (
-    <details className="no-print mt-8 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-xl shadow-black/20">
-      <summary className="cursor-pointer px-5 py-4 text-[var(--gold-main)] font-bold bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)]">
+    <details className="no-print mt-8 bg-(--bg-card) border border-(--border-soft) rounded-3xl overflow-hidden shadow-xl shadow-black/20">
+      <summary className="cursor-pointer px-5 py-4 text-(--gold-main) font-bold bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-(--bg-secondary)">
         {title}
       </summary>
 
-      <div className="border-t border-[var(--border-soft)] p-4">
-        <pre className="max-h-[600px] overflow-auto rounded-2xl bg-black/50 p-4 text-xs leading-relaxed text-green-300 whitespace-pre-wrap">
+      <div className="border-t border-(--border-soft) p-4">
+        <pre className="max-h-150 overflow-auto rounded-2xl bg-black/50 p-4 text-xs leading-relaxed text-green-300 whitespace-pre-wrap">
           {JSON.stringify(data, null, 2)}
         </pre>
       </div>

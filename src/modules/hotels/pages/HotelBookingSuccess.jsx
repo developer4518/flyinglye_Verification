@@ -286,7 +286,7 @@ const HotelBookingSuccess = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-main)] flex items-center justify-center text-[var(--gold-soft)] font-[var(--font-body)]">
+      <div className="min-h-screen bg-[var(--bg-main) flex items-center justify-center text-[var(--gold-soft) font-[var(--font-body)">
         Loading booking...
       </div>
     );
@@ -294,7 +294,7 @@ const HotelBookingSuccess = () => {
 
   if (!booking) {
     return (
-      <div className="min-h-screen bg-[var(--bg-main)] flex flex-col items-center justify-center p-6 text-center font-[var(--font-body)]">
+      <div className="min-h-screen bg-[var(--bg-main) flex flex-col items-center justify-center p-6 text-center font-[var(--font-body)">
         <h2 className="text-2xl font-bold text-red-400 mb-4">
           Booking not found
         </h2>
@@ -310,12 +310,12 @@ const HotelBookingSuccess = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-26 px-3 md:px-8 font-[var(--font-body)]">
+    <div className="min-h-screen bg-(--bg-main) text-(--text-main) py-26 px-3 md:px-8 font-(--font-body)">
       <div className="max-w-7xl mx-auto">
         {/* TOP HEADER */}
-        <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-2xl shadow-black/30">
-          <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-[var(--border-soft)]">
-            <h1 className="text-2xl font-bold text-[var(--gold-main)] font-[var(--font-heading)] tracking-wide">
+        <div className="bg-(--bg-card) border border-(--border-soft) rounded-3xl overflow-hidden shadow-2xl shadow-black/30">
+          <div className="bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-(--bg-secondary) px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-(--border-soft)">
+            <h1 className="text-2xl font-var[(--font-heading) text-[var(--gold-main) font-[var(--font-heading) tracking-wide">
               Booking Details
             </h1>
 
@@ -341,19 +341,19 @@ const HotelBookingSuccess = () => {
 
           <div className="px-5 py-6 flex flex-col md:flex-row justify-between gap-4">
             <div>
-              <p className="inline-block bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black px-3 py-1.5 font-bold rounded-xl text-sm shadow-lg">
+              <p className="inline-block bg-linear-to-r from-[var(--color-start) to-[var(--color-end) text-black px-3 py-1.5 font-bold rounded-xl text-sm shadow-lg">
                 FLYINGLYTE (Delhi)
               </p>
               <br />
-              <p className="inline-block mt-2 border border-[var(--gold-dark)] text-[var(--gold-soft)] px-3 py-1.5 font-bold rounded-xl text-sm">
+              <p className="inline-block mt-2 border border-[var(--gold-dark) text-[var(--gold-soft) px-3 py-1.5 font-bold rounded-xl text-sm">
                 Delhi
               </p>
             </div>
 
-            <div className="text-sm md:text-right text-[var(--text-muted)]">
+            <div className="text-sm md:text-right text-[var(--text-muted)">
               <p>
                 Confirmation No :{" "}
-                <span className="text-[var(--gold-soft)] font-bold">
+                <span className="text-[var(--gold-soft) font-bold">
                   {booking?.ConfirmationNo || "N/A"}
                 </span>
               </p>
@@ -362,24 +362,24 @@ const HotelBookingSuccess = () => {
         </div>
 
         {/* HOTEL SUMMARY */}
-        <div className="mt-5 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center shadow-xl shadow-black/20">
+        <div className="mt-5 bg-[var(--bg-card) border border-[var(--border-soft) rounded-3xl p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center shadow-xl shadow-black/20">
           <div className="lg:col-span-7 flex gap-4">
-            <div className="w-28 h-24 bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl flex items-center justify-center text-5xl text-[var(--gold-dark)] shrink-0">
+            <div className="w-28 h-24 bg-[var(--bg-secondary) border border-[var(--border-soft) rounded-2xl flex items-center justify-center text-5xl text-[var(--gold-dark) shrink-0">
               🛏️
             </div>
 
             <div>
-              <h2 className="text-xl font-bold text-[var(--gold-main)] font-[var(--font-heading)]">
+              <h2 className="text-xl font-bold text-[var(--gold-main) font-[var(--font-heading)">
                 {hotel?.hotel_name ||
                   hotel?.HotelName ||
                   booking?.HotelName ||
                   "Hotel"}
-                <span className="ml-2 text-[var(--color-start)] text-sm">
+                <span className="ml-2 text-[var(--color-start) text-sm">
                   ★★★
                 </span>
               </h2>
 
-              <p className="text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
+              <p className="text-sm text-[var(--text-muted) mt-2 leading-relaxed">
                 {hotel?.address ||
                   hotel?.Address ||
                   booking?.HotelAddress ||
@@ -389,7 +389,7 @@ const HotelBookingSuccess = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-3 text-sm lg:text-right text-[var(--text-muted)] space-y-1">
+          <div className="lg:col-span-3 text-sm lg:text-right text-[var(--text-muted) space-y-1">
             <p>
               Check In :{" "}
               <span className="font-bold text-white">
@@ -409,12 +409,12 @@ const HotelBookingSuccess = () => {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-soft)] overflow-hidden text-center">
+            <div className="bg-[var(--bg-secondary) rounded-2xl border border-[var(--border-soft) overflow-hidden text-center">
               <div className="bg-green-500/15 text-green-400 font-bold py-3 border-b border-green-500/20">
                 {booking?.HotelBookingStatus || "Vouchered"}
               </div>
 
-              <div className="text-[var(--gold-soft)] py-3 text-sm">
+              <div className="text-[var(--gold-soft) py-3 text-sm">
                 {changeLoading
                   ? "Request Sending..."
                   : changeMsg
@@ -434,27 +434,27 @@ const HotelBookingSuccess = () => {
 
               <div className="p-5">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className="md:col-span-1 font-bold text-[var(--gold-soft)]">
+                  <div className="md:col-span-1 font-bold text-[var(--gold-soft)">
                     Room 1
                   </div>
 
-                  <div className="md:col-span-8 text-[var(--text-muted)]">
+                  <div className="md:col-span-8 text-[var(--text-muted)">
                     <p className="text-white font-semibold">{roomName}</p>
                     <p className="text-sm mt-1">Incl: {inclusion}</p>
 
                     {roomPromotion && (
-                      <p className="text-[var(--color-start)] mt-2">
+                      <p className="text-[var(--color-start) mt-2">
                         {roomPromotion}
                       </p>
                     )}
 
                     {supplements.length > 0 && (
                       <div className="mt-3">
-                        <p className="font-semibold text-sm text-[var(--gold-soft)]">
+                        <p className="font-semibold text-sm text-[var(--gold-soft)">
                           Supplements
                         </p>
 
-                        <ul className="list-disc pl-5 text-sm text-[var(--text-muted)] mt-1">
+                        <ul className="list-disc pl-5 text-sm text-[var(--text-muted) mt-1">
                           {supplements.map((item, index) => (
                             <li key={index}>
                               {item?.Description ||
@@ -474,7 +474,7 @@ const HotelBookingSuccess = () => {
                       {childCount > 0 ? `, ${childCount} Child` : ""}
                     </p>
 
-                    <button className="mt-4 text-[var(--gold-main)] underline underline-offset-4">
+                    <button className="mt-4 text-[var(--gold-main) underline underline-offset-4">
                       Show Room Description(+)
                     </button>
                   </div>
@@ -489,7 +489,7 @@ const HotelBookingSuccess = () => {
               <div className="p-5">
                 <div className="flex justify-between gap-4">
                   <div>
-                    <p className="font-bold mb-2 text-[var(--gold-soft)]">
+                    <p className="font-bold mb-2 text-[var(--gold-soft)">
                       Room 1
                     </p>
 
@@ -499,7 +499,7 @@ const HotelBookingSuccess = () => {
                           key={i}
                           className="grid grid-cols-1 md:grid-cols-12 gap-2 py-1 text-sm"
                         >
-                          <p className="md:col-span-3 text-[var(--gold-main)] font-semibold">
+                          <p className="md:col-span-3 text-[var(--gold-main) font-semibold">
                             {Number(g.PaxType) === 2 ||
                             String(g.Title).toLowerCase().includes("mstr") ||
                             String(g.Title).toLowerCase().includes("miss")
@@ -518,13 +518,13 @@ const HotelBookingSuccess = () => {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-[var(--text-muted)]">
+                      <p className="text-sm text-[var(--text-muted)">
                         No guest details available
                       </p>
                     )}
                   </div>
 
-                  <button className="text-[var(--gold-main)] underline underline-offset-4 text-sm h-fit">
+                  <button className="text-[var(--gold-main) underline underline-offset-4 text-sm h-fit">
                     Show Pax Details
                   </button>
                 </div>
@@ -538,31 +538,31 @@ const HotelBookingSuccess = () => {
               <div className="p-5">
                 <p className="font-bold mb-4 text-white">Room 1 : {roomName}</p>
 
-                <div className="overflow-x-auto rounded-2xl border border-[var(--border-soft)]">
+                <div className="overflow-x-auto rounded-2xl border border-[var(--border-soft)">
                   <table className="w-full text-sm">
-                    <thead className="bg-[var(--bg-secondary)] text-[var(--gold-soft)]">
+                    <thead className="bg-[var(--bg-secondary) text-[var(--gold-soft)">
                       <tr>
-                        <th className="text-left p-3 border border-[var(--border-soft)]">
+                        <th className="text-left p-3 border border-[var(--border-soft)">
                           Cancelled on or After
                         </th>
-                        <th className="text-left p-3 border border-[var(--border-soft)]">
+                        <th className="text-left p-3 border border-[var(--border-soft)">
                           Cancelled on or Before
                         </th>
-                        <th className="text-left p-3 border border-[var(--border-soft)]">
+                        <th className="text-left p-3 border border-[var(--border-soft)">
                           Cancellation Charges
                         </th>
                       </tr>
                     </thead>
 
-                    <tbody className="text-[var(--text-muted)]">
+                    <tbody className="text-[var(--text-muted)">
                       {cancelPolicies.length > 0 ? (
                         cancelPolicies.map((policy, index) => (
                           <tr key={index}>
-                            <td className="p-3 border border-[var(--border-soft)]">
+                            <td className="p-3 border border-[var(--border-soft)">
                               {formatDate(policy.FromDate || policy.fromDate)}
                             </td>
 
-                            <td className="p-3 border border-[var(--border-soft)]">
+                            <td className="p-3 border border-[var(--border-soft)">
                               {formatDate(
                                 policy.ToDate ||
                                   policy.toDate ||
@@ -571,7 +571,7 @@ const HotelBookingSuccess = () => {
                               )}
                             </td>
 
-                            <td className="p-3 border border-[var(--border-soft)] text-white font-semibold">
+                            <td className="p-3 border border-[var(--border-soft) text-white font-semibold">
                               {policy.ChargeType === "Percentage"
                                 ? `${policy.CancellationCharge}%`
                                 : policy.CancellationCharge === 0
@@ -584,13 +584,13 @@ const HotelBookingSuccess = () => {
                         ))
                       ) : (
                         <tr>
-                          <td className="p-3 border border-[var(--border-soft)]">
+                          <td className="p-3 border border-[var(--border-soft)">
                             {formatDate(checkIn)}
                           </td>
-                          <td className="p-3 border border-[var(--border-soft)]">
+                          <td className="p-3 border border-[var(--border-soft)">
                             {formatDate(checkOut)}
                           </td>
-                          <td className="p-3 border border-[var(--border-soft)] text-white font-semibold">
+                          <td className="p-3 border border-[var(--border-soft) text-white font-semibold">
                             100%
                           </td>
                         </tr>
@@ -599,7 +599,7 @@ const HotelBookingSuccess = () => {
                   </table>
                 </div>
 
-                <p className="mt-6 text-sm text-[var(--text-muted)]">
+                <p className="mt-6 text-sm text-[var(--text-muted)">
                   <span className="text-red-400 font-semibold">Note:</span>{" "}
                   Early check out will attract full cancellation charges unless
                   otherwise specified.
@@ -612,13 +612,13 @@ const HotelBookingSuccess = () => {
               <SectionTitle icon="☑️" title="Room Amenities" />
 
               <div className="p-5 overflow-x-auto">
-                <table className="w-full border border-[var(--border-soft)] text-sm rounded-2xl overflow-hidden">
-                  <thead className="bg-[var(--bg-secondary)] text-[var(--gold-soft)]">
+                <table className="w-full border border-[var(--border-soft) text-sm rounded-2xl overflow-hidden">
+                  <thead className="bg-[var(--bg-secondary) text-[var(--gold-soft)">
                     <tr>
-                      <th className="p-3 border border-[var(--border-soft)] text-left w-28">
+                      <th className="p-3 border border-[var(--border-soft) text-left w-28">
                         Room
                       </th>
-                      <th className="p-3 border border-[var(--border-soft)] text-left">
+                      <th className="p-3 border border-[var(--border-soft) text-left">
                         Amenities
                       </th>
                     </tr>
@@ -626,10 +626,10 @@ const HotelBookingSuccess = () => {
 
                   <tbody>
                     <tr>
-                      <td className="p-3 border border-[var(--border-soft)] font-bold text-center text-white">
+                      <td className="p-3 border border-[var(--border-soft) font-bold text-center text-white">
                         Room 1
                       </td>
-                      <td className="p-3 border border-[var(--border-soft)] text-[var(--text-muted)] leading-relaxed">
+                      <td className="p-3 border border-[var(--border-soft) text-[var(--text-muted) leading-relaxed">
                         {amenities}
                       </td>
                     </tr>
@@ -642,7 +642,7 @@ const HotelBookingSuccess = () => {
             <SectionCard>
               <SectionTitle icon="📝" title="Remark" />
 
-              <div className="p-5 text-[var(--text-muted)]">
+              <div className="p-5 text-[var(--text-muted)">
                 {booking?.Remark || booking?.Remarks || "N.a."}
               </div>
             </SectionCard>
@@ -651,7 +651,7 @@ const HotelBookingSuccess = () => {
             <SectionCard>
               <SectionTitle icon="📋" title="Hotel Norms" />
 
-              <div className="p-5 text-sm space-y-2 text-[var(--text-muted)]">
+              <div className="p-5 text-sm space-y-2 text-[var(--text-muted)">
                 {hotelNorms.length > 0 ? (
                   hotelNorms.map((norm, index) => (
                     <p key={index}>
@@ -672,16 +672,16 @@ const HotelBookingSuccess = () => {
           {/* RIGHT SIDEBAR */}
           <aside className="lg:col-span-3 space-y-5">
             <SectionCard>
-              <div className="bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black p-4 font-bold">
+              <div className="bg-linear-to-r from-[var(--color-start) to-[var(--color-end) text-black p-4 font-bold">
                 Need Modification in Booking?
               </div>
 
-              <div className="grid grid-cols-2 gap-3 p-4 text-sm text-[var(--text-muted)]">
-                <button className="text-left hover:text-[var(--gold-main)] transition">
+              <div className="grid grid-cols-2 gap-3 p-4 text-sm text-[var(--text-muted)">
+                <button className="text-left hover:text-[var(--gold-main) transition">
                   👤 Amendments
                 </button>
 
-                <button className="text-left hover:text-[var(--gold-main)] transition">
+                <button className="text-left hover:text-[var(--gold-main) transition">
                   ★ Special Requests
                 </button>
 
@@ -692,34 +692,34 @@ const HotelBookingSuccess = () => {
                   ✖ Cancel Booking
                 </button>
 
-                <button className="text-left hover:text-[var(--gold-main)] transition">
+                <button className="text-left hover:text-[var(--gold-main) transition">
                   ? Other Queries
                 </button>
               </div>
 
-              <div className="border-t border-[var(--border-soft)] p-4">
+              <div className="border-t border-[var(--border-soft) p-4">
                 <p className="font-bold text-sm mb-3 text-white">
                   Raised Request
                 </p>
 
-                <p className="text-sm text-[var(--gold-main)]">
+                <p className="text-sm text-[var(--gold-main)">
                   {changeMsg || "No tickets found for the given booking"}
                 </p>
               </div>
             </SectionCard>
 
-            <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl p-4 font-semibold text-white shadow-xl shadow-black/20">
+            <div className="bg-[var(--bg-card) border border-[var(--border-soft) rounded-3xl p-4 font-semibold text-white shadow-xl shadow-black/20">
               📞 Call us at:{" "}
               <a
                 href="tel:+919667455591"
-                className="text-[var(--gold-main)] hover:underline"
+                className="text-[var(--gold-main) hover:underline"
               >
                 +919667455591
               </a>
             </div>
 
             <SectionCard>
-              <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] p-4 font-bold text-[var(--gold-main)] border-b border-[var(--border-soft)]">
+              <div className="bg-linear-to-r from-[var(--bg-primary) via-[var(--bg-via) to-[var(--bg-secondary) p-4 font-bold text-[var(--gold-main) border-b border-[var(--border-soft)">
                 Sale Summary
               </div>
 
@@ -736,20 +736,20 @@ const HotelBookingSuccess = () => {
                   value={formatMoney(offeredRate)}
                 />
 
-                <button className="block ml-auto text-[var(--gold-main)] underline underline-offset-4 text-xs">
+                <button className="block ml-auto text-[var(--gold-main) underline underline-offset-4 text-xs">
                   Rate Breakup
                 </button>
 
                 <SummaryRow label="No. of Rooms" value="1" />
 
-                <div className="border-t border-[var(--border-soft)] pt-3">
+                <div className="border-t border-[var(--border-soft) pt-3">
                   <SummaryRow
                     label="Total"
                     value={formatMoney(offeredRate)}
                     bold
                   />
 
-                  <p className="text-xs text-[var(--text-muted)]">
+                  <p className="text-xs text-[var(--text-muted)">
                     (
                     {Math.round(Number(offeredRate || 0)).toLocaleString(
                       "en-IN",
@@ -820,7 +820,7 @@ const HotelBookingSuccess = () => {
 
 const SectionCard = ({ children }) => {
   return (
-    <section className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-xl shadow-black/20">
+    <section className="bg-[var(--bg-card) border border-[var(--border-soft) rounded-3xl overflow-hidden shadow-xl shadow-black/20">
       {children}
     </section>
   );
@@ -828,9 +828,9 @@ const SectionCard = ({ children }) => {
 
 const SectionTitle = ({ icon, title }) => {
   return (
-    <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-4 font-bold text-[var(--gold-main)] flex items-center gap-2 border-b border-[var(--border-soft)]">
+    <div className="bg-linear-to-r from-[var(--bg-primary) via-[var(--bg-via) to-[var(--bg-secondary) px-5 py-4 font-bold text-[var(--gold-main) flex items-center gap-2 border-b border-[var(--border-soft)">
       <span>{icon}</span>
-      <span className="font-[var(--font-heading)] tracking-wide">{title}</span>
+      <span className="font-[var(--font-heading) tracking-wide">{title}</span>
     </div>
   );
 };
@@ -839,7 +839,7 @@ const SummaryRow = ({ label, value, bold = false, large = false }) => {
   return (
     <div
       className={`flex justify-between gap-4 ${
-        bold ? "font-bold text-white" : "text-[var(--text-muted)]"
+        bold ? "font-bold text-white" : "text-[var(--text-muted)"
       } ${large ? "text-base" : ""}`}
     >
       <span>{label}</span>

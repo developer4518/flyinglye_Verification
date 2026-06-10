@@ -1140,7 +1140,7 @@ const HotelDetails = () => {
                       className={`group cursor-pointer px-4 py-4 transition ${
                         isSelected
                           ? "bg-linear-to-r from-yellow-400/20 via-yellow-300/10 to-transparent"
-                          : "bg-[#0B0B0F] hover:bg-white/[0.03]"
+                          : "bg-[#0B0B0F] hover:bg-white/3"
                       }`}
                     >
                       <div
@@ -1267,7 +1267,7 @@ const HotelDetails = () => {
                                     {policies.map((policy, i) => (
                                       <div
                                         key={i}
-                                        className="flex justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
+                                        className="flex justify-between gap-3 rounded-xl border border-white/5 bg-white/3 px-3 py-2"
                                       >
                                         <span>
                                           From {policy.FromDate || "N/A"}
