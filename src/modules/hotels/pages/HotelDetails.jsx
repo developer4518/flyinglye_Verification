@@ -58,6 +58,16 @@ const getSafeText = (...values) =>
 const formatPriceValue = (val) =>
   Math.round(Number(val) || 0).toLocaleString("en-IN");
 
+const getDayRateBaseTotal = (room = {}) => {
+  const dayRates = room?.DayRates || room?.day_rates || [];
+
+  if (!Array.isArray(dayRates)) return 0;
+
+  return dayRates
+    .flat(Infinity)
+    .reduce((sum, item) => sum + Number(item?.BasePrice || 0), 0);
+};
+
 const getMatchedRawRoom = (roomData = {}, hotel = {}) => {
   const bookingCode =
     roomData?.booking_code ||
@@ -69,9 +79,12 @@ const getMatchedRawRoom = (roomData = {}, hotel = {}) => {
     hotel?.rawHotel?.Rooms ||
     hotel?.HotelResult?.[0]?.Rooms ||
     hotel?.raw?.HotelResult?.[0]?.Rooms ||
+    hotel?.raw?.Response?.HotelResult?.[0]?.Rooms ||
     [];
 
-  if (!Array.isArray(rawRooms) || !bookingCode) return roomData?.room_raw || {};
+  if (!Array.isArray(rawRooms) || !bookingCode) {
+    return roomData?.room_raw || {};
+  }
 
   return (
     rawRooms.find((rawRoom) => rawRoom?.BookingCode === bookingCode) ||
@@ -114,11 +127,12 @@ const getRoomDescription = (roomData = {}, hotel = {}) => {
           item?.RoomName || item?.room_name || item?.Name || "",
         ).toLowerCase();
 
+        const currentName = String(name).toLowerCase();
+
         return (
           detailName &&
-          String(name).toLowerCase() &&
-          (detailName.includes(String(name).toLowerCase()) ||
-            String(name).toLowerCase().includes(detailName))
+          currentName &&
+          (detailName.includes(currentName) || currentName.includes(detailName))
         );
       })
     : null;
@@ -158,37 +172,77 @@ const normalizeRoomData = (roomData = {}, hotel = {}) => {
 
   const cancelPolicies = getRoomCancelPolicies(roomData, rawRoom);
 
+  const totalFare =
+    Number(
+      roomData?.publishedFare ||
+        roomData?.TotalFare ||
+        rawRoom?.TotalFare ||
+        roomData?.Price?.PublishedPrice ||
+        roomData?.PublishedPrice ||
+        roomData?.NetAmount ||
+        rawRoom?.NetAmount ||
+        0,
+    ) || 0;
+
+  const totalTax =
+    Number(
+      roomData?.tax ||
+        roomData?.TotalTax ||
+        rawRoom?.TotalTax ||
+        roomData?.Price?.Tax ||
+        roomData?.Tax ||
+        0,
+    ) || 0;
+
+  const dayRateBase =
+    getDayRateBaseTotal(rawRoom) || getDayRateBaseTotal(roomData);
+
+  const baseFare =
+    Number(
+      roomData?.baseFare ||
+        roomData?.base_fare ||
+        roomData?.BaseFare ||
+        roomData?.Price?.RoomPrice ||
+        roomData?.RoomPrice ||
+        dayRateBase ||
+        (totalFare && totalTax ? totalFare - totalTax : totalFare),
+    ) || 0;
+
+  const publishedFare = totalFare || baseFare + totalTax;
+
   return {
     ...roomData,
+
     room_raw: rawRoom,
+
     booking_code: bookingCode,
     BookingCode: bookingCode,
+
     Name: name,
     room_name: name,
 
-    price:
-      Number(
-        roomData?.price ||
-          roomData?.TotalFare ||
-          rawRoom?.TotalFare ||
-          roomData?.Price?.PublishedPrice ||
-          roomData?.PublishedPrice ||
-          0,
-      ) || 0,
+    price: baseFare,
+    baseFare,
+    base_fare: baseFare,
 
-    tax:
-      Number(
-        roomData?.tax ||
-          roomData?.TotalTax ||
-          rawRoom?.TotalTax ||
-          roomData?.Price?.Tax ||
-          roomData?.Tax ||
-          0,
-      ) || 0,
+    tax: totalTax,
+    TotalTax: totalTax,
+
+    publishedFare,
+    TotalFare: publishedFare,
+
+    dayRateBase,
 
     meal:
       roomData?.meal ||
       roomData?.MealType ||
+      rawRoom?.MealType ||
+      roomData?.MealPlan ||
+      "",
+
+    MealType:
+      roomData?.MealType ||
+      roomData?.meal ||
       rawRoom?.MealType ||
       roomData?.MealPlan ||
       "",
@@ -199,10 +253,20 @@ const normalizeRoomData = (roomData = {}, hotel = {}) => {
       rawRoom?.IsRefundable ??
       false,
 
+    IsRefundable:
+      roomData?.IsRefundable ??
+      roomData?.refundable ??
+      rawRoom?.IsRefundable ??
+      false,
+
     inclusion:
       roomData?.inclusion || roomData?.Inclusion || rawRoom?.Inclusion || "",
 
+    Inclusion:
+      roomData?.Inclusion || roomData?.inclusion || rawRoom?.Inclusion || "",
+
     room_description: getRoomDescription(roomData, hotel),
+
     cancel_policies: cancelPolicies,
     CancelPolicies: cancelPolicies,
   };
@@ -223,6 +287,8 @@ const HotelDetails = () => {
     hotel?.Rooms ||
     hotel?.hotel_raw?.Rooms ||
     hotel?.rawHotel?.Rooms ||
+    hotel?.HotelResult?.[0]?.Rooms ||
+    hotel?.raw?.HotelResult?.[0]?.Rooms ||
     [];
 
   const roomOptions = useMemo(() => {
@@ -241,11 +307,6 @@ const HotelDetails = () => {
     normalizeRoomData(payload.room || selectedRoom || roomOptions[0], hotel),
   );
 
-  const room = activeRoom;
-  const checkIn = payload.checkIn || search?.checkIn;
-  const checkOut = payload.checkOut || search?.checkOut;
-  const guests = payload.guests || search?.guests;
-
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -255,6 +316,23 @@ const HotelDetails = () => {
   const [splitRoom, setSplitRoom] = useState(false);
   const [openDescriptions, setOpenDescriptions] = useState({});
   const [openPolicies, setOpenPolicies] = useState({});
+
+  const room = activeRoom;
+  const checkIn = payload.checkIn || search?.checkIn;
+  const checkOut = payload.checkOut || search?.checkOut;
+  const guests = payload.guests || search?.guests;
+
+  const formatPrice = (val) => formatPriceValue(val);
+
+  const roomPrice = Number(
+    room?.price || room?.baseFare || room?.base_fare || 0,
+  );
+
+  const tax = Number(room?.tax || room?.TotalTax || room?.Tax || 0);
+
+  const totalAmount = Number(
+    room?.publishedFare || room?.TotalFare || roomPrice + tax || 0,
+  );
 
   const { isDomesticHotel, isInternationalHotel } = useMemo(() => {
     if (!hotel) {
@@ -303,6 +381,36 @@ const HotelDetails = () => {
     };
   }, [hotel, search, payload]);
 
+  const filteredRoomOptions = useMemo(() => {
+    let data = [...roomOptions];
+
+    if (roomSearch.trim()) {
+      data = data.filter((item) =>
+        String(item?.room_name || item?.Name || "")
+          .toLowerCase()
+          .includes(roomSearch.toLowerCase()),
+      );
+    }
+
+    if (sortBy === "price") {
+      data.sort(
+        (a, b) =>
+          Number(a.publishedFare || a.TotalFare || a.price || 0) -
+          Number(b.publishedFare || b.TotalFare || b.price || 0),
+      );
+    }
+
+    if (sortBy === "priceHigh") {
+      data.sort(
+        (a, b) =>
+          Number(b.publishedFare || b.TotalFare || b.price || 0) -
+          Number(a.publishedFare || a.TotalFare || a.price || 0),
+      );
+    }
+
+    return data;
+  }, [roomOptions, roomSearch, sortBy]);
+
   if (!hotel) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0B0B0F] text-gray-400">
@@ -325,14 +433,6 @@ const HotelDetails = () => {
     Number(guests?.adults || guests?.Adults || 0) +
     Number(guests?.children || guests?.Children || 0);
 
-  const formatPrice = (val) => formatPriceValue(val);
-
-  const roomPrice = Number(
-    room?.price || room?.TotalFare || room?.NetAmount || 0,
-  );
-  const tax = Number(room?.tax || room?.TotalTax || room?.Tax || 0);
-  const totalAmount = roomPrice + tax;
-
   const roomName =
     room?.room_name || room?.Name || room?.RoomTypeName || "Standard Room";
 
@@ -346,28 +446,6 @@ const HotelDetails = () => {
   const selectedRoomPolicies = Array.isArray(room?.cancel_policies)
     ? room.cancel_policies
     : [];
-
-  const filteredRoomOptions = useMemo(() => {
-    let data = [...roomOptions];
-
-    if (roomSearch.trim()) {
-      data = data.filter((item) =>
-        String(item?.room_name || item?.Name || "")
-          .toLowerCase()
-          .includes(roomSearch.toLowerCase()),
-      );
-    }
-
-    if (sortBy === "price") {
-      data.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-    }
-
-    if (sortBy === "priceHigh") {
-      data.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
-    }
-
-    return data;
-  }, [roomOptions, roomSearch, sortBy]);
 
   const getCancellationCharge = (policy = {}, baseAmount = totalAmount) => {
     const charge = Number(policy.CancellationCharge || 0);
@@ -416,6 +494,13 @@ const HotelDetails = () => {
       ...room,
       booking_code: bookingCode,
       BookingCode: bookingCode,
+      price: roomPrice,
+      baseFare: roomPrice,
+      base_fare: roomPrice,
+      tax,
+      TotalTax: tax,
+      publishedFare: totalAmount,
+      TotalFare: totalAmount,
       cancel_policies: selectedRoomPolicies,
       CancelPolicies: selectedRoomPolicies,
     };
@@ -498,7 +583,7 @@ const HotelDetails = () => {
             src={images[0]}
             alt={hotelName}
             onClick={() => setSelectedImage(images[0])}
-            className="w-full h-64 md:h-[420px] object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
+            className="w-full h-64 md:h-105 object-cover rounded-2xl cursor-pointer hover:opacity-90 transition"
           />
         </div>
 
@@ -509,7 +594,7 @@ const HotelDetails = () => {
               src={img}
               alt={`${hotelName} ${i + 2}`}
               onClick={() => setSelectedImage(img)}
-              className="w-full h-32 md:h-[202px] object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
+              className="w-full h-32 md:h-50.5 object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
             />
           ))}
         </div>
@@ -593,8 +678,8 @@ const HotelDetails = () => {
                     onChange={(e) => setSortBy(e.target.value)}
                     className="h-8 rounded border border-gray-300 bg-white px-2 text-sm outline-none"
                   >
-                    <option value="price">Price</option>
-                    <option value="priceHigh">Price High</option>
+                    <option value="price">Price Low to High</option>
+                    <option value="priceHigh">Price High to Low</option>
                   </select>
 
                   <label className="flex h-8 items-center gap-2 rounded bg-white px-3 text-sm">
@@ -620,8 +705,22 @@ const HotelDetails = () => {
                     ? roomItem.cancel_policies
                     : [];
 
-                  const roomTotal =
-                    Number(roomItem?.price || 0) + Number(roomItem?.tax || 0);
+                  const itemBasePrice = Number(
+                    roomItem?.price ||
+                      roomItem?.baseFare ||
+                      roomItem?.base_fare ||
+                      0,
+                  );
+
+                  const itemTax = Number(
+                    roomItem?.tax || roomItem?.TotalTax || 0,
+                  );
+
+                  const roomTotal = Number(
+                    roomItem?.publishedFare ||
+                      roomItem?.TotalFare ||
+                      itemBasePrice + itemTax,
+                  );
 
                   const roomDesc =
                     roomItem.room_description ||
@@ -640,7 +739,7 @@ const HotelDetails = () => {
                           : "bg-white hover:bg-gray-50"
                       }`}
                     >
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_0.8fr_1fr_0.7fr] md:items-start">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.35fr_0.75fr_1fr_0.9fr] md:items-start">
                         <div>
                           <div className="flex items-start gap-2">
                             <input
@@ -721,6 +820,7 @@ const HotelDetails = () => {
                                       <span>
                                         From {policy.FromDate || "N/A"}
                                       </span>
+
                                       <span
                                         className={
                                           Number(
@@ -744,9 +844,12 @@ const HotelDetails = () => {
                           )}
                         </div>
 
-                        <div className="text-right text-sm font-bold text-[#18558a]">
-                          <p>Off : ₹ {formatPrice(roomItem.price)}</p>
-                          <p>Pub : ₹ {formatPrice(roomTotal)}</p>
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-right text-sm font-bold text-[#18558a]">
+                          <p>Base: ₹ {formatPrice(itemBasePrice)}</p>
+                          <p>Tax: ₹ {formatPrice(itemTax)}</p>
+                          <p className="mt-1 text-base text-[#0f3d66]">
+                            Total: ₹ {formatPrice(roomTotal)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -863,7 +966,7 @@ const HotelDetails = () => {
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <span>Room Price</span>
+              <span>Base Room Price</span>
               <span>₹ {formatPrice(roomPrice)}</span>
             </div>
 
@@ -882,7 +985,7 @@ const HotelDetails = () => {
             </div>
           </div>
 
-          {/* {selectedRoomPolicies.length > 0 && (
+          {selectedRoomPolicies.length > 0 && (
             <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-3">
               <p className="text-xs text-yellow-300 font-semibold">
                 Cancellation
@@ -896,7 +999,7 @@ const HotelDetails = () => {
                   : "Cancellation charges apply as per room policy."}
               </p>
             </div>
-          )} */}
+          )}
 
           <div className="mt-5 rounded-xl border border-gray-800 bg-black/20 p-3">
             <p className="text-xs text-gray-400">Hotel Type</p>
@@ -915,7 +1018,7 @@ const HotelDetails = () => {
           <button
             onClick={handlePreBook}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-gradient-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 disabled:opacity-60 disabled:hover:scale-100 transition"
+            className="mt-6 w-full py-3 rounded-xl font-semibold text-lg bg-linear-to-r from-yellow-400 to-orange-400 text-black hover:scale-105 disabled:opacity-60 disabled:hover:scale-100 transition"
           >
             {loading ? "Processing..." : "Book Now"}
           </button>
