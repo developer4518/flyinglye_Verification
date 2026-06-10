@@ -110,13 +110,12 @@ const HotelBookingSuccess = () => {
     }
   }, [location.state]);
 
-  const roomData = useMemo(() => {
-    return getRoomData(savedData, booking);
-  }, [savedData, booking]);
+  const roomData = useMemo(() => getRoomData(savedData, booking), [
+    savedData,
+    booking,
+  ]);
 
-  const hotelResult = useMemo(() => {
-    return getHotelResult(savedData);
-  }, [savedData]);
+  const hotelResult = useMemo(() => getHotelResult(savedData), [savedData]);
 
   const roomName = useMemo(() => {
     const name =
@@ -206,6 +205,7 @@ const HotelBookingSuccess = () => {
     0;
 
   const offeredRate = roomData?.TotalFare || netAmount;
+
   const publishedRate =
     roomData?.PublishedPrice ||
     roomData?.PublishedFare ||
@@ -216,10 +216,6 @@ const HotelBookingSuccess = () => {
   const tds = booking?.TDS || booking?.Tds || 0;
   const commission = booking?.Commission || booking?.CommEarned || 0;
   const gst = booking?.TotalGSTAmount || booking?.GST || 0;
-
-  const leadGuest =
-    guestDetails?.find((g) => g.LeadPassenger || g.IsLeadPax) ||
-    guestDetails?.[0];
 
   const adultCount = guestDetails.filter(
     (g) => Number(g.PaxType) === 1 || Number(g.Age) >= 12,
@@ -279,7 +275,7 @@ const HotelBookingSuccess = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-700">
+      <div className="min-h-screen bg-[var(--bg-main)] flex items-center justify-center text-[var(--gold-soft)] font-[var(--font-body)]">
         Loading booking...
       </div>
     );
@@ -287,14 +283,14 @@ const HotelBookingSuccess = () => {
 
   if (!booking) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
-        <h2 className="text-2xl font-bold text-red-600 mb-4">
+      <div className="min-h-screen bg-[var(--bg-main)] flex flex-col items-center justify-center p-6 text-center font-[var(--font-body)]">
+        <h2 className="text-2xl font-bold text-red-400 mb-4">
           Booking not found
         </h2>
 
         <button
           onClick={() => navigate("/")}
-          className="px-6 py-3 rounded-lg bg-blue-700 text-white font-semibold"
+          className="px-6 py-3 rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black font-bold shadow-lg"
         >
           Go Home
         </button>
@@ -303,55 +299,51 @@ const HotelBookingSuccess = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#eef2f8] text-slate-900 py-6 px-3 md:px-8">
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-16 px-3 md:px-8 font-[var(--font-body)]">
       <div className="max-w-7xl mx-auto">
         {/* TOP HEADER */}
-        <div className="bg-white border border-slate-200 rounded-t-lg overflow-hidden">
-          <div className="bg-[#e8edf7] px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <h1 className="text-xl font-bold text-[#2b5f93]">
-              ☰ Booking Details
+        <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-2xl shadow-black/30">
+          <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-[var(--border-soft)]">
+            <h1 className="text-2xl font-bold text-[var(--gold-main)] font-[var(--font-heading)] tracking-wide">
+              Booking Details
             </h1>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 bg-[#21608f] text-white rounded font-semibold text-sm"
-              >
+              <GoldButton onClick={() => navigate(-1)}>
                 &lt;&lt; Back To Queue
-              </button>
+              </GoldButton>
 
-              <button
-                onClick={handleVoucherClick}
-                className="px-4 py-2 bg-[#21608f] text-white rounded font-semibold text-sm"
-              >
-                View Voucher
-              </button>
+              <GoldButton onClick={handleVoucherClick}>View Voucher</GoldButton>
 
-              <button className="px-4 py-2 bg-green-600 text-white rounded font-semibold text-sm">
+              <button className="px-4 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 transition">
                 WhatsApp
               </button>
             </div>
           </div>
 
-          <div className="px-4 py-5 flex flex-col md:flex-row justify-between gap-4">
+          <div className="px-5 py-6 flex flex-col md:flex-row justify-between gap-4">
             <div>
-              <p className="inline-block bg-[#2b69aa] text-white px-2 py-1 font-bold rounded text-sm">
+              <p className="inline-block bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black px-3 py-1.5 font-bold rounded-xl text-sm shadow-lg">
                 FLYINGLYTE1 (Delhi)
               </p>
               <br />
-              <p className="inline-block mt-1 bg-[#2b69aa] text-white px-2 py-1 font-bold rounded text-sm">
+              <p className="inline-block mt-2 border border-[var(--gold-dark)] text-[var(--gold-soft)] px-3 py-1.5 font-bold rounded-xl text-sm">
                 Delhi
               </p>
             </div>
 
-            <div className="text-sm md:text-right">
+            <div className="text-sm md:text-right text-[var(--text-muted)]">
               <p>
                 TBO Confirmation No :{" "}
-                <span className="text-[#2b69aa] font-semibold">
+                <span className="text-[var(--gold-soft)] font-bold">
                   {booking?.ConfirmationNo || "N/A"}
                 </span>
               </p>
-              <button className="mt-2 text-[#2b69aa] underline">
+
+              <button
+                onClick={() => navigate("/")}
+                className="mt-2 text-[var(--gold-main)] underline underline-offset-4"
+              >
                 Add Another Item
               </button>
             </div>
@@ -359,22 +351,24 @@ const HotelBookingSuccess = () => {
         </div>
 
         {/* HOTEL SUMMARY */}
-        <div className="bg-[#f5f7fb] border-x border-b border-slate-200 p-4 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+        <div className="mt-5 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center shadow-xl shadow-black/20">
           <div className="lg:col-span-7 flex gap-4">
-            <div className="w-28 h-24 bg-slate-200 rounded flex items-center justify-center text-5xl text-slate-400 shrink-0">
+            <div className="w-28 h-24 bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl flex items-center justify-center text-5xl text-[var(--gold-dark)] shrink-0">
               🛏️
             </div>
 
             <div>
-              <h2 className="text-lg font-bold text-[#2b5f93]">
+              <h2 className="text-xl font-bold text-[var(--gold-main)] font-[var(--font-heading)]">
                 {hotel?.hotel_name ||
                   hotel?.HotelName ||
                   booking?.HotelName ||
                   "Hotel"}
-                <span className="ml-2 text-yellow-500 text-sm">★★★</span>
+                <span className="ml-2 text-[var(--color-start)] text-sm">
+                  ★★★
+                </span>
               </h2>
 
-              <p className="text-sm text-slate-700 mt-1">
+              <p className="text-sm text-[var(--text-muted)] mt-2 leading-relaxed">
                 {hotel?.address ||
                   hotel?.Address ||
                   booking?.HotelAddress ||
@@ -384,26 +378,28 @@ const HotelBookingSuccess = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-3 text-sm lg:text-right">
+          <div className="lg:col-span-3 text-sm lg:text-right text-[var(--text-muted)] space-y-1">
             <p>
               Check In :{" "}
-              <span className="font-bold">{formatDate(checkIn)}</span>
+              <span className="font-bold text-white">{formatDate(checkIn)}</span>
             </p>
             <p>
               Check Out :{" "}
-              <span className="font-bold">{formatDate(checkOut)}</span>
+              <span className="font-bold text-white">{formatDate(checkOut)}</span>
             </p>
             <p>
-              No. of Nights: <span className="font-bold">{nights}</span>
+              No. of Nights:{" "}
+              <span className="font-bold text-white">{nights}</span>
             </p>
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden text-center">
-              <div className="bg-green-100 text-green-700 font-bold py-3">
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-soft)] overflow-hidden text-center">
+              <div className="bg-green-500/15 text-green-400 font-bold py-3 border-b border-green-500/20">
                 {booking?.HotelBookingStatus || "Vouchered"}
               </div>
-              <div className="text-red-500 py-3 text-sm">
+
+              <div className="text-[var(--gold-soft)] py-3 text-sm">
                 {changeLoading
                   ? "Request Sending..."
                   : changeMsg
@@ -414,31 +410,36 @@ const HotelBookingSuccess = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
           {/* LEFT CONTENT */}
-          <div className="lg:col-span-9 space-y-4">
+          <div className="lg:col-span-9 space-y-5">
             {/* ROOM DETAILS */}
-            <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <SectionCard>
               <SectionTitle icon="🛏️" title="Room Details" />
 
-              <div className="p-4">
+              <div className="p-5">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className="md:col-span-1 font-bold">Room 1</div>
+                  <div className="md:col-span-1 font-bold text-[var(--gold-soft)]">
+                    Room 1
+                  </div>
 
-                  <div className="md:col-span-8">
-                    <p>{roomName}</p>
-                    <p className="text-sm">Incl: {inclusion}</p>
+                  <div className="md:col-span-8 text-[var(--text-muted)]">
+                    <p className="text-white font-semibold">{roomName}</p>
+                    <p className="text-sm mt-1">Incl: {inclusion}</p>
 
                     {roomPromotion && (
-                      <p className="text-red-500 mt-2">{roomPromotion}</p>
+                      <p className="text-[var(--color-start)] mt-2">
+                        {roomPromotion}
+                      </p>
                     )}
 
                     {supplements.length > 0 && (
                       <div className="mt-3">
-                        <p className="font-semibold text-sm text-slate-700">
+                        <p className="font-semibold text-sm text-[var(--gold-soft)]">
                           Supplements
                         </p>
-                        <ul className="list-disc pl-5 text-sm text-slate-600">
+
+                        <ul className="list-disc pl-5 text-sm text-[var(--text-muted)] mt-1">
                           {supplements.map((item, index) => (
                             <li key={index}>
                               {item?.Description ||
@@ -453,27 +454,29 @@ const HotelBookingSuccess = () => {
                   </div>
 
                   <div className="md:col-span-3 text-right text-sm">
-                    <p className="font-semibold">
+                    <p className="font-semibold text-white">
                       👤 {adultCount || 1} Adult(s)
                       {childCount > 0 ? `, ${childCount} Child` : ""}
                     </p>
 
-                    <button className="mt-4 text-[#2b69aa] underline">
+                    <button className="mt-4 text-[var(--gold-main)] underline underline-offset-4">
                       Show Room Description(+)
                     </button>
                   </div>
                 </div>
               </div>
-            </section>
+            </SectionCard>
 
             {/* GUEST DETAILS */}
-            <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <SectionCard>
               <SectionTitle icon="🪪" title="Guest Details" />
 
-              <div className="p-4">
+              <div className="p-5">
                 <div className="flex justify-between gap-4">
                   <div>
-                    <p className="font-bold mb-2">Room 1</p>
+                    <p className="font-bold mb-2 text-[var(--gold-soft)]">
+                      Room 1
+                    </p>
 
                     {guestDetails.length > 0 ? (
                       guestDetails.map((g, i) => (
@@ -481,7 +484,7 @@ const HotelBookingSuccess = () => {
                           key={i}
                           className="grid grid-cols-1 md:grid-cols-12 gap-2 py-1 text-sm"
                         >
-                          <p className="md:col-span-3 text-[#2b69aa] font-semibold">
+                          <p className="md:col-span-3 text-[var(--gold-main)] font-semibold">
                             {Number(g.PaxType) === 2 ||
                             String(g.Title).toLowerCase().includes("mstr") ||
                             String(g.Title).toLowerCase().includes("miss")
@@ -492,7 +495,7 @@ const HotelBookingSuccess = () => {
                               : i + 1}
                           </p>
 
-                          <p className="md:col-span-9 font-bold">
+                          <p className="md:col-span-9 font-bold text-white">
                             {g.Title ? `${g.Title}. ` : ""}
                             {g.FirstName || g.firstName || ""}{" "}
                             {g.LastName || g.lastName || ""}
@@ -500,50 +503,51 @@ const HotelBookingSuccess = () => {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-[var(--text-muted)]">
                         No guest details available
                       </p>
                     )}
                   </div>
 
-                  <button className="text-[#2b69aa] underline text-sm h-fit">
+                  <button className="text-[var(--gold-main)] underline underline-offset-4 text-sm h-fit">
                     Show Pax Details
                   </button>
                 </div>
               </div>
-            </section>
+            </SectionCard>
 
             {/* CANCELLATION CHARGES */}
-            <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <SectionCard>
               <SectionTitle icon="🕘" title="Cancellation Charges" />
 
-              <div className="p-4">
-                <p className="font-bold mb-4">Room 1 : {roomName}</p>
+              <div className="p-5">
+                <p className="font-bold mb-4 text-white">Room 1 : {roomName}</p>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full border border-slate-200 rounded-lg overflow-hidden text-sm">
-                    <thead className="bg-[#e8edf7] text-slate-700">
+                <div className="overflow-x-auto rounded-2xl border border-[var(--border-soft)]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-[var(--bg-secondary)] text-[var(--gold-soft)]">
                       <tr>
-                        <th className="text-left p-3 border border-slate-200">
+                        <th className="text-left p-3 border border-[var(--border-soft)]">
                           Cancelled on or After
                         </th>
-                        <th className="text-left p-3 border border-slate-200">
+                        <th className="text-left p-3 border border-[var(--border-soft)]">
                           Cancelled on or Before
                         </th>
-                        <th className="text-left p-3 border border-slate-200">
+                        <th className="text-left p-3 border border-[var(--border-soft)]">
                           Cancellation Charges
                         </th>
                       </tr>
                     </thead>
 
-                    <tbody>
+                    <tbody className="text-[var(--text-muted)]">
                       {cancelPolicies.length > 0 ? (
                         cancelPolicies.map((policy, index) => (
                           <tr key={index}>
-                            <td className="p-3 border border-slate-200">
+                            <td className="p-3 border border-[var(--border-soft)]">
                               {formatDate(policy.FromDate || policy.fromDate)}
                             </td>
-                            <td className="p-3 border border-slate-200">
+
+                            <td className="p-3 border border-[var(--border-soft)]">
                               {formatDate(
                                 policy.ToDate ||
                                   policy.toDate ||
@@ -551,7 +555,8 @@ const HotelBookingSuccess = () => {
                                   policy.FromDate,
                               )}
                             </td>
-                            <td className="p-3 border border-slate-200">
+
+                            <td className="p-3 border border-[var(--border-soft)] text-white font-semibold">
                               {policy.ChargeType === "Percentage"
                                 ? `${policy.CancellationCharge}%`
                                 : policy.CancellationCharge === 0
@@ -564,39 +569,41 @@ const HotelBookingSuccess = () => {
                         ))
                       ) : (
                         <tr>
-                          <td className="p-3 border border-slate-200">
+                          <td className="p-3 border border-[var(--border-soft)]">
                             {formatDate(checkIn)}
                           </td>
-                          <td className="p-3 border border-slate-200">
+                          <td className="p-3 border border-[var(--border-soft)]">
                             {formatDate(checkOut)}
                           </td>
-                          <td className="p-3 border border-slate-200">100%</td>
+                          <td className="p-3 border border-[var(--border-soft)] text-white font-semibold">
+                            100%
+                          </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
 
-                <p className="mt-6 text-sm">
-                  <span className="text-red-500 font-semibold">Note:</span>{" "}
+                <p className="mt-6 text-sm text-[var(--text-muted)]">
+                  <span className="text-red-400 font-semibold">Note:</span>{" "}
                   Early check out will attract full cancellation charges unless
                   otherwise specified.
                 </p>
               </div>
-            </section>
+            </SectionCard>
 
             {/* ROOM AMENITIES */}
-            <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <SectionCard>
               <SectionTitle icon="☑️" title="Room Amenities" />
 
-              <div className="p-4 overflow-x-auto">
-                <table className="w-full border border-slate-200 text-sm">
-                  <thead className="bg-[#e8edf7]">
+              <div className="p-5 overflow-x-auto">
+                <table className="w-full border border-[var(--border-soft)] text-sm rounded-2xl overflow-hidden">
+                  <thead className="bg-[var(--bg-secondary)] text-[var(--gold-soft)]">
                     <tr>
-                      <th className="p-3 border border-slate-200 text-left w-28">
+                      <th className="p-3 border border-[var(--border-soft)] text-left w-28">
                         Room
                       </th>
-                      <th className="p-3 border border-slate-200 text-left">
+                      <th className="p-3 border border-[var(--border-soft)] text-left">
                         Amenities
                       </th>
                     </tr>
@@ -604,32 +611,32 @@ const HotelBookingSuccess = () => {
 
                   <tbody>
                     <tr>
-                      <td className="p-3 border border-slate-200 font-bold text-center">
+                      <td className="p-3 border border-[var(--border-soft)] font-bold text-center text-white">
                         Room 1
                       </td>
-                      <td className="p-3 border border-slate-200">
+                      <td className="p-3 border border-[var(--border-soft)] text-[var(--text-muted)] leading-relaxed">
                         {amenities}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-            </section>
+            </SectionCard>
 
             {/* REMARK */}
-            <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <SectionCard>
               <SectionTitle icon="📝" title="Remark" />
 
-              <div className="p-4">
+              <div className="p-5 text-[var(--text-muted)]">
                 {booking?.Remark || booking?.Remarks || "N.a."}
               </div>
-            </section>
+            </SectionCard>
 
             {/* HOTEL NORMS */}
-            <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <SectionCard>
               <SectionTitle icon="📋" title="Hotel Norms" />
 
-              <div className="p-4 text-sm space-y-2">
+              <div className="p-5 text-sm space-y-2 text-[var(--text-muted)]">
                 {hotelNorms.length > 0 ? (
                   hotelNorms.map((norm, index) => (
                     <p key={index}>
@@ -644,51 +651,65 @@ const HotelBookingSuccess = () => {
                   </>
                 )}
               </div>
-            </section>
+            </SectionCard>
           </div>
 
           {/* RIGHT SIDEBAR */}
-          <aside className="lg:col-span-3 space-y-4">
-            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-              <div className="bg-[#bfe3f7] p-4 font-bold">
+          <aside className="lg:col-span-3 space-y-5">
+            <SectionCard>
+              <div className="bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black p-4 font-bold">
                 Need Modification in Booking?
               </div>
 
-              <div className="grid grid-cols-2 gap-3 p-4 text-sm text-slate-600">
-                <button className="text-left hover:text-[#2b69aa]">
+              <div className="grid grid-cols-2 gap-3 p-4 text-sm text-[var(--text-muted)]">
+                <button className="text-left hover:text-[var(--gold-main)] transition">
                   👤 Amendments
                 </button>
-                <button className="text-left hover:text-[#2b69aa]">
+
+                <button className="text-left hover:text-[var(--gold-main)] transition">
                   ★ Special Requests
                 </button>
+
                 <button
                   onClick={handleChangeRequest}
-                  className="text-left hover:text-red-600"
+                  className="text-left hover:text-red-400 transition"
                 >
                   ✖ Cancel Booking
                 </button>
-                <button className="text-left hover:text-[#2b69aa]">
+
+                <button className="text-left hover:text-[var(--gold-main)] transition">
                   ? Other Queries
                 </button>
               </div>
 
-              <div className="border-t border-slate-200 p-4">
-                <p className="font-bold text-sm mb-3">Raised Request</p>
-                <p className="text-sm text-[#2b69aa]">
+              <div className="border-t border-[var(--border-soft)] p-4">
+                <p className="font-bold text-sm mb-3 text-white">
+                  Raised Request
+                </p>
+
+                <p className="text-sm text-[var(--gold-main)]">
                   {changeMsg || "No tickets found for the given booking"}
                 </p>
               </div>
+            </SectionCard>
+
+            <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl p-4 font-semibold text-white shadow-xl shadow-black/20">
+              📞 Call us at:{" "}
+              <a
+                href="tel:+919876543210"
+                className="text-[var(--gold-main)] hover:underline"
+              >
+                +919876543210
+              </a>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-lg p-4 font-semibold">
-              📞 Call us at: +919876543210
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-              <div className="bg-[#dce5f7] p-4 font-bold">Sale Summary</div>
+            <SectionCard>
+              <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] p-4 font-bold text-[var(--gold-main)] border-b border-[var(--border-soft)]">
+                Sale Summary
+              </div>
 
               <div className="p-4 text-sm space-y-3">
-                <p className="font-bold">{roomName}</p>
+                <p className="font-bold text-white">{roomName}</p>
 
                 <SummaryRow
                   label="Rate (Published)"
@@ -700,41 +721,41 @@ const HotelBookingSuccess = () => {
                   value={formatMoney(offeredRate)}
                 />
 
-                <button className="block ml-auto text-[#2b69aa] underline text-xs">
+                <button className="block ml-auto text-[var(--gold-main)] underline underline-offset-4 text-xs">
                   Rate Breakup
                 </button>
 
                 <SummaryRow label="No. of Rooms" value="1" />
 
-                <div className="border-t pt-3">
+                <div className="border-t border-[var(--border-soft)] pt-3">
                   <SummaryRow
                     label="Total"
                     value={formatMoney(offeredRate)}
                     bold
                   />
 
-                  <p className="text-xs text-slate-500">
-                    ({Math.round(Number(offeredRate || 0)).toLocaleString(
+                  <p className="text-xs text-[var(--text-muted)]">
+                    (
+                    {Math.round(Number(offeredRate || 0)).toLocaleString(
                       "en-IN",
                     )}{" "}
                     X 1)
                   </p>
                 </div>
 
-                <SummaryRow label="Comm. Earned" value={formatMoney(commission)} />
+                <SummaryRow
+                  label="Comm. Earned"
+                  value={formatMoney(commission)}
+                />
                 <SummaryRow label="TDS" value={formatMoney(tds)} />
 
                 {tax > 0 && <SummaryRow label="Tax" value={formatMoney(tax)} />}
 
-                <div className="bg-[#e8edf7] -mx-4 px-4 py-3">
-                  <SummaryRow
-                    label="Total GST"
-                    value={formatMoney(gst)}
-                    bold
-                  />
+                <div className="bg-[var(--bg-secondary)] -mx-4 px-4 py-3 border-y border-[var(--border-soft)]">
+                  <SummaryRow label="Total GST" value={formatMoney(gst)} bold />
                 </div>
 
-                <div className="bg-[#d5def3] -mx-4 px-4 py-4">
+                <div className="bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] -mx-4 px-4 py-4 text-black">
                   <SummaryRow
                     label="Grand Total"
                     value={formatMoney(netAmount)}
@@ -743,63 +764,58 @@ const HotelBookingSuccess = () => {
                   />
                 </div>
 
-                <button className="text-[#2b69aa] font-bold">
+                <button className="text-[var(--gold-main)] font-bold">
                   + Show Details
                 </button>
               </div>
-            </div>
+            </SectionCard>
           </aside>
         </div>
 
         {/* MESSAGES */}
         {changeMsg && (
-          <div className="mt-5 bg-green-50 border border-green-300 p-4 rounded-lg text-green-700">
+          <div className="mt-5 bg-green-500/10 border border-green-500/30 p-4 rounded-2xl text-green-400">
             {changeMsg}
           </div>
         )}
 
         {changeError && (
-          <div className="mt-5 bg-red-50 border border-red-300 p-4 rounded-lg text-red-700">
+          <div className="mt-5 bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-red-400">
             {changeError}
           </div>
         )}
 
         {/* BOTTOM ACTIONS */}
         <div className="mt-8 flex flex-wrap justify-end gap-4">
-          <button
-            onClick={handleInvoiceClick}
-            className="px-6 py-3 rounded bg-[#21608f] text-white font-bold"
-          >
-            View Invoice
-          </button>
+          <GoldButton onClick={handleInvoiceClick}>View Invoice</GoldButton>
 
-          <button
+          <GoldButton
             onClick={() => {
               setViewLoading(true);
               navigate(`/booking-details/${booking.BookingId}`);
             }}
-            className="px-6 py-3 rounded bg-[#21608f] text-white font-bold"
           >
             {viewLoading ? "Loading..." : "View Voucher"}
-          </button>
-
-          <button
-            onClick={() => navigate("/")}
-            className="px-6 py-3 rounded bg-[#21608f] text-white font-bold"
-          >
-            Add Another Item
-          </button>
+          </GoldButton>
         </div>
       </div>
     </div>
   );
 };
 
+const SectionCard = ({ children }) => {
+  return (
+    <section className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-xl shadow-black/20">
+      {children}
+    </section>
+  );
+};
+
 const SectionTitle = ({ icon, title }) => {
   return (
-    <div className="bg-[#e8edf7] px-4 py-3 font-bold text-[#2b5f93] flex items-center gap-2">
+    <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-4 font-bold text-[var(--gold-main)] flex items-center gap-2 border-b border-[var(--border-soft)]">
       <span>{icon}</span>
-      <span>{title}</span>
+      <span className="font-[var(--font-heading)] tracking-wide">{title}</span>
     </div>
   );
 };
@@ -808,12 +824,23 @@ const SummaryRow = ({ label, value, bold = false, large = false }) => {
   return (
     <div
       className={`flex justify-between gap-4 ${
-        bold ? "font-bold" : ""
+        bold ? "font-bold text-white" : "text-[var(--text-muted)]"
       } ${large ? "text-base" : ""}`}
     >
       <span>{label}</span>
       <span>{value}</span>
     </div>
+  );
+};
+
+const GoldButton = ({ children, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="px-4 py-2 rounded-xl bg-linear-to-r from-start to-end text-black font-bold text-sm shadow-lg shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition"
+    >
+      {children}
+    </button>
   );
 };
 
