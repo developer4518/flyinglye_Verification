@@ -639,7 +639,7 @@ const HotelBooking = () => {
 
       setGuestDetails(guestsForStorage);
 
-      navigate("/review-booking", {
+      navigate("/hotel-review-booking", {
         state: reviewBookingData,
       });
     } catch (err) {

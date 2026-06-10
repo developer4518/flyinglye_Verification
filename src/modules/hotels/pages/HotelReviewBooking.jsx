@@ -5,7 +5,7 @@ import { useState } from "react";
 import { privateApi } from "../../../services/api";
 import { useHotelStore } from "../../../store/hotelStore";
 
-const ReviewBooking = () => {
+const HotelReviewBooking = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { setGuestDetails } = useHotelStore();
@@ -502,4 +502,4 @@ const ReviewBooking = () => {
   );
 };
 
-export default ReviewBooking;
+export default HotelReviewBooking;
