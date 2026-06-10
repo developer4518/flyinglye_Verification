@@ -15,7 +15,17 @@ const HotelBooking = () => {
 
   const { hotel, preBook, checkIn, checkOut, guests } = payload;
 
-  const roomData = preBook?.raw?.HotelResult?.[0]?.Rooms?.[0];
+  const roomData =
+    preBook?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
+    preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
+    preBook?.room ||
+    {};
+
+  const hotelResult =
+    preBook?.raw?.HotelResult?.[0] ||
+    preBook?.raw?.Response?.HotelResult?.[0] ||
+    {};
+
   const validation = preBook?.validation || {};
 
   const bookingCode =
@@ -27,6 +37,146 @@ const HotelBooking = () => {
     preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode;
 
   const net = Number(preBook?.net_amount || preBook?.NetAmount || 0);
+
+  const parseDateValue = (value) => {
+    if (!value) return null;
+
+    const datePart = String(value).split(" ")[0].trim();
+    const parts = datePart.split("-");
+
+    if (parts.length === 3) {
+      const [a, b, c] = parts;
+
+      // YYYY-MM-DD
+      if (a.length === 4) {
+        const date = new Date(Number(a), Number(b) - 1, Number(c));
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+
+      // DD-MM-YYYY
+      if (c.length === 4) {
+        const date = new Date(Number(c), Number(b) - 1, Number(a));
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+    }
+
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const formatDate = (value) => {
+    const date = parseDateValue(value);
+
+    if (!date) return value || "-";
+
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const addDays = (date, days) => {
+    if (!date) return null;
+
+    const updatedDate = new Date(date);
+    updatedDate.setDate(updatedDate.getDate() + days);
+    return updatedDate;
+  };
+
+  const cancellationPoliciesRaw =
+    roomData?.CancelPolicies ||
+    preBook?.raw?.HotelResult?.[0]?.Rooms?.[0]?.CancelPolicies ||
+    preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.CancelPolicies ||
+    [];
+
+  const cancellationPolicies = Array.isArray(cancellationPoliciesRaw)
+    ? cancellationPoliciesRaw
+    : [];
+
+  const getPolicyBeforeDate = (policy, index) => {
+    if (
+      policy?.ToDate ||
+      policy?.To ||
+      policy?.CancelledOnOrBefore ||
+      policy?.CancelTillDate
+    ) {
+      return (
+        policy?.ToDate ||
+        policy?.To ||
+        policy?.CancelledOnOrBefore ||
+        policy?.CancelTillDate
+      );
+    }
+
+    const nextPolicy = cancellationPolicies[index + 1];
+
+    if (nextPolicy?.FromDate) {
+      const nextFromDate = parseDateValue(nextPolicy.FromDate);
+      const previousDate = addDays(nextFromDate, -1);
+
+      if (previousDate) return previousDate;
+    }
+
+    return checkOut || policy?.FromDate;
+  };
+
+  const roomAmenitiesRaw =
+    roomData?.Amenities ||
+    roomData?.RoomAmenities ||
+    roomData?.RoomPromotion ||
+    hotelResult?.Amenities ||
+    hotel?.amenities ||
+    hotel?.Amenities ||
+    [];
+
+  const roomAmenities = Array.isArray(roomAmenitiesRaw)
+    ? roomAmenitiesRaw
+        .flatMap((item) =>
+          typeof item === "string" ? item.split(",") : String(item).split(","),
+        )
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : String(roomAmenitiesRaw || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  const hotelNormsRaw =
+    hotel?.HotelNorms ||
+    hotel?.hotelNorms ||
+    hotel?.norms ||
+    hotel?.HotelPolicy ||
+    hotelResult?.HotelNorms ||
+    preBook?.raw?.HotelResult?.[0]?.HotelNorms ||
+    preBook?.raw?.Response?.HotelResult?.[0]?.HotelNorms ||
+    [];
+
+  const hotelNorms = Array.isArray(hotelNormsRaw)
+    ? hotelNormsRaw
+        .flatMap((item) =>
+          typeof item === "string" ? item.split("|") : String(item).split("|"),
+        )
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : String(hotelNormsRaw || "")
+        .split("|")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  const getCancellationChargeText = (policy) => {
+    const charge = Number(policy?.CancellationCharge ?? 0);
+    const type = String(policy?.ChargeType || "").toLowerCase();
+
+    if (type === "percentage") return `${charge}%`;
+
+    if (type === "fixed") {
+      if (charge === 0) return "Free Cancellation";
+      return `₹ ${Math.round(charge)}`;
+    }
+
+    return charge ? String(charge) : "-";
+  };
 
   const isPANRequired =
     Boolean(validation?.PANRequired) ||
@@ -165,11 +315,11 @@ const HotelBooking = () => {
 
   if (!preBook) {
     return (
-      <div className="p-10 text-center text-white bg-[#0B0B0F] min-h-screen">
-        <h2 className="text-xl text-red-400 mb-4">⚠️ Session Expired</h2>
+      <div className="min-h-screen bg-[#0B0B0F] p-10 text-center text-white">
+        <h2 className="mb-4 text-xl text-red-400">⚠️ Session Expired</h2>
         <button
           onClick={() => navigate("/")}
-          className="px-5 py-2 bg-yellow-400 text-black rounded-lg"
+          className="rounded-lg bg-yellow-400 px-5 py-2 text-black"
         >
           Go Home
         </button>
@@ -448,32 +598,171 @@ const HotelBooking = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0B0F] text-white px-4 md:px-10 py-24">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800">
+    <div className="min-h-screen bg-[#0B0B0F] px-4 py-24 text-white md:px-10">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
             <h2 className="text-2xl font-bold text-yellow-400">
               {hotel?.hotel_name || hotel?.HotelName || "Hotel Booking"}
             </h2>
 
-            <p className="text-gray-400 text-sm mt-2">
-              📅 {checkIn} → {checkOut}
+            <p className="mt-2 text-sm text-gray-400">
+              📅 {formatDate(checkIn)} → {formatDate(checkOut)}
             </p>
 
-            <p className="text-gray-400 text-sm mt-1">
-              🛏 {roomData?.Name?.[0] || "Standard Room"}
+            <p className="mt-1 text-sm text-gray-400">
+              🛏{" "}
+              {Array.isArray(roomData?.Name)
+                ? roomData?.Name?.[0]
+                : roomData?.Name || "Standard Room"}
             </p>
 
-            <p className="text-xs mt-3 text-gray-500">
+            <p className="mt-3 text-xs text-gray-500">
               {isPANRequired
                 ? "International / PAN required booking"
                 : "Domestic booking"}
             </p>
           </div>
 
+          {/* Cancellation Charges */}
+          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+            <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
+              <span className="text-yellow-300">🕒</span>
+              <h3 className="font-semibold text-yellow-300">
+                Cancellation Charges
+              </h3>
+            </div>
+
+            <div className="p-5">
+              {cancellationPolicies.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto rounded-xl border border-gray-800">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-[#202432] text-gray-300">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">
+                            Cancelled on or After
+                          </th>
+                          <th className="px-4 py-3 text-left font-semibold">
+                            Cancelled on or Before
+                          </th>
+                          <th className="px-4 py-3 text-left font-semibold">
+                            Cancellation Charges
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody className="divide-y divide-gray-800">
+                        {cancellationPolicies.map((policy, index) => (
+                          <tr key={index} className="text-gray-300">
+                            <td className="px-4 py-3">
+                              {formatDate(policy?.FromDate)}
+                            </td>
+
+                            <td className="px-4 py-3">
+                              {formatDate(getPolicyBeforeDate(policy, index))}
+                            </td>
+
+                            <td
+                              className={`px-4 py-3 font-semibold ${
+                                getCancellationChargeText(policy) ===
+                                "Free Cancellation"
+                                  ? "text-green-300"
+                                  : "text-red-300"
+                              }`}
+                            >
+                              {getCancellationChargeText(policy)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p className="mt-4 text-sm text-gray-400">
+                    <span className="font-semibold text-red-400">Note:</span>{" "}
+                    Early check out may attract full cancellation charges unless
+                    otherwise specified.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  Cancellation policy is not available for this room.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Room Amenities */}
+          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+            <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
+              <span className="text-yellow-300">🛏️</span>
+              <h3 className="font-semibold text-yellow-300">Room Amenities</h3>
+            </div>
+
+            <div className="p-5">
+              {roomAmenities.length > 0 ? (
+                <div className="overflow-hidden rounded-xl border border-gray-800">
+                  <div className="grid grid-cols-1 md:grid-cols-[120px_1fr]">
+                    <div className="bg-[#202432] px-4 py-3 font-semibold text-gray-300 md:border-r md:border-gray-800">
+                      Room
+                    </div>
+
+                    <div className="bg-[#202432] px-4 py-3 font-semibold text-gray-300">
+                      Amenities
+                    </div>
+
+                    <div className="border-t border-gray-800 px-4 py-4 font-semibold text-white md:border-r">
+                      Room 1
+                    </div>
+
+                    <div className="border-t border-gray-800 px-4 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        {roomAmenities.map((amenity, index) => (
+                          <span
+                            key={index}
+                            className="rounded-full border border-gray-700 bg-[#0B0B0F] px-3 py-1.5 text-xs text-gray-300"
+                          >
+                            {amenity}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  Room amenities are not available.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Hotel Norms */}
+          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+            <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
+              <span className="text-yellow-300">📋</span>
+              <h3 className="font-semibold text-yellow-300">Hotel Norms</h3>
+            </div>
+
+            <div className="p-5">
+              {hotelNorms.length > 0 ? (
+                <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-gray-300">
+                  {hotelNorms.map((norm, index) => (
+                    <li key={index}>{norm}</li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  Hotel norms are not available.
+                </p>
+              )}
+            </div>
+          </div>
+
           {isPANRequired && (
-            <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800">
-              <h3 className="text-yellow-300 mb-4">PAN Details</h3>
+            <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
+              <h3 className="mb-4 text-yellow-300">PAN Details</h3>
 
               <input
                 placeholder="Enter Corporate PAN"
@@ -487,7 +776,7 @@ const HotelBooking = () => {
                 }
               />
 
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="mt-2 text-xs text-gray-500">
                 This PAN will be sent as CorporatePAN and passenger PAN.
               </p>
             </div>
@@ -496,17 +785,17 @@ const HotelBooking = () => {
           {guestList.map((guest, index) => (
             <div
               key={index}
-              className="bg-[#15151C] p-6 rounded-2xl border border-gray-800"
+              className="rounded-2xl border border-gray-800 bg-[#15151C] p-6"
             >
-              <h3 className="text-yellow-300 mb-4">
+              <h3 className="mb-4 text-yellow-300">
                 Room {guest.RoomIndex + 1} - Guest {index + 1}{" "}
                 {guest.LeadPassenger && "(Lead)"}{" "}
-                <span className="text-gray-500 text-sm">
+                <span className="text-sm text-gray-500">
                   {guest.PaxType === 1 ? "Adult" : "Child"}
                 </span>
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <select
                   className="input"
                   value={guest.Title}
@@ -553,7 +842,7 @@ const HotelBooking = () => {
                 />
 
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">
+                  <label className="mb-1 block text-xs text-gray-400">
                     {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
                   </label>
 
@@ -604,8 +893,8 @@ const HotelBooking = () => {
           ))}
         </div>
 
-        <div className="bg-[#15151C] p-6 rounded-2xl border border-gray-800 h-fit sticky top-24">
-          <h3 className="text-yellow-300 mb-4 text-lg">Price Summary</h3>
+        <div className="sticky top-24 h-fit rounded-2xl border border-gray-800 bg-[#15151C] p-6">
+          <h3 className="mb-4 text-lg text-yellow-300">Price Summary</h3>
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -615,7 +904,7 @@ const HotelBooking = () => {
 
             <hr className="border-gray-700" />
 
-            <div className="flex justify-between font-bold text-lg">
+            <div className="flex justify-between text-lg font-bold">
               <span>Total</span>
               <span className="text-yellow-400">₹ {Math.round(net)}</span>
             </div>
@@ -624,14 +913,14 @@ const HotelBooking = () => {
           <button
             onClick={handleBookHotel}
             disabled={loading}
-            className="mt-6 w-full py-3 rounded-xl font-semibold bg-linear-to-r from-yellow-400 to-orange-400 text-black disabled:opacity-60"
+            className="mt-6 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 py-3 font-semibold text-black disabled:opacity-60"
           >
             {loading ? "Processing..." : "Proceed to Payment"}
           </button>
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .input {
           background: #0b0b0f;
           border: 1px solid #2a2a2f;

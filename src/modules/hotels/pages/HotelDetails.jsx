@@ -882,21 +882,21 @@ const HotelDetails = () => {
             </div>
           </div>
 
-          {selectedRoomPolicies.length > 0 && (
+          {/* {selectedRoomPolicies.length > 0 && (
             <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-3">
               <p className="text-xs text-yellow-300 font-semibold">
                 Cancellation
               </p>
 
-              {/* <p className="mt-1 text-xs text-gray-300">
+              <p className="mt-1 text-xs text-gray-300">
                 {selectedRoomPolicies.some(
                   (policy) => Number(policy.CancellationCharge || 0) === 0,
                 )
                   ? "Free cancellation available as per room policy."
                   : "Cancellation charges apply as per room policy."}
-              </p> */}
+              </p>
             </div>
-          )}
+          )} */}
 
           <div className="mt-5 rounded-xl border border-gray-800 bg-black/20 p-3">
             <p className="text-xs text-gray-400">Hotel Type</p>
