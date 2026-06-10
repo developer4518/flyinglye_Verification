@@ -494,14 +494,14 @@ const HotelInvoice = () => {
 
   if (!booking || Object.keys(booking).length === 0) {
     return (
-      <div className="min-h-screen bg-[var(--bg-main)] flex flex-col items-center justify-center text-center px-4 font-[var(--font-body)]">
+      <div className="min-h-screen bg-(--bg-main) flex flex-col items-center justify-center text-center px-4 font-(--font-body)">
         <h1 className="text-2xl font-bold text-red-400 mb-4">
           Invoice data not found
         </h1>
 
         <button
           onClick={() => navigate(-1)}
-          className="px-6 py-3 rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black font-bold"
+          className="px-6 py-3 rounded-xl bg-linear-to-r from-start to-end text-black font-bold"
         >
           Go Back
         </button>
@@ -510,7 +510,7 @@ const HotelInvoice = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-24 px-3 md:px-8 font-[var(--font-body)]">
+    <div className="min-h-screen bg-(--bg-main) text-(--text-main) py-24 px-3 md:px-8 font-(--font-body)">
       <style>
         {`
           @media print {
@@ -541,7 +541,7 @@ const HotelInvoice = () => {
         <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="px-5 py-2 rounded-xl border border-[var(--border-soft)] text-[var(--gold-soft)] hover:bg-white/5 transition font-bold"
+            className="px-5 py-2 rounded-xl border border-(--border-soft) text-(--gold-soft) hover:bg-white/5 transition font-bold"
           >
             ← Back To Booking
           </button>
@@ -564,38 +564,38 @@ const HotelInvoice = () => {
         <div
           ref={invoiceRef}
           id="invoice-print-area"
-          className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-2xl shadow-black/30"
+          className="bg-(--bg-card) border border-(--border-soft) rounded-3xl overflow-hidden shadow-2xl shadow-black/30"
         >
-          <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-5 border-b border-[var(--border-soft)] flex flex-col md:flex-row justify-between gap-4">
+          <div className="bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-(--bg-secondary) px-5 py-5 border-b border-(--border-soft) flex flex-col md:flex-row justify-between gap-4">
             <div>
-              <h1 className="font-[var(--font-logo)] text-3xl md:text-4xl tracking-wide">
-                <span className="text-[var(--gold-main)]">FLYING</span>
-                <span className="text-[var(--gold-soft)]">LYTE</span>
+              <h1 className="font-(--font-logo) text-3xl md:text-4xl tracking-wide">
+                <span className="text-(--gold-main)">FLYING</span>
+                <span className="text-(--gold-soft)">LYTE</span>
               </h1>
 
-              <p className="text-[var(--text-muted)] text-sm mt-1">
+              <p className="text-(--text-muted) text-sm mt-1">
                 Hotel Invoice
               </p>
             </div>
 
             <div className="text-sm md:text-right space-y-1">
               <p>
-                <span className="text-[var(--text-muted)]">Invoice No:</span>{" "}
-                <span className="font-bold text-[var(--gold-soft)]">
+                <span className="text-(--text-muted)">Invoice No:</span>{" "}
+                <span className="font-bold text-(--gold-soft)">
                   {invoiceNo}
                 </span>
               </p>
 
               <p>
-                <span className="text-[var(--text-muted)]">Invoice Date:</span>{" "}
+                <span className="text-(--text-muted)">Invoice Date:</span>{" "}
                 <span className="font-bold text-white">
                   {formatDate(invoiceDate)}
                 </span>
               </p>
 
               <p>
-                <span className="text-[var(--text-muted)]">
-                  TBO Confirmation No:
+                <span className="text-(--text-muted)">
+                Confirmation No:
                 </span>{" "}
                 <span className="font-bold text-white">{confirmationNo}</span>
               </p>
@@ -604,25 +604,25 @@ const HotelInvoice = () => {
 
           <div className="p-5 md:p-7">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-[var(--gold-main)] font-[var(--font-heading)]">
+              <h2 className="text-2xl font-var[(--font-heading) text-(--gold-main) font-(--font-heading)">
                 Invoice
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-[var(--border-soft)] pb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-(--border-soft) pb-6">
               <div>
-                <h3 className="text-xl font-bold text-[var(--gold-main)] mb-3">
+                <h3 className="text-xl font-bold text-(--gold-main) mb-3">
                   {companyName}
                 </h3>
 
-                <div className="text-sm text-[var(--text-muted)] leading-relaxed">
+                <div className="text-sm text-(--text-muted) leading-relaxed">
                   <p>{companyAddress}</p>
 
                   <p>
                     <span className="font-bold text-white">Email:</span>{" "}
                     <a
                       href={`mailto:${companyEmail}`}
-                      className="hover:text-[var(--gold-main)]"
+                      className="hover:text-(--gold-main)"
                     >
                       {companyEmail}
                     </a>
@@ -632,7 +632,7 @@ const HotelInvoice = () => {
                     <span className="font-bold text-white">Mobile:</span>{" "}
                     <a
                       href={`tel:+91${companyMobile}`}
-                      className="hover:text-[var(--gold-main)]"
+                      className="hover:text-(--gold-main)"
                     >
                       {companyMobile}
                     </a>
@@ -644,7 +644,7 @@ const HotelInvoice = () => {
                       href={companyWebsite}
                       target="_blank"
                       rel="noreferrer"
-                      className="hover:text-[var(--gold-main)]"
+                      className="hover:text-(--gold-main)"
                     >
                       {companyWebsite}
                     </a>
@@ -655,11 +655,11 @@ const HotelInvoice = () => {
               </div>
 
               <div className="md:text-right">
-                <h3 className="text-xl font-bold text-[var(--gold-main)] mb-3">
+                <h3 className="text-xl font-bold text-(--gold-main) mb-3">
                   Invoice To
                 </h3>
 
-                <div className="text-sm text-[var(--text-muted)] leading-relaxed">
+                <div className="text-sm text-(--text-muted) leading-relaxed">
                   <p className="text-white font-bold">{invoiceToName}</p>
 
                   {invoiceToAddress !== "N/A" && <p>{invoiceToAddress}</p>}
@@ -685,35 +685,35 @@ const HotelInvoice = () => {
               </div>
             </div>
 
-            <div className="mt-6 overflow-x-auto rounded-2xl border border-[var(--border-soft)]">
-              <table className="w-full text-sm min-w-[900px]">
-                <thead className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] text-[var(--gold-soft)]">
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-(--border-soft)">
+              <table className="w-full text-sm min-w-225">
+                <thead className="bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-[var(--bg-secondary)] text-(--gold-soft)">
                   <tr>
-                    <th className="p-3 text-left border border-[var(--border-soft)]">
+                    <th className="p-3 text-left border border-(--border-soft)">
                       Hotel Name
                     </th>
-                    <th className="p-3 text-left border border-[var(--border-soft)]">
+                    <th className="p-3 text-left border border-(--border-soft)">
                       Room Type
                     </th>
-                    <th className="p-3 text-left border border-[var(--border-soft)]">
+                    <th className="p-3 text-left border border-(--border-soft)">
                       PAX Name
                     </th>
-                    <th className="p-3 text-center border border-[var(--border-soft)]">
+                    <th className="p-3 text-center border border-(--border-soft)">
                       Rooms
                     </th>
-                    <th className="p-3 text-center border border-[var(--border-soft)]">
+                    <th className="p-3 text-center border border-(--border-soft)">
                       Nights
                     </th>
-                    <th className="p-3 text-right border border-[var(--border-soft)]">
+                    <th className="p-3 text-right border border-(--border-soft)">
                       Rate
                     </th>
-                    <th className="p-3 text-right border border-[var(--border-soft)]">
+                    <th className="p-3 text-right border border-(--border-soft)">
                       Tax
                     </th>
-                    <th className="p-3 text-right border border-[var(--border-soft)]">
+                    <th className="p-3 text-right border border-(--border-soft)">
                       Service Charges
                     </th>
-                    <th className="p-3 text-center border border-[var(--border-soft)]">
+                    <th className="p-3 text-center border border-(--border-soft)">
                       Currency
                     </th>
                   </tr>
@@ -721,39 +721,39 @@ const HotelInvoice = () => {
 
                 <tbody>
                   <tr className="text-white">
-                    <td className="p-3 border border-[var(--border-soft)]">
+                    <td className="p-3 border border-(--border-soft)">
                       {hotelName}
                     </td>
 
-                    <td className="p-3 border border-[var(--border-soft)]">
+                    <td className="p-3 border border-(--border-soft)">
                       {roomName}
                     </td>
 
-                    <td className="p-3 border border-[var(--border-soft)]">
+                    <td className="p-3 border border-(--border-soft)">
                       {guestName}
                     </td>
 
-                    <td className="p-3 text-center border border-[var(--border-soft)]">
+                    <td className="p-3 text-center border border-(--border-soft)">
                       {rooms}
                     </td>
 
-                    <td className="p-3 text-center border border-[var(--border-soft)]">
+                    <td className="p-3 text-center border border-(--border-soft)">
                       {nights}
                     </td>
 
-                    <td className="p-3 text-right border border-[var(--border-soft)]">
+                    <td className="p-3 text-t border border(--border-soft)">
                       {formatAmount(rate || gross)}
                     </td>
 
-                    <td className="p-3 text-right border border-[var(--border-soft)]">
+                    <td className="p-3 text-right border border-(--border-soft)">
                       {formatAmount(tax)}
                     </td>
 
-                    <td className="p-3 text-right border border-[var(--border-soft)]">
+                    <td className="p-3 text-right border border-(--border-soft)">
                       {formatAmount(serviceCharges)}
                     </td>
 
-                    <td className="p-3 text-center border border-[var(--border-soft)]">
+                    <td className="p-3 text-center border border-(--border-soft)">
                       {currency}
                     </td>
                   </tr>

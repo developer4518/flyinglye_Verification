@@ -459,7 +459,7 @@ Check Out: ${formatDate(checkOut)}`,
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] py-10 md:py-24 px-3 font-[var(--font-body)] text-[var(--text-main)]">
+    <div className="min-h-screen bg-(--bg-main) py-10 md:py-24 px-3 font-(--font-body) text-(--text-main)">
       <style>
         {`
           .voucher-wrapper {
@@ -802,10 +802,10 @@ Check Out: ${formatDate(checkOut)}`,
 
           <div className="voucher-actions no-print">
             <button onClick={handleEmail}>Email Voucher</button>
-            <span className="text-[var(--text-muted)]">|</span>
+            <span className="text-(--text-muted)">|</span>
 
             <button onClick={handlePrint}>Print Voucher</button>
-            <span className="text-[var(--text-muted)]">|</span>
+            <span className="text-(--text-muted)">|</span>
 
             <button onClick={handleGeneratePdf} disabled={pdfLoading}>
               {pdfLoading ? "Generating..." : "Generate PDF 🧾"}
@@ -1069,7 +1069,7 @@ Check Out: ${formatDate(checkOut)}`,
         )}
       </div>
 
-      <div className="no-print max-w-[1050px] mx-auto mt-5 flex justify-end">
+      <div className="no-print max-w-262.5 mx-auto mt-5 flex justify-end">
         <button onClick={() => navigate(-1)} className="back-btn">
           Back
         </button>
