@@ -5,8 +5,11 @@ import { sendHotelChangeRequest } from "../services/sendHotelChangeRequest";
 
 const HotelBookings = () => {
   const queryClient = useQueryClient();
+
   const [activeBookingId, setActiveBookingId] = useState(null);
-  const [message, setMessage] = useState("");
+
+  // Store request result per booking card
+  const [changeRequests, setChangeRequests] = useState({});
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["hotelBookings"],
@@ -15,36 +18,79 @@ const HotelBookings = () => {
 
   const changeRequestMutation = useMutation({
     mutationFn: (bookingId) => sendHotelChangeRequest(bookingId),
+
     onMutate: (bookingId) => {
       setActiveBookingId(bookingId);
-      setMessage("");
+
+      setChangeRequests((prev) => ({
+        ...prev,
+        [bookingId]: {
+          ...prev[bookingId],
+          loading: true,
+          error: "",
+          message: "",
+        },
+      }));
     },
-    onSuccess: (res) => {
-      setMessage(
-        `Change request submitted successfully. Request ID: ${
-          res?.data?.ChangeRequestId || "N/A"
-        }`,
-      );
+
+    onSuccess: (res, bookingId) => {
+      const changeRequestId = res?.data?.ChangeRequestId || "N/A";
+
+      setChangeRequests((prev) => ({
+        ...prev,
+        [bookingId]: {
+          loading: false,
+          sent: true,
+          changeRequestId,
+          message: `Change request submitted successfully. Request ID: ${changeRequestId}`,
+          error: "",
+        },
+      }));
 
       queryClient.invalidateQueries({
         queryKey: ["hotelBookings"],
       });
     },
-    onError: (error) => {
-      setMessage(
-        error?.response?.data?.message ||
-          error?.message ||
-          "Failed to submit change request",
-      );
+
+    onError: (error, bookingId) => {
+      setChangeRequests((prev) => ({
+        ...prev,
+        [bookingId]: {
+          ...prev[bookingId],
+          loading: false,
+          sent: false,
+          changeRequestId: "",
+          message: "",
+          error:
+            error?.response?.data?.message ||
+            error?.message ||
+            "Failed to submit change request",
+        },
+      }));
     },
+
     onSettled: () => {
       setActiveBookingId(null);
     },
   });
 
   const handleSendChangeRequest = (bookingId) => {
-    if (!bookingId) {
-      setMessage("Booking ID not found");
+    if (!bookingId) return;
+
+    const existingRequest = changeRequests[bookingId];
+
+    if (existingRequest?.sent) {
+      setChangeRequests((prev) => ({
+        ...prev,
+        [bookingId]: {
+          ...prev[bookingId],
+          message: `You already sent a change request. Request ID: ${
+            existingRequest.changeRequestId || "N/A"
+          }`,
+          error: "",
+        },
+      }));
+
       return;
     }
 
@@ -73,29 +119,17 @@ const HotelBookings = () => {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h2 className="text-xl sm:text-2xl font-semibold text-white">
-          My Bookings
-        </h2>
-
-        {message && (
-          <div
-            className={`text-sm px-4 py-2 rounded-xl border ${
-              message.toLowerCase().includes("failed") ||
-              message.toLowerCase().includes("not found")
-                ? "bg-red-500/10 text-red-300 border-red-500/20"
-                : "bg-green-500/10 text-green-300 border-green-500/20"
-            }`}
-          >
-            {message}
-          </div>
-        )}
-      </div>
+      <h2 className="text-xl sm:text-2xl font-semibold text-white mb-6">
+        My Bookings
+      </h2>
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {confirmedBookings.map((b) => {
           const bookingId = b.booking_id;
+          const requestInfo = changeRequests[bookingId];
+
           const isSubmitting = activeBookingId === bookingId;
+          const alreadySent = requestInfo?.sent;
 
           return (
             <div
@@ -212,22 +246,49 @@ const HotelBookings = () => {
                 )}
               </div>
 
+              {/* Card Message */}
+              {(requestInfo?.message || requestInfo?.error) && (
+                <div
+                  className={`rounded-xl px-3 py-2 text-xs border ${
+                    requestInfo?.error
+                      ? "bg-red-500/10 text-red-300 border-red-500/20"
+                      : alreadySent
+                        ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/20"
+                        : "bg-green-500/10 text-green-300 border-green-500/20"
+                  }`}
+                >
+                  {requestInfo?.error || requestInfo?.message}
+                </div>
+              )}
+
               {/* Footer Button */}
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={() => handleSendChangeRequest(bookingId)}
                   disabled={isSubmitting || !bookingId}
-                  className="w-full rounded-xl bg-red-500/90 hover:bg-red-500 
+                  className={`w-full rounded-xl 
                   disabled:opacity-60 disabled:cursor-not-allowed 
                   text-white text-sm font-semibold px-4 py-3 
-                  transition-all duration-300 shadow-lg shadow-red-500/10"
+                  transition-all duration-300 shadow-lg ${
+                    alreadySent
+                      ? "bg-yellow-500/90 hover:bg-yellow-500 shadow-yellow-500/10"
+                      : "bg-red-500/90 hover:bg-red-500 shadow-red-500/10"
+                  }`}
                 >
-                  {isSubmitting ? "Sending Request..." : "Send Change Request"}
+                  {isSubmitting
+                    ? "Sending Request..."
+                    : alreadySent
+                      ? "Request Already Sent"
+                      : "Send Change Request"}
                 </button>
 
                 <p className="text-[11px] text-gray-500 mt-2 text-center">
-                  This will submit a hotel change/cancellation request.
+                  {alreadySent
+                    ? `Change Request ID: ${
+                        requestInfo?.changeRequestId || "N/A"
+                      }`
+                    : "This will submit a hotel change/cancellation request."}
                 </p>
               </div>
             </div>
