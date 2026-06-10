@@ -899,13 +899,13 @@ const HotelInvoice = () => {
               </div>
             </div>
 
-            <div className="mt-8 bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-5 text-sm text-[var(--text-muted)]">
+            {/* <div className="mt-8 bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-5 text-sm text-[var(--text-muted)]">
               <p className="text-[var(--gold-soft)] font-bold mb-2">Note:</p>
               <p>
                 This is a system generated invoice. Amounts are shown in{" "}
                 {currency} and generated from hotel booking response data.
               </p>
-            </div>
+            </div> */}
 
             <div className="no-print mt-6 flex flex-wrap justify-end gap-4">
               <button
@@ -940,7 +940,7 @@ const InvoiceActionButton = ({ children, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] text-black font-bold text-sm shadow-lg shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition"
+      className="px-4 py-2 rounded-xl bg-linear-to-r from-[var(--color-start)] to-[var(--color-end)] text-black font-bold text-sm shadow-lg shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition"
     >
       {children}
     </button>
