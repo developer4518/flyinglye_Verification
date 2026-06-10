@@ -790,9 +790,7 @@ const HotelBooking = () => {
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">➕</span>
-              <h3 className="font-semibold text-yellow-300">
-                Supplements / Extra Charges
-              </h3>
+              <h3 className="font-semibold text-yellow-300">Supplements</h3>
             </div>
 
             <div className="p-5">
@@ -884,7 +882,7 @@ const HotelBooking = () => {
                   {rateConditions.map((condition, index) => (
                     <li
                       key={index}
-                      className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300"
+                      className="rounded-xl border border-white/10 bg-white/3 p-3 text-gray-300"
                       dangerouslySetInnerHTML={{
                         __html: String(condition || "")
                           .replaceAll("&lt;", "<")
