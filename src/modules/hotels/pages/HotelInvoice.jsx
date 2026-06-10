@@ -28,9 +28,17 @@ const formatDate = (dateValue) => {
 
 const formatMoney = (value) => {
   const amount = Number(value || 0);
+
   return `₹ ${amount.toLocaleString("en-IN", {
     maximumFractionDigits: 2,
   })}`;
+};
+
+const formatAmount = (value) => {
+  return Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 const getNights = (checkIn, checkOut) => {
@@ -47,16 +55,71 @@ const getNights = (checkIn, checkOut) => {
   return diff > 0 ? diff : 1;
 };
 
-const getRoomData = (saved, bookingData) => {
+const getNestedBooking = (data) => {
+  return (
+    data?.data?.Response ||
+    data?.data?.Data ||
+    data?.data ||
+    data?.Response ||
+    data?.Data ||
+    data
+  );
+};
+
+const getRoomData = (saved, booking) => {
   return (
     saved?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
     saved?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
     saved?.prebookData?.room ||
     saved?.selectedRoom ||
     saved?.room ||
-    bookingData?.HotelRoomsDetails?.[0] ||
+    booking?.HotelRoomsDetails?.[0] ||
+    booking?.HotelRoomsDetail?.[0] ||
+    booking?.Rooms?.[0] ||
     {}
   );
+};
+
+const getHotelData = (saved, booking, locationHotel) => {
+  return (
+    locationHotel ||
+    saved?.hotel ||
+    booking?.HotelDetails ||
+    booking?.HotelDetail ||
+    booking?.Hotel ||
+    {}
+  );
+};
+
+const getAgencyData = (booking, saved) => {
+  return (
+    booking?.AgencyDetails ||
+    booking?.AgencyDetail ||
+    booking?.AgentDetails ||
+    booking?.AgentDetail ||
+    booking?.InvoiceTo ||
+    booking?.CustomerDetails ||
+    saved?.agencyDetails ||
+    saved?.agentDetails ||
+    {}
+  );
+};
+
+const getSupplierData = (booking) => {
+  return (
+    booking?.SupplierDetails ||
+    booking?.SupplierDetail ||
+    booking?.TboDetails ||
+    booking?.TBOInvoiceDetails ||
+    booking?.InvoiceFrom ||
+    {}
+  );
+};
+
+const getFullName = (guest = {}) => {
+  return `${guest?.Title ? `${guest.Title}. ` : ""}${
+    guest?.FirstName || guest?.firstName || ""
+  } ${guest?.LastName || guest?.lastName || ""}`.trim();
 };
 
 const HotelInvoice = () => {
@@ -67,36 +130,38 @@ const HotelInvoice = () => {
 
   const saved = safeJsonParse(localStorage.getItem("hotelBookingData"), {});
 
-  const bookingData =
+  const rawBookingData =
     location.state?.booking ||
-    saved.bookingResponse?.data ||
-    saved.bookingResponse?.Data ||
-    saved.bookingResponse?.Response ||
-    saved.bookingResponse ||
+    saved?.bookingResponse ||
+    saved?.bookingData ||
     {};
 
-  const booking =
-    bookingData?.data ||
-    bookingData?.Data ||
-    bookingData?.Response ||
-    bookingData ||
-    {};
+  const booking = getNestedBooking(rawBookingData);
 
-  const hotel =
-    location.state?.hotel || saved.hotel || booking?.HotelDetails || {};
+  const savedData = location.state?.savedData || saved || {};
+
+  const hotel = getHotelData(savedData, booking, location.state?.hotel);
 
   const guestDetails =
     location.state?.guestDetails ||
-    saved.guestList ||
+    saved?.guestList ||
     booking?.HotelPassenger ||
+    booking?.HotelPassengers ||
+    booking?.PassengerDetails ||
+    booking?.Passengers ||
     [];
-
-  const savedData = location.state?.savedData || saved || {};
 
   const roomData = useMemo(
     () => getRoomData(savedData, booking),
     [savedData, booking],
   );
+
+  const agencyData = useMemo(
+    () => getAgencyData(booking, savedData),
+    [booking, savedData],
+  );
+
+  const supplierData = useMemo(() => getSupplierData(booking), [booking]);
 
   const roomName = useMemo(() => {
     const name =
@@ -105,72 +170,311 @@ const HotelInvoice = () => {
       roomData?.RoomTypeName ||
       roomData?.RoomType ||
       booking?.HotelRoomsDetails?.[0]?.RoomTypeName ||
+      booking?.HotelRoomsDetail?.[0]?.RoomTypeName ||
       "Room";
 
     return Array.isArray(name) ? name[0] : name;
   }, [roomData, booking]);
 
   const hotelName =
-    hotel?.hotel_name || hotel?.HotelName || booking?.HotelName || "Hotel";
+    hotel?.hotel_name ||
+    hotel?.HotelName ||
+    booking?.HotelName ||
+    booking?.HotelDetails?.HotelName ||
+    "Hotel";
 
   const city =
     hotel?.city ||
     hotel?.CityName ||
+    hotel?.City ||
     booking?.CityName ||
     booking?.HotelCity ||
+    booking?.City ||
     "N/A";
 
   const checkIn =
     savedData?.checkIn ||
     booking?.CheckInDate ||
     booking?.HotelCheckIn ||
-    booking?.CheckIn;
+    booking?.CheckIn ||
+    booking?.CheckInDateTime;
 
   const checkOut =
     savedData?.checkOut ||
     booking?.CheckOutDate ||
     booking?.HotelCheckOut ||
-    booking?.CheckOut;
+    booking?.CheckOut ||
+    booking?.CheckOutDateTime;
 
-  const nights = getNights(checkIn, checkOut);
+  const nights =
+    Number(booking?.NoOfNights || booking?.Nights || roomData?.Nights) ||
+    getNights(checkIn, checkOut);
 
-  const leadGuest = guestDetails?.[0] || {};
+  const rooms =
+    Number(
+      booking?.NoOfRooms ||
+        booking?.Rooms ||
+        booking?.RoomCount ||
+        savedData?.guests?.rooms,
+    ) || 1;
 
-  const guestName = `${leadGuest?.Title ? `${leadGuest.Title}. ` : ""}${
-    leadGuest?.FirstName || leadGuest?.firstName || ""
-  } ${leadGuest?.LastName || leadGuest?.lastName || ""}`.trim();
+  const leadGuest =
+    guestDetails?.find?.((guest) => guest?.LeadPassenger) ||
+    guestDetails?.[0] ||
+    {};
+
+  const guestName =
+    getFullName(leadGuest) ||
+    booking?.GuestName ||
+    booking?.LeadPassengerName ||
+    "N/A";
 
   const invoiceNo =
     booking?.InvoiceNumber ||
     booking?.InvoiceNo ||
+    booking?.InvoiceId ||
+    booking?.InvoiceID ||
+    booking?.HotelInvoiceNo ||
     `MW/2627/${booking?.BookingId || bookingId || "INV"}`;
 
   const invoiceDate =
     booking?.InvoiceDate ||
     booking?.InvoiceCreatedOn ||
     booking?.BookingDate ||
+    booking?.CreatedOn ||
+    booking?.BookedOn ||
     new Date();
 
   const confirmationNo =
     booking?.ConfirmationNo ||
-    booking?.HotelConfirmationNo ||
     booking?.TBOConfirmationNo ||
+    booking?.HotelConfirmationNo ||
+    booking?.ConfirmationNumber ||
+    booking?.BookingRefNo ||
+    booking?.SupplierConfirmationNo ||
     "N/A";
 
-  const netAmount =
-    savedData?.net ||
-    booking?.NetAmount ||
-    booking?.TotalAmount ||
-    booking?.InvoiceAmount ||
-    roomData?.TotalFare ||
-    0;
+  const currency =
+    booking?.Currency ||
+    booking?.HotelCurrency ||
+    roomData?.Currency ||
+    savedData?.currency ||
+    "INR";
 
-  const offeredRate = Number(roomData?.TotalFare || netAmount || 0);
-  const tax = Number(roomData?.TotalTax || booking?.TotalTax || 0);
-  const commission = Number(booking?.Commission || booking?.CommEarned || 0);
-  const tds = Number(booking?.TDS || booking?.Tds || 0);
-  const gst = Number(booking?.TotalGSTAmount || booking?.GST || 0);
-  const netReceivable = Math.round(Number(netAmount || 0));
+  const rate =
+    Number(
+      booking?.Rate ||
+        booking?.RoomRate ||
+        booking?.BaseFare ||
+        booking?.BasePrice ||
+        roomData?.BasePrice ||
+        roomData?.DayRates?.[0]?.[0]?.BasePrice,
+    ) || 0;
+
+  const tax =
+    Number(
+      booking?.Tax ||
+        booking?.TotalTax ||
+        booking?.TaxAmount ||
+        roomData?.TotalTax ||
+        roomData?.Tax,
+    ) || 0;
+
+  const serviceCharges =
+    Number(
+      booking?.ServiceCharge ||
+        booking?.ServiceCharges ||
+        booking?.TransactionFee ||
+        booking?.TransactionFees,
+    ) || 0;
+
+  const gross =
+    Number(
+      booking?.GrossAmount ||
+        booking?.Gross ||
+        booking?.InvoiceAmount ||
+        booking?.TotalAmount ||
+        booking?.NetAmount ||
+        roomData?.TotalFare,
+    ) || 0;
+
+  const commission =
+    Number(
+      booking?.Commission ||
+        booking?.CommEarned ||
+        booking?.CommissionEarned ||
+        booking?.AgencyCommission,
+    ) || 0;
+
+  const tds = Number(booking?.TDS || booking?.Tds || booking?.TDSAmount) || 0;
+
+  const cgst =
+    Number(
+      booking?.CGST ||
+        booking?.CGSTAmount ||
+        booking?.GSTDetails?.CGST ||
+        booking?.GstDetails?.CGST,
+    ) || 0;
+
+  const sgst =
+    Number(
+      booking?.SGST ||
+        booking?.SGSTAmount ||
+        booking?.GSTDetails?.SGST ||
+        booking?.GstDetails?.SGST,
+    ) || 0;
+
+  const igst =
+    Number(
+      booking?.IGST ||
+        booking?.IGSTAmount ||
+        booking?.GSTDetails?.IGST ||
+        booking?.GstDetails?.IGST ||
+        booking?.TotalGSTAmount ||
+        booking?.GST,
+    ) || 0;
+
+  const gstTotal = cgst + sgst + igst;
+
+  const netAmount =
+    Number(
+      booking?.NetAmount ||
+        booking?.NetPayable ||
+        booking?.NetPayableAmount ||
+        booking?.PayableAmount ||
+        booking?.InvoiceAmount ||
+        savedData?.net ||
+        gross,
+    ) || 0;
+
+  const netReceivable =
+    Number(
+      booking?.NetReceivable ||
+        booking?.ReceivableAmount ||
+        booking?.TotalReceivable,
+    ) || Math.round(netAmount || gross || 0);
+
+  const taxableValue =
+    Number(
+      booking?.TaxableValue ||
+        booking?.GSTDetails?.TaxableValue ||
+        booking?.GstDetails?.TaxableValue,
+    ) || 0;
+
+  const sacCode =
+    booking?.SAC ||
+    booking?.SacCode ||
+    booking?.GSTDetails?.SAC ||
+    booking?.GstDetails?.SAC ||
+    "9985";
+
+  const supplierName =
+    supplierData?.CompanyName ||
+    supplierData?.Name ||
+    supplierData?.SupplierName ||
+    booking?.SupplierName ||
+    "TBO Tek Limited";
+
+  const supplierAddress =
+    supplierData?.Address ||
+    booking?.SupplierAddress ||
+    "Regd Office: E-78, South Extn Part-I, New Delhi 110049";
+
+  const supplierCorpAddress =
+    supplierData?.CorporateAddress ||
+    booking?.SupplierCorporateAddress ||
+    "Corp Off: Plot No 728, Udyog Vihar, Phase-V, Gurgaon 122016";
+
+  const supplierEmail =
+    supplierData?.Email ||
+    booking?.SupplierEmail ||
+    "info@travelboutiqueonline.com";
+
+  const supplierWebsite =
+    supplierData?.Website ||
+    booking?.SupplierWebsite ||
+    "www.travelboutiqueonline.com";
+
+  const supplierPhone =
+    supplierData?.Phone ||
+    supplierData?.Mobile ||
+    booking?.SupplierPhone ||
+    "0124-4998999";
+
+  const supplierState =
+    supplierData?.State || booking?.SupplierState || "Haryana";
+
+  const supplierGstin =
+    supplierData?.GSTIN ||
+    supplierData?.GSTNumber ||
+    booking?.SupplierGSTIN ||
+    "06AACCT6259K1ZZ";
+
+  const supplierCin =
+    supplierData?.CIN ||
+    supplierData?.CINNumber ||
+    booking?.SupplierCIN ||
+    "L74999DL2006PLC155233";
+
+  const supplierPan =
+    supplierData?.PAN ||
+    supplierData?.PanNumber ||
+    booking?.SupplierPAN ||
+    "AACCT6259K";
+
+  const agencyName =
+    agencyData?.AgencyName ||
+    agencyData?.CompanyName ||
+    agencyData?.Name ||
+    booking?.AgencyName ||
+    booking?.IssuedBy ||
+    "FLYINGLYTE1";
+
+  const ownerName =
+    agencyData?.OwnerName ||
+    agencyData?.ContactPerson ||
+    booking?.OwnerName ||
+    booking?.CustomerName ||
+    "";
+
+  const agencyCity =
+    agencyData?.City || agencyData?.city || booking?.AgencyCity || "Delhi";
+
+  const agencyState =
+    agencyData?.State || agencyData?.state || booking?.AgencyState || "Delhi";
+
+  const agencyPin =
+    agencyData?.PinCode ||
+    agencyData?.PIN ||
+    agencyData?.Pincode ||
+    booking?.AgencyPinCode ||
+    "110021";
+
+  const agencyPhone =
+    agencyData?.Phone ||
+    agencyData?.Mobile ||
+    agencyData?.PhoneNumber ||
+    booking?.AgencyPhone ||
+    booking?.AgencyMobile ||
+    "9999055591";
+
+  const agencyEmail =
+    agencyData?.Email ||
+    agencyData?.EmailId ||
+    booking?.AgencyEmail ||
+    "flyinglyte@outlook.com";
+
+  const agencyPan =
+    agencyData?.PAN ||
+    agencyData?.PanNumber ||
+    booking?.AgencyPAN ||
+    "AALFF0579Q";
+
+  const billedBy =
+    booking?.BilledBy || booking?.BillingCompany || "Travelboutique Online";
+
+  const issuedBy =
+    booking?.IssuedBy || booking?.AgentCode || agencyName || "FLYINGLYTE1";
 
   const handleGeneratePdf = async () => {
     if (!invoiceRef.current) return;
@@ -215,7 +519,7 @@ const HotelInvoice = () => {
 
     const body = `Dear Guest,%0D%0A%0D%0APlease find your hotel invoice details.%0D%0A%0D%0AHotel: ${hotelName}%0D%0ABooking ID: ${
       booking?.BookingId || bookingId || "N/A"
-    }%0D%0AInvoice No: ${invoiceNo}%0D%0AConfirmation No: ${confirmationNo}%0D%0A%0D%0ARegards,%0D%0AFLYINGLYTE`;
+    }%0D%0AInvoice No: ${invoiceNo}%0D%0AConfirmation No: ${confirmationNo}%0D%0A%0D%0ARegards,%0D%0A${issuedBy}`;
 
     window.location.href = `mailto:?subject=${encodeURIComponent(
       subject,
@@ -343,25 +647,23 @@ const HotelInvoice = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-[var(--border-soft)] pb-6">
               <div>
                 <h3 className="text-xl font-bold text-[var(--gold-main)] mb-3">
-                  TBO Tek Limited
+                  {supplierName}
                 </h3>
 
                 <div className="text-sm text-[var(--text-muted)] leading-relaxed">
-                  <p>Regd Office: E-78, South Extn Part-I,</p>
-                  <p>New Delhi 110049</p>
-                  <p>Corp Off: Plot No 728, Udyog Vihar</p>
-                  <p>Phase-V, Gurgaon 122016</p>
-                  <p>Email: info@travelboutiqueonline.com</p>
-                  <p>Web: www.travelboutiqueonline.com</p>
-                  <p>Phone: 0124-4998999</p>
-                  <p>State: Haryana</p>
+                  <p>{supplierAddress}</p>
+                  <p>{supplierCorpAddress}</p>
+                  <p>Email: {supplierEmail}</p>
+                  <p>Web: {supplierWebsite}</p>
+                  <p>Phone: {supplierPhone}</p>
+                  <p>State: {supplierState}</p>
                   <p className="text-white font-semibold">
-                    GSTIN: 06AACCT6259K1ZZ
+                    GSTIN: {supplierGstin}
                   </p>
                   <p className="text-white font-semibold">
-                    CIN Number: L74999DL2006PLC155233
+                    CIN Number: {supplierCin}
                   </p>
-                  <p className="text-white font-semibold">PAN: AACCT6259K</p>
+                  <p className="text-white font-semibold">PAN: {supplierPan}</p>
                 </div>
               </div>
 
@@ -371,24 +673,34 @@ const HotelInvoice = () => {
                 </h3>
 
                 <div className="text-sm text-[var(--text-muted)] leading-relaxed">
-                  <p className="text-white font-bold">FLYINGLYTE1</p>
-                  <p>
-                    <span className="font-bold text-white">Owner's Name:</span>{" "}
-                    Anu Jain
-                  </p>
-                  <p>Delhi</p>
-                  <p>PIN - 110021</p>
+                  <p className="text-white font-bold">{agencyName}</p>
+
+                  {ownerName && (
+                    <p>
+                      <span className="font-bold text-white">
+                        Owner's Name:
+                      </span>{" "}
+                      {ownerName}
+                    </p>
+                  )}
+
+                  <p>{agencyCity}</p>
+                  <p>{agencyState}</p>
+                  <p>PIN - {agencyPin}</p>
+
                   <p>
                     <span className="font-bold text-white">Phone:</span>{" "}
-                    9999055591
+                    {agencyPhone}
                   </p>
+
                   <p>
                     <span className="font-bold text-white">Email:</span>{" "}
-                    flyinglyte@outlook.com
+                    {agencyEmail}
                   </p>
+
                   <p>
                     <span className="font-bold text-white">PAN:</span>{" "}
-                    AALFF0579Q
+                    {agencyPan}
                   </p>
                 </div>
               </div>
@@ -439,11 +751,11 @@ const HotelInvoice = () => {
                     </td>
 
                     <td className="p-3 border border-[var(--border-soft)]">
-                      {guestName || "N/A"}
+                      {guestName}
                     </td>
 
                     <td className="p-3 text-center border border-[var(--border-soft)]">
-                      1
+                      {rooms}
                     </td>
 
                     <td className="p-3 text-center border border-[var(--border-soft)]">
@@ -451,19 +763,19 @@ const HotelInvoice = () => {
                     </td>
 
                     <td className="p-3 text-right border border-[var(--border-soft)]">
-                      {offeredRate.toFixed(2)}
+                      {formatAmount(rate || gross)}
                     </td>
 
                     <td className="p-3 text-right border border-[var(--border-soft)]">
-                      {tax.toFixed(2)}
+                      {formatAmount(tax)}
                     </td>
 
                     <td className="p-3 text-right border border-[var(--border-soft)]">
-                      0.00
+                      {formatAmount(serviceCharges)}
                     </td>
 
                     <td className="p-3 text-center border border-[var(--border-soft)]">
-                      INR
+                      {currency}
                     </td>
                   </tr>
                 </tbody>
@@ -480,22 +792,22 @@ const HotelInvoice = () => {
               <div className="text-sm text-[var(--text-muted)] space-y-2">
                 <p>
                   <span className="text-white font-bold">Billed By:</span>{" "}
-                  Travelboutique Online
+                  {billedBy}
                 </p>
 
                 <p>
                   <span className="text-white font-bold">Issued By:</span>{" "}
-                  FLYINGLYTE1
+                  {issuedBy}
                 </p>
               </div>
 
               <div className="bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-5 text-sm space-y-3">
-                <AmountRow label="Gross" value={offeredRate} highlight />
+                <AmountRow label="Gross" value={gross} highlight />
                 <AmountRow label="Less Commission Earned" value={commission} />
                 <AmountRow label="Add TDS" value={tds} />
-                <AmountRow label="Add CGST @0%" value={0} />
-                <AmountRow label="Add SGST @0%" value={0} />
-                <AmountRow label="Add IGST @18%" value={gst} />
+                <AmountRow label="Add CGST @0%" value={cgst} />
+                <AmountRow label="Add SGST @0%" value={sgst} />
+                <AmountRow label="Add IGST @18%" value={igst} />
 
                 <div className="border-t border-[var(--border-soft)] pt-3">
                   <AmountRow label="Net Amount" value={netAmount} highlight />
@@ -552,27 +864,27 @@ const HotelInvoice = () => {
                       </td>
 
                       <td className="p-3 border border-[var(--border-soft)]">
-                        9985
+                        {sacCode}
                       </td>
 
                       <td className="p-3 text-right border border-[var(--border-soft)]">
-                        0
+                        {formatAmount(taxableValue)}
                       </td>
 
                       <td className="p-3 text-right border border-[var(--border-soft)]">
-                        0
+                        {formatAmount(cgst)}
                       </td>
 
                       <td className="p-3 text-right border border-[var(--border-soft)]">
-                        0
+                        {formatAmount(sgst)}
                       </td>
 
                       <td className="p-3 text-right border border-[var(--border-soft)]">
-                        {gst.toFixed(2)}
+                        {formatAmount(igst)}
                       </td>
 
                       <td className="p-3 text-right border border-[var(--border-soft)]">
-                        {gst.toFixed(2)}
+                        {formatAmount(gstTotal)}
                       </td>
                     </tr>
                   </tbody>
@@ -583,8 +895,8 @@ const HotelInvoice = () => {
             <div className="mt-8 bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-5 text-sm text-[var(--text-muted)]">
               <p className="text-[var(--gold-soft)] font-bold mb-2">Note:</p>
               <p>
-                This is a system generated invoice. Amounts are shown in INR and
-                generated from hotel booking response data.
+                This is a system generated invoice. Amounts are shown in{" "}
+                {currency} and generated from hotel booking response data.
               </p>
             </div>
 
@@ -632,7 +944,7 @@ const InfoBox = ({ label, value }) => {
   return (
     <div className="bg-[var(--bg-secondary)] border border-[var(--border-soft)] rounded-2xl p-4">
       <span className="font-bold text-[var(--gold-soft)]">{label}:</span>{" "}
-      <span className="text-white">{value}</span>
+      <span className="text-white">{value || "N/A"}</span>
     </div>
   );
 };
