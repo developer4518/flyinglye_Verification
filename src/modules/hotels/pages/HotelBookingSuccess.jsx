@@ -310,7 +310,7 @@ const HotelBookingSuccess = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-16 px-3 md:px-8 font-[var(--font-body)]">
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] py-26 px-3 md:px-8 font-[var(--font-body)]">
       <div className="max-w-7xl mx-auto">
         {/* TOP HEADER */}
         <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-3xl overflow-hidden shadow-2xl shadow-black/30">
