@@ -246,12 +246,12 @@ const HotelReviewBooking = () => {
                   </p>
                 </div>
 
-                <div className="rounded-xl bg-[#0B0B0F] p-4 sm:col-span-2">
+                {/* <div className="rounded-xl bg-[#0B0B0F] p-4 sm:col-span-2">
                   <p className="text-xs text-gray-500">Booking Code</p>
                   <p className="mt-1 break-all text-sm font-semibold text-gray-300">
                     {bookingCode || "-"}
                   </p>
-                </div>
+                </div> */}
               </div>
             </div>
 
