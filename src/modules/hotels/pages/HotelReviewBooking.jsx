@@ -131,11 +131,14 @@ const HotelReviewBooking = () => {
       const bookingSuccessData = {
         ...reviewData,
 
+        bookingResponse: res.data,
+
         guestList: reviewData.guestList || [],
         bookingCode: reviewData.bookingCode,
-        hotel: reviewData.hotel,
-        roomData: reviewData.roomData,
-        hotelResult: reviewData.hotelResult,
+
+        hotel: reviewData.hotel || {},
+        roomData: reviewData.roomData || {},
+        hotelResult: reviewData.hotelResult || {},
 
         checkIn: reviewData.checkIn,
         checkOut: reviewData.checkOut,
@@ -151,8 +154,6 @@ const HotelReviewBooking = () => {
         supplements: reviewData.supplements || [],
         roomAmenities: reviewData.roomAmenities || [],
         rateConditions: reviewData.rateConditions || [],
-
-        bookingResponse: res.data,
       };
 
       localStorage.setItem(
@@ -162,14 +163,14 @@ const HotelReviewBooking = () => {
 
       setGuestDetails(reviewData.guestList || []);
 
-      localStorage.removeItem("reviewBookingData");
-
       navigate("/hotel-booking-success", {
         state: {
           booking: res.data,
           savedData: bookingSuccessData,
         },
       });
+
+      localStorage.removeItem("reviewBookingData");
     } catch (err) {
       console.log("BOOK ERROR:", err?.response?.data || err);
 

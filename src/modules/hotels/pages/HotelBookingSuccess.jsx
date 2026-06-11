@@ -386,6 +386,7 @@ const HotelBookingSuccess = () => {
         location.state?.bookingResponse ||
         location.state?.fullResponse ||
         location.state?.data ||
+        stateSaved?.bookingResponse ||
         bookingSaved?.bookingResponse ||
         reviewSaved?.bookingResponse;
 
@@ -401,6 +402,7 @@ const HotelBookingSuccess = () => {
         stateSaved?.hotel ||
         bookingSaved?.hotel ||
         reviewSaved?.hotel ||
+        mergedSaved?.hotel ||
         finalBooking?.HotelDetails ||
         finalBooking?.HotelDetail ||
         {};
@@ -409,7 +411,11 @@ const HotelBookingSuccess = () => {
         stateSaved?.guestList ||
         bookingSaved?.guestList ||
         reviewSaved?.guestList ||
+        mergedSaved?.guestList ||
         reviewSaved?.finalPayload?.HotelRoomsDetails?.flatMap(
+          (room) => room?.HotelPassenger || [],
+        ) ||
+        bookingSaved?.finalPayload?.HotelRoomsDetails?.flatMap(
           (room) => room?.HotelPassenger || [],
         ) ||
         finalBooking?.HotelPassenger ||
@@ -484,8 +490,6 @@ const HotelBookingSuccess = () => {
     booking?.ReferenceNo ||
     "N/A";
 
-  // const traceId = booking?.TraceId || savedData?.traceId || "N/A";
-
   const currency =
     booking?.Currency ||
     booking?.currency ||
@@ -539,9 +543,15 @@ const HotelBookingSuccess = () => {
   const hotelAddress =
     hotel?.address ||
     hotel?.Address ||
-    booking?.HotelAddress ||
+    hotel?.HotelAddress ||
+    savedData?.hotel?.address ||
+    savedData?.hotel?.Address ||
+    savedData?.hotel?.HotelAddress ||
+    savedData?.hotelResult?.HotelAddress ||
+    savedData?.hotelResult?.Address ||
     hotelResult?.HotelAddress ||
     hotelResult?.Address ||
+    booking?.HotelAddress ||
     "Address N/A";
 
   const cityName =
@@ -578,25 +588,24 @@ const HotelBookingSuccess = () => {
   const amenities = useMemo(() => {
     const list =
       savedData?.roomAmenities ||
+      savedData?.RoomAmenities ||
       savedData?.amenities ||
+      savedData?.Amenities ||
       savedData?.reviewBookingData?.roomAmenities ||
+      savedData?.reviewBookingData?.RoomAmenities ||
       roomData?.Amenities ||
       roomData?.RoomAmenities ||
       roomData?.amenities ||
+      savedData?.hotelResult?.Amenities ||
+      savedData?.hotelResult?.RoomAmenities ||
+      hotelResult?.Amenities ||
+      hotelResult?.RoomAmenities ||
       hotel?.amenities ||
       hotel?.Amenities ||
       [];
 
-    if (Array.isArray(list)) return list.filter(Boolean);
-    if (typeof list === "string") {
-      return list
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-
-    return [];
-  }, [savedData, roomData, hotel]);
+    return splitTextList(list);
+  }, [savedData, roomData, hotelResult, hotel]);
 
   const cancelPolicies = useMemo(() => {
     const data =
@@ -627,15 +636,36 @@ const HotelBookingSuccess = () => {
     const data =
       savedData?.roomPromotions ||
       savedData?.roomPromotion ||
+      savedData?.RoomPromotion ||
+      savedData?.RoomPromotions ||
       savedData?.reviewBookingData?.roomPromotions ||
+      savedData?.reviewBookingData?.RoomPromotion ||
       roomData?.RoomPromotion ||
       roomData?.RoomPromotions ||
       roomData?.Promotion ||
+      savedData?.hotelResult?.RoomPromotion ||
+      hotelResult?.RoomPromotion ||
       booking?.HotelRoomsDetails?.[0]?.RoomPromotion ||
       [];
 
     return flatArray(data);
-  }, [savedData, roomData, booking]);
+  }, [savedData, roomData, hotelResult, booking]);
+
+  const rateConditions = useMemo(() => {
+    const data =
+      savedData?.rateConditions ||
+      savedData?.RateConditions ||
+      savedData?.reviewBookingData?.rateConditions ||
+      savedData?.reviewBookingData?.RateConditions ||
+      roomData?.RateConditions ||
+      savedData?.hotelResult?.RateConditions ||
+      hotelResult?.RateConditions ||
+      booking?.RateConditions ||
+      booking?.HotelRoomsDetails?.[0]?.RateConditions ||
+      [];
+
+    return Array.isArray(data) ? data.filter(Boolean) : splitTextList(data);
+  }, [savedData, roomData, hotelResult, booking]);
 
   const totalAdults = guestDetails.filter(
     (guest) => getPaxTypeLabel(guest) === "Adult",
@@ -726,7 +756,7 @@ const HotelBookingSuccess = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-(--bg-main) px-4 text-center font-(--font-body) text-(--gold-soft)">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] px-4 text-center font-[var(--font-body)] text-[var(--gold-soft)]">
         Loading booking details...
       </div>
     );
@@ -734,19 +764,19 @@ const HotelBookingSuccess = () => {
 
   if (!booking) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-main) p-6 text-center font-(--font-body) text-(--text-main)">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-main)] p-6 text-center font-[var(--font-body)] text-[var(--text-main)]">
         <div className="rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
           <h2 className="mb-3 text-2xl font-bold text-red-300">
             Booking not found
           </h2>
 
-          <p className="mb-6 text-sm text-(--text-muted)">
+          <p className="mb-6 text-sm text-[var(--text-muted)]">
             No booking response was found for this page.
           </p>
 
           <button
             onClick={() => navigate("/")}
-            className="rounded-xl bg-linear-to-r from-start to-end px-6 py-3 font-bold text-black shadow-lg shadow-yellow-500/10"
+            className="rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] px-6 py-3 font-bold text-black shadow-lg shadow-yellow-500/10"
           >
             Go Home
           </button>
@@ -756,10 +786,10 @@ const HotelBookingSuccess = () => {
   }
 
   return (
-    <div className="min-h-screen bg-(--bg-main) px-3 py-24 font-(--font-body) text-(--text-main) md:px-8">
+    <div className="min-h-screen bg-[var(--bg-main)] px-3 py-24 font-[var(--font-body)] text-[var(--text-main)] md:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-4xl border border-(--border-soft) bg-(--bg-card) shadow-2xl shadow-black/40">
-          <div className="bg-linear-to-r from-(--bg-primary) via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-5 md:px-7">
+        <div className="overflow-hidden rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-card)] shadow-2xl shadow-black/40">
+          <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-5 md:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -829,11 +859,10 @@ const HotelBookingSuccess = () => {
             </div>
           </div>
 
-          <div className="grid gap-4 p-5 md:grid-cols-4 md:p-7">
+          <div className="grid gap-4 p-5 md:grid-cols-3 md:p-7">
             <InfoTile label="Confirmation No" value={confirmationNo} />
             <InfoTile label="Booking Reference" value={bookingRefNo} />
             <InfoTile label="Invoice Number" value={invoiceNumber} />
-            {/* <InfoTile label="Trace ID" value={traceId} /> */}
           </div>
         </div>
 
@@ -1188,6 +1217,30 @@ const HotelBookingSuccess = () => {
                 ) : (
                   <p className="text-sm text-[var(--text-muted)]">
                     Hotel norms not available from previous response.
+                  </p>
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard>
+              <SectionTitle icon="📌" title="Rate Conditions" />
+
+              <div className="p-5">
+                {rateConditions.length > 0 ? (
+                  <ol className="list-decimal space-y-3 pl-5 text-sm leading-6 text-[var(--text-muted)]">
+                    {rateConditions.map((condition, index) => (
+                      <li
+                        key={index}
+                        className="rounded-2xl border border-[var(--border-soft)] bg-white/[0.03] p-3"
+                        dangerouslySetInnerHTML={{
+                          __html: cleanHtml(condition),
+                        }}
+                      />
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Rate conditions not available from previous response.
                   </p>
                 )}
               </div>
