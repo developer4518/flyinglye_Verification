@@ -528,15 +528,15 @@ const HotelBookings = () => {
                         label="Booking ID"
                         value={hotelDetail.BookingId}
                       />
-                      <DetailItem
+                      {/* <DetailItem
                         label="TBO Ref No"
                         value={hotelDetail.TBOReferenceNo}
-                      />
-                      <DetailItem
+                      /> */}
+                      {/* <DetailItem
                         label="Trace ID"
                         value={hotelDetail.TraceId}
                         className="col-span-2"
-                      />
+                      /> */}
                       <DetailItem
                         label="Confirmation No"
                         value={hotelDetail.ConfirmationNo}
@@ -621,14 +621,14 @@ const HotelBookings = () => {
                       value={hotelDetail.CreditNoteGSTIN}
                     />
                     <DetailItem label="Net Amount" value={formatMoney(net)} />
-                    <DetailItem
+                    {/* <DetailItem
                       label="Net Tax"
                       value={formatMoney(hotelDetail.NetTax)}
-                    />
-                    <DetailItem
+                    /> */}
+                    {/* <DetailItem
                       label="Convenience Fee"
                       value={formatMoney(fee)}
-                    />
+                    /> */}
                     <DetailItem
                       label="Total Amount"
                       value={formatMoney(total)}
@@ -643,26 +643,31 @@ const HotelBookings = () => {
 
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between gap-4">
-                        <span className="text-gray-300">Net Amount</span>
+                        <span className="text-gray-300">
+                          Net Amount{" "}
+                          <p className="text-gray-200 text-xs">
+                            (inclusive of all taxes)
+                          </p>
+                        </span>
                         <span>{formatMoney(net)}</span>
                       </div>
 
-                      <div className="flex justify-between gap-4">
+                      {/* <div className="flex justify-between gap-4">
                         <span className="text-gray-300">Convenience Fee</span>
                         <span>{formatMoney(fee)}</span>
-                      </div>
+                      </div> */}
 
-                      <div className="flex justify-between gap-4">
+                      {/* <div className="flex justify-between gap-4">
                         <span className="text-gray-300">Net Tax</span>
                         <span>{formatMoney(hotelDetail.NetTax)}</span>
-                      </div>
+                      </div> */}
 
                       <hr className="border-gray-700" />
 
                       <div className="flex justify-between gap-4 text-lg font-bold">
                         <span>Total</span>
                         <span className="text-yellow-400">
-                          {formatMoney(total)}
+                          {formatMoney(net)}
                         </span>
                       </div>
 
