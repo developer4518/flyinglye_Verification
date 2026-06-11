@@ -364,7 +364,7 @@ const HotelBookings = () => {
                     text-white text-sm font-semibold px-4 py-3 
                     transition-all duration-300 shadow-lg shadow-blue-500/10"
                   >
-                    Get Hotel Detail
+                    Get Booking Detail
                   </button>
 
                   <button
