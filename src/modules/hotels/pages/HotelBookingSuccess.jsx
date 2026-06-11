@@ -12,10 +12,34 @@ const safeJsonParse = (value, fallback = {}) => {
   }
 };
 
+const toArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return [value].filter(Boolean);
+};
+
+const flatArray = (value) => toArray(value).flat(Infinity).filter(Boolean);
+
 const formatDate = (dateValue) => {
   if (!dateValue) return "N/A";
 
-  const date = new Date(dateValue);
+  const value = String(dateValue).trim();
+  const datePart = value.split(" ")[0];
+  const parts = datePart.split("-");
+
+  let date;
+
+  if (parts.length === 3) {
+    const [a, b, c] = parts;
+
+    if (a.length === 4) {
+      date = new Date(Number(a), Number(b) - 1, Number(c));
+    } else if (c.length === 4) {
+      date = new Date(Number(c), Number(b) - 1, Number(a));
+    }
+  }
+
+  if (!date) date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return dateValue;
 
   return date.toLocaleDateString("en-GB", {
@@ -25,9 +49,14 @@ const formatDate = (dateValue) => {
   });
 };
 
-const formatMoney = (value) => {
+const formatMoney = (value, currency = "INR") => {
   const amount = Number(value || 0);
-  return `₹ ${Math.round(amount).toLocaleString("en-IN")}`;
+
+  if (currency === "INR") {
+    return `₹ ${Math.round(amount).toLocaleString("en-IN")}`;
+  }
+
+  return `${currency} ${Math.round(amount).toLocaleString("en-IN")}`;
 };
 
 const getNights = (checkIn, checkOut) => {
@@ -42,6 +71,40 @@ const getNights = (checkIn, checkOut) => {
 
   const diff = Math.ceil((outDate - inDate) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : 1;
+};
+
+const cleanHtml = (value) => {
+  return String(value || "")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&")
+    .replaceAll(",", ", ");
+};
+
+const getStatusClass = (status = "") => {
+  const value = String(status).toLowerCase();
+
+  if (
+    value.includes("confirm") ||
+    value.includes("voucher") ||
+    value.includes("success")
+  ) {
+    return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
+  }
+
+  if (
+    value.includes("cancel") ||
+    value.includes("reject") ||
+    value.includes("failed")
+  ) {
+    return "border-red-400/30 bg-red-400/10 text-red-300";
+  }
+
+  if (value.includes("pending") || value.includes("hold")) {
+    return "border-yellow-400/30 bg-yellow-400/10 text-yellow-300";
+  }
+
+  return "border-slate-400/30 bg-slate-400/10 text-slate-300";
 };
 
 const getRoomData = (saved, bookingData) => {
@@ -65,6 +128,148 @@ const getHotelResult = (saved) => {
   );
 };
 
+const getRoomName = (room, fallbackRoomData, index) => {
+  const name =
+    room?.RoomTypeName ||
+    room?.RoomName ||
+    room?.RoomType ||
+    room?.Name?.[0] ||
+    room?.Name ||
+    fallbackRoomData?.Name?.[0] ||
+    fallbackRoomData?.RoomName ||
+    fallbackRoomData?.RoomTypeName ||
+    fallbackRoomData?.RoomType ||
+    fallbackRoomData?.Name ||
+    `Room ${index + 1}`;
+
+  return Array.isArray(name) ? name[0] : name;
+};
+
+const getRoomInclusion = (room, fallbackRoomData) => {
+  return (
+    room?.Inclusion ||
+    room?.MealType ||
+    room?.MealPlan ||
+    fallbackRoomData?.Inclusion ||
+    fallbackRoomData?.MealType ||
+    fallbackRoomData?.MealPlan ||
+    "N/A"
+  );
+};
+
+const getCancellationChargeText = (policy) => {
+  const type = String(
+    policy?.ChargeType || policy?.chargeType || "",
+  ).toLowerCase();
+  const charge = Number(policy?.CancellationCharge ?? policy?.Charge ?? 0);
+
+  if (type === "percentage") return `${charge}%`;
+
+  if (type === "fixed") {
+    if (charge === 0) return "Free";
+    return formatMoney(charge);
+  }
+
+  if (charge === 0) return "Free";
+  return charge ? formatMoney(charge) : "N/A";
+};
+
+const getPaxTypeLabel = (guest) => {
+  const title = String(guest?.Title || "").toLowerCase();
+
+  if (
+    Number(guest?.PaxType) === 2 ||
+    title.includes("mstr") ||
+    title.includes("miss") ||
+    Number(guest?.Age) < 12
+  ) {
+    return "Child";
+  }
+
+  return "Adult";
+};
+
+const getGuestName = (guest) => {
+  const title = guest?.Title ? `${guest.Title}. ` : "";
+  const firstName = guest?.FirstName || guest?.firstName || "";
+  const lastName = guest?.LastName || guest?.lastName || "";
+
+  const fullName = `${title}${firstName} ${lastName}`.trim();
+  return fullName || "Guest Name N/A";
+};
+
+const normalizeGuestsByRoom = (
+  guestDetails = [],
+  booking = {},
+  savedData = {},
+) => {
+  const finalPayloadRooms =
+    savedData?.finalPayload?.HotelRoomsDetails ||
+    savedData?.reviewBookingData?.finalPayload?.HotelRoomsDetails ||
+    booking?.HotelRoomsDetails ||
+    [];
+
+  if (Array.isArray(finalPayloadRooms) && finalPayloadRooms.length > 0) {
+    return finalPayloadRooms.map((room, index) => ({
+      roomIndex: index,
+      guests: room?.HotelPassenger || room?.HotelPassengers || [],
+    }));
+  }
+
+  const grouped = {};
+
+  guestDetails.forEach((guest, index) => {
+    const roomIndex = Number(guest?.RoomIndex ?? guest?.RoomNo ?? 0);
+    if (!grouped[roomIndex]) grouped[roomIndex] = [];
+    grouped[roomIndex].push({ ...guest, _originalIndex: index });
+  });
+
+  const entries = Object.entries(grouped);
+
+  if (entries.length > 0) {
+    return entries.map(([roomIndex, guests]) => ({
+      roomIndex: Number(roomIndex),
+      guests,
+    }));
+  }
+
+  return [
+    {
+      roomIndex: 0,
+      guests: guestDetails || [],
+    },
+  ];
+};
+
+const normalizeRooms = (booking = {}, savedData = {}, roomData = {}) => {
+  const bookingRooms = booking?.HotelRoomsDetails || [];
+  const finalPayloadRooms =
+    savedData?.finalPayload?.HotelRoomsDetails ||
+    savedData?.reviewBookingData?.finalPayload?.HotelRoomsDetails ||
+    [];
+
+  const sourceRooms =
+    Array.isArray(bookingRooms) && bookingRooms.length > 0
+      ? bookingRooms
+      : Array.isArray(finalPayloadRooms) && finalPayloadRooms.length > 0
+        ? finalPayloadRooms
+        : [];
+
+  if (sourceRooms.length > 0) {
+    return sourceRooms.map((room, index) => ({
+      ...room,
+      _roomIndex: index,
+    }));
+  }
+
+  return [
+    {
+      ...roomData,
+      _roomIndex: 0,
+    },
+  ];
+};
+
 const HotelBookingSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,11 +290,11 @@ const HotelBookingSuccess = () => {
     try {
       const saved = safeJsonParse(localStorage.getItem("hotelBookingData"), {});
 
-      let bookingData = location.state?.booking;
-
-      if (!bookingData) {
-        bookingData = saved.bookingResponse;
-      }
+      let bookingData =
+        location.state?.booking ||
+        location.state?.bookingResponse ||
+        location.state?.fullResponse ||
+        saved?.bookingResponse;
 
       if (!bookingData) throw new Error("No booking data");
 
@@ -99,10 +304,25 @@ const HotelBookingSuccess = () => {
         bookingData?.Response ||
         bookingData;
 
+      const finalHotel =
+        saved?.hotel ||
+        finalBooking?.HotelDetails ||
+        finalBooking?.HotelDetail ||
+        {};
+
+      const finalGuests =
+        saved?.guestList ||
+        finalBooking?.HotelPassenger ||
+        finalBooking?.HotelPassengers ||
+        finalBooking?.HotelRoomsDetails?.flatMap(
+          (room) => room?.HotelPassenger || room?.HotelPassengers || [],
+        ) ||
+        [];
+
       setBooking(finalBooking);
       setSavedData(saved);
-      setHotel(saved.hotel || finalBooking?.HotelDetails || {});
-      setGuestDetails(saved.guestList || finalBooking?.HotelPassenger || []);
+      setHotel(finalHotel);
+      setGuestDetails(finalGuests);
     } catch (err) {
       console.error("BOOKING LOAD ERROR:", err);
     } finally {
@@ -117,70 +337,15 @@ const HotelBookingSuccess = () => {
 
   const hotelResult = useMemo(() => getHotelResult(savedData), [savedData]);
 
-  const roomName = useMemo(() => {
-    const name =
-      roomData?.Name?.[0] ||
-      roomData?.RoomName ||
-      roomData?.RoomTypeName ||
-      roomData?.RoomType ||
-      roomData?.Name ||
-      booking?.HotelRoomsDetails?.[0]?.RoomTypeName ||
-      "Room";
+  const rooms = useMemo(
+    () => normalizeRooms(booking, savedData, roomData),
+    [booking, savedData, roomData],
+  );
 
-    return Array.isArray(name) ? name[0] : name;
-  }, [roomData, booking]);
-
-  const inclusion =
-    roomData?.Inclusion ||
-    roomData?.MealType ||
-    booking?.HotelRoomsDetails?.[0]?.MealType ||
-    "Room Only";
-
-  const roomPromotion =
-    roomData?.RoomPromotion?.[0] ||
-    roomData?.RoomPromotions?.[0] ||
-    roomData?.Promotion ||
-    "";
-
-  const amenities = useMemo(() => {
-    const list =
-      roomData?.Amenities ||
-      roomData?.RoomAmenities ||
-      roomData?.amenities ||
-      hotel?.amenities ||
-      [];
-
-    if (Array.isArray(list)) return list.join(", ");
-    return list || "N.A.";
-  }, [roomData, hotel]);
-
-  const cancelPolicies = useMemo(() => {
-    return (
-      roomData?.CancelPolicies ||
-      roomData?.CancellationPolicies ||
-      booking?.HotelRoomsDetails?.[0]?.CancellationPolicies ||
-      []
-    );
-  }, [roomData, booking]);
-
-  const hotelNorms = useMemo(() => {
-    const norms =
-      hotelResult?.HotelNorms ||
-      hotel?.HotelNorms ||
-      hotel?.hotel_norms ||
-      roomData?.HotelNorms ||
-      [];
-
-    if (Array.isArray(norms)) return norms;
-    if (typeof norms === "string") return norms.split("|").filter(Boolean);
-    return [];
-  }, [hotelResult, hotel, roomData]);
-
-  const supplements = useMemo(() => {
-    const data = roomData?.Supplements || roomData?.Supplement || [];
-    if (!Array.isArray(data)) return [];
-    return data.flat?.() || data;
-  }, [roomData]);
+  const guestsByRoom = useMemo(
+    () => normalizeGuestsByRoom(guestDetails, booking, savedData),
+    [guestDetails, booking, savedData],
+  );
 
   const checkIn =
     savedData?.checkIn ||
@@ -196,6 +361,34 @@ const HotelBookingSuccess = () => {
 
   const nights = getNights(checkIn, checkOut);
 
+  const status =
+    booking?.HotelBookingStatus ||
+    booking?.BookingStatus ||
+    booking?.StatusDescription ||
+    booking?.VoucherStatusText ||
+    (booking?.VoucherStatus ? "Vouchered" : "Confirmed");
+
+  const confirmationNo =
+    booking?.ConfirmationNo ||
+    booking?.ConfirmationNumber ||
+    booking?.SupplierConfirmationNo ||
+    "N/A";
+
+  const bookingId = booking?.BookingId || booking?.BookingID || "N/A";
+
+  const bookingRefNo =
+    booking?.BookingRefNo ||
+    booking?.TBOReferenceNo ||
+    booking?.ReferenceNo ||
+    "N/A";
+
+  const currency =
+    booking?.Currency ||
+    booking?.currency ||
+    roomData?.Currency ||
+    savedData?.currency ||
+    "INR";
+
   const netAmount =
     savedData?.net ||
     booking?.NetAmount ||
@@ -204,26 +397,139 @@ const HotelBookingSuccess = () => {
     roomData?.TotalFare ||
     0;
 
-  const offeredRate = roomData?.TotalFare || netAmount;
+  const offeredRate =
+    roomData?.TotalFare ||
+    booking?.TotalFare ||
+    booking?.OfferedFare ||
+    netAmount;
 
   const publishedRate =
     roomData?.PublishedPrice ||
     roomData?.PublishedFare ||
     roomData?.Price?.PublishedPrice ||
+    booking?.PublishedPrice ||
+    booking?.PublishedFare ||
     offeredRate;
 
-  const tax = roomData?.TotalTax || booking?.TotalTax || 0;
+  const tax =
+    roomData?.TotalTax ||
+    booking?.TotalTax ||
+    booking?.Tax ||
+    booking?.TotalGSTAmount ||
+    0;
+
   const tds = booking?.TDS || booking?.Tds || 0;
   const commission = booking?.Commission || booking?.CommEarned || 0;
   const gst = booking?.TotalGSTAmount || booking?.GST || 0;
 
-  const adultCount = guestDetails.filter(
-    (g) => Number(g.PaxType) === 1 || Number(g.Age) >= 12,
+  const hotelName =
+    hotel?.hotel_name ||
+    hotel?.HotelName ||
+    booking?.HotelName ||
+    hotelResult?.HotelName ||
+    "Hotel Name N/A";
+
+  const hotelAddress =
+    hotel?.address ||
+    hotel?.Address ||
+    booking?.HotelAddress ||
+    hotelResult?.HotelAddress ||
+    hotelResult?.Address ||
+    "Address N/A";
+
+  const cityName =
+    hotel?.city_name ||
+    hotel?.CityName ||
+    booking?.CityName ||
+    hotelResult?.CityName ||
+    "";
+
+  const hotelRating =
+    hotel?.rating ||
+    hotel?.HotelRating ||
+    hotelResult?.HotelRating ||
+    hotelResult?.StarRating ||
+    "";
+
+  const hotelNorms = useMemo(() => {
+    const norms =
+      hotelResult?.HotelNorms ||
+      hotel?.HotelNorms ||
+      hotel?.hotel_norms ||
+      roomData?.HotelNorms ||
+      booking?.HotelNorms ||
+      [];
+
+    if (Array.isArray(norms)) return norms.filter(Boolean);
+    if (typeof norms === "string") return norms.split("|").filter(Boolean);
+
+    return [];
+  }, [hotelResult, hotel, roomData, booking]);
+
+  const amenities = useMemo(() => {
+    const list =
+      roomData?.Amenities ||
+      roomData?.RoomAmenities ||
+      roomData?.amenities ||
+      hotel?.amenities ||
+      hotel?.Amenities ||
+      [];
+
+    if (Array.isArray(list)) return list.filter(Boolean);
+    if (typeof list === "string") {
+      return list
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  }, [roomData, hotel]);
+
+  const cancelPolicies = useMemo(() => {
+    return (
+      roomData?.CancelPolicies ||
+      roomData?.CancellationPolicies ||
+      booking?.HotelRoomsDetails?.[0]?.CancellationPolicies ||
+      booking?.HotelRoomsDetails?.[0]?.CancelPolicies ||
+      []
+    );
+  }, [roomData, booking]);
+
+  const supplements = useMemo(() => {
+    const data =
+      roomData?.Supplements ||
+      roomData?.Supplement ||
+      booking?.HotelRoomsDetails?.[0]?.Supplements ||
+      [];
+
+    return flatArray(data);
+  }, [roomData, booking]);
+
+  const roomPromotions = useMemo(() => {
+    const data =
+      roomData?.RoomPromotion ||
+      roomData?.RoomPromotions ||
+      roomData?.Promotion ||
+      booking?.HotelRoomsDetails?.[0]?.RoomPromotion ||
+      [];
+
+    return flatArray(data);
+  }, [roomData, booking]);
+
+  const totalAdults = guestDetails.filter(
+    (guest) => getPaxTypeLabel(guest) === "Adult",
   ).length;
 
-  const childCount = guestDetails.filter(
-    (g) => Number(g.PaxType) === 2 || Number(g.Age) < 12,
+  const totalChildren = guestDetails.filter(
+    (guest) => getPaxTypeLabel(guest) === "Child",
   ).length;
+
+  const supportPhone =
+    booking?.SupportPhone ||
+    booking?.CustomerSupportPhone ||
+    savedData?.supportPhone ||
+    "";
 
   const handleInvoiceClick = () => {
     navigate(`/hotel-invoice/${booking.BookingId}`, {
@@ -250,6 +556,8 @@ const HotelBookingSuccess = () => {
   };
 
   const handleChangeRequest = async () => {
+    if (changeMsg) return;
+
     const remarks = window.prompt("Enter cancellation/change request reason");
     if (!remarks) return;
 
@@ -286,532 +594,582 @@ const HotelBookingSuccess = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-main) flex items-center justify-center text-[var(--gold-soft) font-[var(--font-body)">
-        Loading booking...
+      <div className="flex min-h-screen items-center justify-center bg-[#08080C] px-4 text-center font-sans text-yellow-300">
+        Loading booking details...
       </div>
     );
   }
 
   if (!booking) {
     return (
-      <div className="min-h-screen bg-[var(--bg-main) flex flex-col items-center justify-center p-6 text-center font-[var(--font-body)">
-        <h2 className="text-2xl font-bold text-red-400 mb-4">
-          Booking not found
-        </h2>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#08080C] p-6 text-center font-sans text-white">
+        <div className="rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
+          <h2 className="mb-3 text-2xl font-bold text-red-300">
+            Booking not found
+          </h2>
 
-        <button
-          onClick={() => navigate("/")}
-          className="px-6 py-3 rounded-xl bg-linear-to-r from-start to-end text-black font-bold shadow-lg"
-        >
-          Go Home
-        </button>
+          <p className="mb-6 text-sm text-slate-300">
+            No booking response was found for this page.
+          </p>
+
+          <button
+            onClick={() => navigate("/")}
+            className="rounded-xl bg-gradient-to-r from-yellow-300 to-orange-400 px-6 py-3 font-bold text-black shadow-lg shadow-yellow-500/10"
+          >
+            Go Home
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-(--bg-main) text-(--text-main) py-26 px-3 md:px-8 font-(--font-body)">
-      <div className="max-w-7xl mx-auto">
-        {/* TOP HEADER */}
-        <div className="bg-(--bg-card) border border-(--border-soft) rounded-3xl overflow-hidden shadow-2xl shadow-black/30">
-          <div className="bg-linear-to-r from-(--bg-primary) via-(--bg-via) to-(--bg-secondary) px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-(--border-soft)">
-            <h1 className="text-2xl font-var[(--font-heading) text-[var(--gold-main) font-[var(--font-heading) tracking-wide">
-              Booking Details
-            </h1>
+    <div className="min-h-screen bg-[#08080C] px-3 py-24 font-sans text-white md:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#12121A] shadow-2xl shadow-black/40">
+          <div className="bg-gradient-to-r from-[#1A1B28] via-[#171923] to-[#111827] px-5 py-5 md:px-7">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-bold ${getStatusClass(
+                      status,
+                    )}`}
+                  >
+                    {status}
+                  </span>
 
-            <div className="flex flex-wrap gap-2">
-              <GoldButton onClick={() => navigate(-1)}>
-                &lt;&lt; Back To Queue
-              </GoldButton>
+                  {booking?.VoucherStatus !== undefined && (
+                    <span className="rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1 text-xs font-bold text-blue-300">
+                      Voucher: {booking.VoucherStatus ? "Yes" : "No"}
+                    </span>
+                  )}
+                </div>
 
-              <GoldButton
-                onClick={() => {
-                  setViewLoading(true);
-                  handleVoucherClick();
-                }}
-              >
-                {viewLoading ? "Loading..." : "View Voucher"}
-              </GoldButton>
+                <h1 className="text-2xl font-black tracking-tight text-yellow-300 md:text-3xl">
+                  Booking Details
+                </h1>
 
-              <button className="px-4 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-500 transition">
-                WhatsApp
-              </button>
-            </div>
-          </div>
-
-          <div className="px-5 py-6 flex flex-col md:flex-row justify-between gap-4">
-            <div>
-              <p className="inline-block bg-linear-to-r from-[var(--color-start) to-[var(--color-end) text-black px-3 py-1.5 font-bold rounded-xl text-sm shadow-lg">
-                FLYINGLYTE (Delhi)
-              </p>
-              <br />
-              <p className="inline-block mt-2 border border-[var(--gold-dark) text-[var(--gold-soft) px-3 py-1.5 font-bold rounded-xl text-sm">
-                Delhi
-              </p>
-            </div>
-
-            <div className="text-sm md:text-right text-[var(--text-muted)">
-              <p>
-                Confirmation No :{" "}
-                <span className="text-[var(--gold-soft) font-bold">
-                  {booking?.ConfirmationNo || "N/A"}
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* HOTEL SUMMARY */}
-        <div className="mt-5 bg-[var(--bg-card) border border-[var(--border-soft) rounded-3xl p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center shadow-xl shadow-black/20">
-          <div className="lg:col-span-7 flex gap-4">
-            <div className="w-28 h-24 bg-[var(--bg-secondary) border border-[var(--border-soft) rounded-2xl flex items-center justify-center text-5xl text-[var(--gold-dark) shrink-0">
-              🛏️
-            </div>
-
-            <div>
-              <h2 className="text-xl font-bold text-[var(--gold-main) font-[var(--font-heading)">
-                {hotel?.hotel_name ||
-                  hotel?.HotelName ||
-                  booking?.HotelName ||
-                  "Hotel"}
-                <span className="ml-2 text-[var(--color-start) text-sm">
-                  ★★★
-                </span>
-              </h2>
-
-              <p className="text-sm text-[var(--text-muted) mt-2 leading-relaxed">
-                {hotel?.address ||
-                  hotel?.Address ||
-                  booking?.HotelAddress ||
-                  hotelResult?.HotelAddress ||
-                  "Hotel address not available"}
-              </p>
-            </div>
-          </div>
-
-          <div className="lg:col-span-3 text-sm lg:text-right text-[var(--text-muted) space-y-1">
-            <p>
-              Check In :{" "}
-              <span className="font-bold text-white">
-                {formatDate(checkIn)}
-              </span>
-            </p>
-            <p>
-              Check Out :{" "}
-              <span className="font-bold text-white">
-                {formatDate(checkOut)}
-              </span>
-            </p>
-            <p>
-              No. of Nights:{" "}
-              <span className="font-bold text-white">{nights}</span>
-            </p>
-          </div>
-
-          <div className="lg:col-span-2">
-            <div className="bg-[var(--bg-secondary) rounded-2xl border border-[var(--border-soft) overflow-hidden text-center">
-              <div className="bg-green-500/15 text-green-400 font-bold py-3 border-b border-green-500/20">
-                {booking?.HotelBookingStatus || "Vouchered"}
+                <p className="mt-1 text-sm text-slate-400">
+                  Booking ID:{" "}
+                  <span className="font-semibold text-white">{bookingId}</span>
+                </p>
               </div>
 
-              <div className="text-[var(--gold-soft) py-3 text-sm">
-                {changeLoading
-                  ? "Request Sending..."
-                  : changeMsg
-                    ? "Request Raised"
-                    : "Booking Confirmed"}
+              <div className="flex flex-wrap gap-2">
+                <ActionButton variant="dark" onClick={() => navigate(-1)}>
+                  Back
+                </ActionButton>
+
+                <ActionButton
+                  onClick={() => {
+                    setViewLoading(true);
+                    handleVoucherClick();
+                  }}
+                >
+                  {viewLoading ? "Loading..." : "View Voucher"}
+                </ActionButton>
+
+                <ActionButton onClick={handleInvoiceClick}>
+                  View Invoice
+                </ActionButton>
+
+                {supportPhone && (
+                  <a
+                    href={`https://wa.me/${String(supportPhone).replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400"
+                  >
+                    WhatsApp
+                  </a>
+                )}
               </div>
             </div>
           </div>
+
+          <div className="grid gap-4 p-5 md:grid-cols-3 md:p-7">
+            <InfoTile label="Confirmation No" value={confirmationNo} />
+            <InfoTile label="Booking Reference" value={bookingRefNo} />
+            <InfoTile label="Trace ID" value={booking?.TraceId || "N/A"} />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
-          {/* LEFT CONTENT */}
-          <div className="lg:col-span-9 space-y-5">
-            {/* ROOM DETAILS */}
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            <div className="rounded-[2rem] border border-white/10 bg-[#12121A] p-5 shadow-xl shadow-black/30 md:p-6">
+              <div className="flex flex-col gap-5 md:flex-row md:items-start">
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border border-yellow-300/20 bg-yellow-300/10 text-5xl text-yellow-300">
+                  🏨
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-2xl font-black text-white">
+                      {hotelName}
+                    </h2>
+
+                    {hotelRating && (
+                      <span className="rounded-full border border-yellow-300/30 bg-yellow-300/10 px-3 py-1 text-xs font-bold text-yellow-300">
+                        {hotelRating} Star
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    {hotelAddress}
+                  </p>
+
+                  {cityName && (
+                    <p className="mt-2 text-sm font-semibold text-yellow-200">
+                      📍 {cityName}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-3 lg:col-span-4 lg:grid-cols-1">
+            <DateTile label="Check In" value={formatDate(checkIn)} icon="📅" />
+            <DateTile
+              label="Check Out"
+              value={formatDate(checkOut)}
+              icon="📅"
+            />
+            <DateTile
+              label="Stay Duration"
+              value={`${nights} Night${nights > 1 ? "s" : ""}`}
+              icon="🌙"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-12">
+          <main className="space-y-5 lg:col-span-8">
             <SectionCard>
               <SectionTitle icon="🛏️" title="Room Details" />
 
-              <div className="p-5">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className="md:col-span-1 font-bold text-[var(--gold-soft)">
-                    Room 1
-                  </div>
+              <div className="space-y-4 p-5">
+                {rooms.map((room, index) => {
+                  const roomName = getRoomName(room, roomData, index);
+                  const inclusion = getRoomInclusion(room, roomData);
+                  const roomGuests =
+                    guestsByRoom.find((item) => item.roomIndex === index)
+                      ?.guests || [];
 
-                  <div className="md:col-span-8 text-[var(--text-muted)">
-                    <p className="text-white font-semibold">{roomName}</p>
-                    <p className="text-sm mt-1">Incl: {inclusion}</p>
+                  const adults = roomGuests.filter(
+                    (guest) => getPaxTypeLabel(guest) === "Adult",
+                  ).length;
 
-                    {roomPromotion && (
-                      <p className="text-[var(--color-start) mt-2">
-                        {roomPromotion}
-                      </p>
-                    )}
+                  const children = roomGuests.filter(
+                    (guest) => getPaxTypeLabel(guest) === "Child",
+                  ).length;
 
-                    {supplements.length > 0 && (
-                      <div className="mt-3">
-                        <p className="font-semibold text-sm text-[var(--gold-soft)">
-                          Supplements
-                        </p>
+                  return (
+                    <div
+                      key={index}
+                      className="rounded-3xl border border-white/10 bg-white/[0.03] p-4"
+                    >
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-yellow-300">
+                            Room {index + 1}
+                          </p>
 
-                        <ul className="list-disc pl-5 text-sm text-[var(--text-muted) mt-1">
-                          {supplements.map((item, index) => (
-                            <li key={index}>
-                              {item?.Description ||
-                                item?.Name ||
-                                item?.SupplementDescription ||
-                                JSON.stringify(item)}
-                            </li>
-                          ))}
-                        </ul>
+                          <h3 className="mt-1 text-lg font-bold text-white">
+                            {roomName}
+                          </h3>
+
+                          <p className="mt-2 text-sm text-slate-400">
+                            Inclusion:{" "}
+                            <span className="font-semibold text-slate-200">
+                              {inclusion}
+                            </span>
+                          </p>
+
+                          {roomPromotions.length > 0 && index === 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {roomPromotions.map((promotion, promoIndex) => (
+                                <span
+                                  key={promoIndex}
+                                  className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300"
+                                >
+                                  {typeof promotion === "string"
+                                    ? promotion
+                                    : promotion?.Description ||
+                                      promotion?.Name ||
+                                      promotion?.PromotionName ||
+                                      "Promotion"}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-300">
+                          <p className="font-bold text-white">
+                            👤 {adults || totalAdults || 0} Adult
+                            {(adults || totalAdults || 0) !== 1 ? "s" : ""}
+                          </p>
+
+                          <p className="mt-1 font-bold text-white">
+                            🧒 {children || totalChildren || 0} Child
+                            {(children || totalChildren || 0) !== 1
+                              ? "ren"
+                              : ""}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  );
+                })}
 
-                  <div className="md:col-span-3 text-right text-sm">
-                    <p className="font-semibold text-white">
-                      👤 {adultCount || 1} Adult(s)
-                      {childCount > 0 ? `, ${childCount} Child` : ""}
-                    </p>
+                {supplements.length > 0 && (
+                  <div className="rounded-3xl border border-orange-400/20 bg-orange-400/10 p-4">
+                    <h4 className="mb-3 font-bold text-orange-200">
+                      Supplements
+                    </h4>
 
-                    <button className="mt-4 text-[var(--gold-main) underline underline-offset-4">
-                      Show Room Description(+)
-                    </button>
+                    <ul className="space-y-2 text-sm text-orange-100">
+                      {supplements.map((item, index) => (
+                        <li key={index}>
+                          •{" "}
+                          {item?.Description ||
+                            item?.Name ||
+                            item?.SupplementDescription ||
+                            item?.SupplementName ||
+                            JSON.stringify(item)}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
+                )}
               </div>
             </SectionCard>
 
-            {/* GUEST DETAILS */}
             <SectionCard>
               <SectionTitle icon="🪪" title="Guest Details" />
 
-              <div className="p-5">
-                <div className="flex justify-between gap-4">
-                  <div>
-                    <p className="font-bold mb-2 text-[var(--gold-soft)">
-                      Room 1
-                    </p>
-
-                    {guestDetails.length > 0 ? (
-                      guestDetails.map((g, i) => (
-                        <div
-                          key={i}
-                          className="grid grid-cols-1 md:grid-cols-12 gap-2 py-1 text-sm"
-                        >
-                          <p className="md:col-span-3 text-[var(--gold-main) font-semibold">
-                            {Number(g.PaxType) === 2 ||
-                            String(g.Title).toLowerCase().includes("mstr") ||
-                            String(g.Title).toLowerCase().includes("miss")
-                              ? "Child"
-                              : "Adult"}{" "}
-                            {g.LeadPassenger || i === 0
-                              ? "1 (Lead Guest)"
-                              : i + 1}
-                          </p>
-
-                          <p className="md:col-span-9 font-bold text-white">
-                            {g.Title ? `${g.Title}. ` : ""}
-                            {g.FirstName || g.firstName || ""}{" "}
-                            {g.LastName || g.lastName || ""}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-[var(--text-muted)">
-                        No guest details available
+              <div className="space-y-4 p-5">
+                {guestsByRoom.length > 0 ? (
+                  guestsByRoom.map((roomGroup, roomIndex) => (
+                    <div
+                      key={roomIndex}
+                      className="rounded-3xl border border-white/10 bg-white/[0.03] p-4"
+                    >
+                      <p className="mb-3 font-bold text-yellow-300">
+                        Room {roomGroup.roomIndex + 1}
                       </p>
-                    )}
-                  </div>
 
-                  <button className="text-[var(--gold-main) underline underline-offset-4 text-sm h-fit">
-                    Show Pax Details
-                  </button>
-                </div>
+                      <div className="space-y-3">
+                        {roomGroup.guests.length > 0 ? (
+                          roomGroup.guests.map((guest, guestIndex) => (
+                            <div
+                              key={guestIndex}
+                              className="grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-black/20 p-3 md:grid-cols-12 md:items-center"
+                            >
+                              <div className="md:col-span-3">
+                                <span className="rounded-full border border-yellow-300/20 bg-yellow-300/10 px-3 py-1 text-xs font-bold text-yellow-300">
+                                  {getPaxTypeLabel(guest)} {guestIndex + 1}
+                                </span>
+                              </div>
+
+                              <div className="md:col-span-6">
+                                <p className="font-bold text-white">
+                                  {getGuestName(guest)}
+                                </p>
+
+                                {guest?.Age && (
+                                  <p className="text-xs text-slate-400">
+                                    Age: {guest.Age}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="md:col-span-3 md:text-right">
+                                {guest?.LeadPassenger && (
+                                  <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                                    Lead Guest
+                                  </span>
+                                )}
+                              </div>
+
+                              {guest?.LeadPassenger &&
+                                (guest?.Email || guest?.Phoneno) && (
+                                  <div className="md:col-span-12 grid gap-2 border-t border-white/10 pt-3 text-xs text-slate-400 sm:grid-cols-2">
+                                    {guest?.Email && <p>📧 {guest.Email}</p>}
+                                    {guest?.Phoneno && (
+                                      <p>📞 {guest.Phoneno}</p>
+                                    )}
+                                  </div>
+                                )}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-slate-400">
+                            Guest details not available for this room.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    No guest details available.
+                  </p>
+                )}
               </div>
             </SectionCard>
 
-            {/* CANCELLATION CHARGES */}
             <SectionCard>
               <SectionTitle icon="🕘" title="Cancellation Charges" />
 
               <div className="p-5">
-                <p className="font-bold mb-4 text-white">Room 1 : {roomName}</p>
+                <p className="mb-4 text-sm font-semibold text-slate-300">
+                  {getRoomName(rooms[0], roomData, 0)}
+                </p>
 
-                <div className="overflow-x-auto rounded-2xl border border-[var(--border-soft)">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[var(--bg-secondary) text-[var(--gold-soft)">
-                      <tr>
-                        <th className="text-left p-3 border border-[var(--border-soft)">
-                          Cancelled on or After
-                        </th>
-                        <th className="text-left p-3 border border-[var(--border-soft)">
-                          Cancelled on or Before
-                        </th>
-                        <th className="text-left p-3 border border-[var(--border-soft)">
-                          Cancellation Charges
-                        </th>
-                      </tr>
-                    </thead>
+                <div className="overflow-hidden rounded-3xl border border-white/10">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px] text-sm">
+                      <thead className="bg-white/[0.04] text-yellow-300">
+                        <tr>
+                          <th className="p-4 text-left font-bold">
+                            Cancelled on or After
+                          </th>
+                          <th className="p-4 text-left font-bold">
+                            Cancelled on or Before
+                          </th>
+                          <th className="p-4 text-left font-bold">Charges</th>
+                        </tr>
+                      </thead>
 
-                    <tbody className="text-[var(--text-muted)">
-                      {cancelPolicies.length > 0 ? (
-                        cancelPolicies.map((policy, index) => (
-                          <tr key={index}>
-                            <td className="p-3 border border-[var(--border-soft)">
-                              {formatDate(policy.FromDate || policy.fromDate)}
-                            </td>
+                      <tbody className="divide-y divide-white/10 text-slate-300">
+                        {cancelPolicies.length > 0 ? (
+                          cancelPolicies.map((policy, index) => (
+                            <tr key={index}>
+                              <td className="p-4">
+                                {formatDate(
+                                  policy?.FromDate || policy?.fromDate,
+                                )}
+                              </td>
 
-                            <td className="p-3 border border-[var(--border-soft)">
-                              {formatDate(
-                                policy.ToDate ||
-                                  policy.toDate ||
-                                  checkOut ||
-                                  policy.FromDate,
-                              )}
-                            </td>
+                              <td className="p-4">
+                                {formatDate(
+                                  policy?.ToDate ||
+                                    policy?.toDate ||
+                                    policy?.CancelledOnOrBefore ||
+                                    checkOut ||
+                                    policy?.FromDate,
+                                )}
+                              </td>
 
-                            <td className="p-3 border border-[var(--border-soft) text-white font-semibold">
-                              {policy.ChargeType === "Percentage"
-                                ? `${policy.CancellationCharge}%`
-                                : policy.CancellationCharge === 0
-                                  ? "Free"
-                                  : policy.CancellationCharge
-                                    ? formatMoney(policy.CancellationCharge)
-                                    : "100%"}
+                              <td className="p-4">
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-bold ${
+                                    getCancellationChargeText(policy) === "Free"
+                                      ? "bg-emerald-400/10 text-emerald-300"
+                                      : "bg-red-400/10 text-red-300"
+                                  }`}
+                                >
+                                  {getCancellationChargeText(policy)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="p-4 text-center">
+                              Cancellation policy not available in response.
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td className="p-3 border border-[var(--border-soft)">
-                            {formatDate(checkIn)}
-                          </td>
-                          <td className="p-3 border border-[var(--border-soft)">
-                            {formatDate(checkOut)}
-                          </td>
-                          <td className="p-3 border border-[var(--border-soft) text-white font-semibold">
-                            100%
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
-                <p className="mt-6 text-sm text-[var(--text-muted)">
-                  <span className="text-red-400 font-semibold">Note:</span>{" "}
-                  Early check out will attract full cancellation charges unless
-                  otherwise specified.
+                <p className="mt-4 text-sm text-slate-400">
+                  <span className="font-semibold text-red-300">Note:</span>{" "}
+                  Early check out may attract full cancellation charges if
+                  specified by the supplier.
                 </p>
               </div>
             </SectionCard>
 
-            {/* ROOM AMENITIES */}
             <SectionCard>
               <SectionTitle icon="☑️" title="Room Amenities" />
 
-              <div className="p-5 overflow-x-auto">
-                <table className="w-full border border-[var(--border-soft) text-sm rounded-2xl overflow-hidden">
-                  <thead className="bg-[var(--bg-secondary) text-[var(--gold-soft)">
-                    <tr>
-                      <th className="p-3 border border-[var(--border-soft) text-left w-28">
-                        Room
-                      </th>
-                      <th className="p-3 border border-[var(--border-soft) text-left">
-                        Amenities
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    <tr>
-                      <td className="p-3 border border-[var(--border-soft) font-bold text-center text-white">
-                        Room 1
-                      </td>
-                      <td className="p-3 border border-[var(--border-soft) text-[var(--text-muted) leading-relaxed">
-                        {amenities}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </SectionCard>
-
-            {/* REMARK */}
-            <SectionCard>
-              <SectionTitle icon="📝" title="Remark" />
-
-              <div className="p-5 text-[var(--text-muted)">
-                {booking?.Remark || booking?.Remarks || "N.a."}
-              </div>
-            </SectionCard>
-
-            {/* HOTEL NORMS */}
-            <SectionCard>
-              <SectionTitle icon="📋" title="Hotel Norms" />
-
-              <div className="p-5 text-sm space-y-2 text-[var(--text-muted)">
-                {hotelNorms.length > 0 ? (
-                  hotelNorms.map((norm, index) => (
-                    <p key={index}>
-                      {index + 1}. {norm}
-                    </p>
-                  ))
+              <div className="p-5">
+                {amenities.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {amenities.map((amenity, index) => (
+                      <span
+                        key={index}
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-300"
+                      >
+                        {amenity}
+                      </span>
+                    ))}
+                  </div>
                 ) : (
-                  <>
-                    <p>1. CheckIn Time-Begin: 12:00 PM</p>
-                    <p>2. CheckIn Time-End: anytime</p>
-                    <p>3. CheckOut Time: 12:00 PM</p>
-                  </>
+                  <p className="text-sm text-slate-400">
+                    Room amenities not available in response.
+                  </p>
                 )}
               </div>
             </SectionCard>
-          </div>
 
-          {/* RIGHT SIDEBAR */}
-          <aside className="lg:col-span-3 space-y-5">
             <SectionCard>
-              <div className="bg-linear-to-r from-[var(--color-start) to-[var(--color-end) text-black p-4 font-bold">
-                Need Modification in Booking?
-              </div>
+              <SectionTitle icon="📋" title="Hotel Norms" />
 
-              <div className="grid grid-cols-2 gap-3 p-4 text-sm text-[var(--text-muted)">
-                <button className="text-left hover:text-[var(--gold-main) transition">
-                  👤 Amendments
-                </button>
-
-                <button className="text-left hover:text-[var(--gold-main) transition">
-                  ★ Special Requests
-                </button>
-
-                <button
-                  onClick={handleChangeRequest}
-                  className="text-left hover:text-red-400 transition"
-                >
-                  ✖ Cancel Booking
-                </button>
-
-                <button className="text-left hover:text-[var(--gold-main) transition">
-                  ? Other Queries
-                </button>
-              </div>
-
-              <div className="border-t border-[var(--border-soft) p-4">
-                <p className="font-bold text-sm mb-3 text-white">
-                  Raised Request
-                </p>
-
-                <p className="text-sm text-[var(--gold-main)">
-                  {changeMsg || "No tickets found for the given booking"}
-                </p>
+              <div className="p-5">
+                {hotelNorms.length > 0 ? (
+                  <div className="space-y-3 text-sm text-slate-300">
+                    {hotelNorms.map((norm, index) => (
+                      <div
+                        key={index}
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+                        dangerouslySetInnerHTML={{
+                          __html: `${index + 1}. ${cleanHtml(norm)}`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    Hotel norms not available in response.
+                  </p>
+                )}
               </div>
             </SectionCard>
 
-            <div className="bg-[var(--bg-card) border border-[var(--border-soft) rounded-3xl p-4 font-semibold text-white shadow-xl shadow-black/20">
-              📞 Call us at:{" "}
-              <a
-                href="tel:+919667455591"
-                className="text-[var(--gold-main) hover:underline"
-              >
-                +919667455591
-              </a>
-            </div>
+            <SectionCard>
+              <SectionTitle icon="📝" title="Remark" />
+
+              <div className="p-5 text-sm text-slate-300">
+                {booking?.Remark || booking?.Remarks || "Remark not available."}
+              </div>
+            </SectionCard>
+          </main>
+
+          <aside className="space-y-5 lg:col-span-4">
+            <SectionCard>
+              <SectionTitle icon="⚙️" title="Booking Actions" />
+
+              <div className="space-y-3 p-5">
+                <button
+                  onClick={handleChangeRequest}
+                  disabled={changeLoading || Boolean(changeMsg)}
+                  className={`w-full rounded-2xl border px-4 py-3 text-left text-sm font-bold transition ${
+                    changeMsg
+                      ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                      : "border-red-400/30 bg-red-400/10 text-red-300 hover:bg-red-400/20"
+                  } disabled:cursor-not-allowed disabled:opacity-70`}
+                >
+                  {changeLoading
+                    ? "Sending request..."
+                    : changeMsg
+                      ? "Change request already raised"
+                      : "Cancel / Change Request"}
+                </button>
+
+                {changeMsg && (
+                  <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-300">
+                    {changeMsg}
+                  </div>
+                )}
+
+                {changeError && (
+                  <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-300">
+                    {changeError}
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+
+            {supportPhone && (
+              <div className="rounded-[2rem] border border-white/10 bg-[#12121A] p-5 shadow-xl shadow-black/30">
+                <p className="text-sm text-slate-400">Support Contact</p>
+
+                <a
+                  href={`tel:${supportPhone}`}
+                  className="mt-1 block text-lg font-black text-yellow-300 hover:underline"
+                >
+                  {supportPhone}
+                </a>
+              </div>
+            )}
 
             <SectionCard>
-              <div className="bg-linear-to-r from-[var(--bg-primary) via-[var(--bg-via) to-[var(--bg-secondary) p-4 font-bold text-[var(--gold-main) border-b border-[var(--border-soft)">
-                Sale Summary
+              <SectionTitle icon="💰" title="Sale Summary" />
+
+              <div className="space-y-4 p-5 text-sm">
+                <p className="font-bold text-white">
+                  {getRoomName(rooms[0], roomData, 0)}
+                </p>
+
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                  <SummaryRow
+                    label="Published Rate"
+                    value={formatMoney(publishedRate, currency)}
+                  />
+
+                  <SummaryRow
+                    label="Offered Rate"
+                    value={formatMoney(offeredRate, currency)}
+                  />
+
+                  <SummaryRow label="No. of Rooms" value={rooms.length} />
+
+                  <SummaryRow label="Tax" value={formatMoney(tax, currency)} />
+
+                  <SummaryRow
+                    label="Commission"
+                    value={formatMoney(commission, currency)}
+                  />
+
+                  <SummaryRow label="TDS" value={formatMoney(tds, currency)} />
+
+                  <SummaryRow label="GST" value={formatMoney(gst, currency)} />
+                </div>
+
+                <div className="rounded-3xl bg-gradient-to-r from-yellow-300 to-orange-400 p-4 text-black">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-black">Grand Total</span>
+                    <span className="text-xl font-black">
+                      {formatMoney(netAmount, currency)}
+                    </span>
+                  </div>
+                </div>
               </div>
+            </SectionCard>
 
-              <div className="p-4 text-sm space-y-3">
-                <p className="font-bold text-white">{roomName}</p>
+            <SectionCard>
+              <SectionTitle icon="📊" title="Stay Summary" />
 
-                <SummaryRow
-                  label="Rate (Published)"
-                  value={formatMoney(publishedRate)}
-                />
-
-                <SummaryRow
-                  label="Rate (Offered)"
-                  value={formatMoney(offeredRate)}
-                />
-
-                <button className="block ml-auto text-[var(--gold-main) underline underline-offset-4 text-xs">
-                  Rate Breakup
-                </button>
-
-                <SummaryRow label="No. of Rooms" value="1" />
-
-                <div className="border-t border-[var(--border-soft) pt-3">
-                  <SummaryRow
-                    label="Total"
-                    value={formatMoney(offeredRate)}
-                    bold
-                  />
-
-                  <p className="text-xs text-[var(--text-muted)">
-                    (
-                    {Math.round(Number(offeredRate || 0)).toLocaleString(
-                      "en-IN",
-                    )}{" "}
-                    X 1)
-                  </p>
-                </div>
-
-                <SummaryRow
-                  label="Comm. Earned"
-                  value={formatMoney(commission)}
-                />
-                <SummaryRow label="TDS" value={formatMoney(tds)} />
-
-                {tax > 0 && <SummaryRow label="Tax" value={formatMoney(tax)} />}
-
-                <div className="bg-(--bg-secondary) -mx-4 px-4 py-3 border-y border-(--border-soft)">
-                  <SummaryRow label="Total GST" value={formatMoney(gst)} bold />
-                </div>
-
-                <div className="bg-linear-to-r from-start to-end -mx-4 px-4 py-4 text-black">
-                  <SummaryRow
-                    label="Grand Total"
-                    value={formatMoney(netAmount)}
-                    bold
-                    large
-                  />
-                </div>
-
-                <button className="text-(--gold-main) font-bold">
-                  + Show Details
-                </button>
+              <div className="grid grid-cols-2 gap-3 p-5">
+                <MiniStat label="Rooms" value={rooms.length} />
+                <MiniStat label="Nights" value={nights} />
+                <MiniStat label="Adults" value={totalAdults} />
+                <MiniStat label="Children" value={totalChildren} />
               </div>
             </SectionCard>
           </aside>
         </div>
 
-        {/* MESSAGES */}
-        {changeMsg && (
-          <div className="mt-5 bg-green-500/10 border border-green-500/30 p-4 rounded-2xl text-green-400">
-            {changeMsg}
-          </div>
-        )}
+        <div className="mt-8 flex flex-wrap justify-end gap-3">
+          <ActionButton onClick={handleInvoiceClick}>View Invoice</ActionButton>
 
-        {changeError && (
-          <div className="mt-5 bg-red-500/10 border border-red-500/30 p-4 rounded-2xl text-red-400">
-            {changeError}
-          </div>
-        )}
-
-        {/* BOTTOM ACTIONS */}
-        <div className="mt-8 flex flex-wrap justify-end gap-4">
-          <GoldButton onClick={handleInvoiceClick}>View Invoice</GoldButton>
-
-          <GoldButton
+          <ActionButton
             onClick={() => {
               setViewLoading(true);
               handleVoucherClick();
             }}
           >
             {viewLoading ? "Loading..." : "View Voucher"}
-          </GoldButton>
+          </ActionButton>
         </div>
       </div>
     </div>
@@ -820,7 +1178,7 @@ const HotelBookingSuccess = () => {
 
 const SectionCard = ({ children }) => {
   return (
-    <section className="bg-[var(--bg-card) border border-[var(--border-soft) rounded-3xl overflow-hidden shadow-xl shadow-black/20">
+    <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#12121A] shadow-xl shadow-black/30">
       {children}
     </section>
   );
@@ -828,32 +1186,73 @@ const SectionCard = ({ children }) => {
 
 const SectionTitle = ({ icon, title }) => {
   return (
-    <div className="bg-linear-to-r from-[var(--bg-primary) via-[var(--bg-via) to-[var(--bg-secondary) px-5 py-4 font-bold text-[var(--gold-main) flex items-center gap-2 border-b border-[var(--border-soft)">
-      <span>{icon}</span>
-      <span className="font-[var(--font-heading) tracking-wide">{title}</span>
+    <div className="border-b border-white/10 bg-gradient-to-r from-[#1A1B28] via-[#171923] to-[#111827] px-5 py-4">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{icon}</span>
+        <h3 className="font-black tracking-wide text-yellow-300">{title}</h3>
+      </div>
     </div>
   );
 };
 
-const SummaryRow = ({ label, value, bold = false, large = false }) => {
+const SummaryRow = ({ label, value }) => {
   return (
-    <div
-      className={`flex justify-between gap-4 ${
-        bold ? "font-bold text-white" : "text-[var(--text-muted)"
-      } ${large ? "text-base" : ""}`}
-    >
-      <span>{label}</span>
-      <span>{value}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-white/10 py-3 last:border-b-0">
+      <span className="text-slate-400">{label}</span>
+      <span className="font-bold text-white">{value}</span>
     </div>
   );
 };
 
-const GoldButton = ({ children, onClick }) => {
+const InfoTile = ({ label, value }) => {
   return (
-    <button
-      onClick={onClick}
-      className="px-4 py-2 rounded-xl bg-linear-to-r from-start to-end text-black font-bold text-sm shadow-lg shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition"
-    >
+    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-sm font-bold text-white">{value}</p>
+    </div>
+  );
+};
+
+const DateTile = ({ label, value, icon }) => {
+  return (
+    <div className="rounded-[2rem] border border-white/10 bg-[#12121A] p-5 shadow-xl shadow-black/30">
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-300/20 bg-yellow-300/10 text-xl">
+          {icon}
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-1 font-black text-white">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MiniStat = ({ label, value }) => {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">
+      <p className="text-2xl font-black text-yellow-300">{value}</p>
+      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+    </div>
+  );
+};
+
+const ActionButton = ({ children, onClick, variant = "gold" }) => {
+  const className =
+    variant === "dark"
+      ? "rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-white transition hover:bg-white/[0.08]"
+      : "rounded-xl bg-gradient-to-r from-yellow-300 to-orange-400 px-4 py-2 text-sm font-bold text-black shadow-lg shadow-yellow-500/10 transition hover:scale-[1.02] active:scale-[0.98]";
+
+  return (
+    <button onClick={onClick} className={className}>
       {children}
     </button>
   );
