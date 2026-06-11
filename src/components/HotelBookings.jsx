@@ -629,11 +629,11 @@ const HotelBookings = () => {
                       label="Convenience Fee"
                       value={formatMoney(fee)}
                     /> */}
-                    <DetailItem
+                    {/* <DetailItem
                       label="Total Amount"
                       value={formatMoney(total)}
                       className="sm:col-span-2 lg:col-span-1"
-                    />
+                    /> */}
                   </div>
 
                   <div className="mt-5 rounded-2xl bg-yellow-400/10 p-5 border border-yellow-400/20">
@@ -694,10 +694,10 @@ const HotelBookings = () => {
                       value={hotelDetail.HotelCode}
                     />
                     <DetailItem label="Hotel ID" value={hotelDetail.HotelId} />
-                    <DetailItem
+                    {/* <DetailItem
                       label="TBO Hotel Code"
                       value={hotelDetail.TBOHotelCode}
-                    />
+                    /> */}
                     <DetailItem
                       label="Hotel Confirmation No"
                       value={hotelDetail.HotelConfirmationNo}
@@ -737,7 +737,7 @@ const HotelBookings = () => {
                     />
                   </div>
 
-                  {hotelDetail.Latitude && hotelDetail.Longitude && (
+                  {/* {hotelDetail.Latitude && hotelDetail.Longitude && (
                     <a
                       href={`https://www.google.com/maps?q=${hotelDetail.Latitude},${hotelDetail.Longitude}`}
                       target="_blank"
@@ -746,7 +746,7 @@ const HotelBookings = () => {
                     >
                       Open Location in Google Maps
                     </a>
-                  )}
+                  )} */}
                 </DetailSection>
 
                 {/* Dates */}
@@ -789,25 +789,6 @@ const HotelBookings = () => {
                   </div>
                 </DetailSection>
 
-                {/* Error */}
-                <DetailSection title="TBO Response / Error">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <DetailItem
-                      label="Error Code"
-                      value={hotelDetail.Error?.ErrorCode}
-                    />
-                    <DetailItem
-                      label="Error Message"
-                      value={hotelDetail.Error?.ErrorMessage}
-                    />
-                    <DetailItem
-                      label="Response Status"
-                      value={hotelDetail.ResponseStatus}
-                    />
-                    <DetailItem label="Trace ID" value={hotelDetail.TraceId} />
-                  </div>
-                </DetailSection>
-
                 {/* Rooms */}
                 {hotelDetail.Rooms?.map((room, idx) => (
                   <DetailSection
@@ -818,10 +799,7 @@ const HotelBookings = () => {
                       <DetailItem label="Room ID" value={room.RoomId} />
                       <DetailItem label="Room Index" value={room.RoomIndex} />
                       <DetailItem label="Room Status" value={room.RoomStatus} />
-                      <DetailItem
-                        label="Availability Type"
-                        value={room.AvailabilityType}
-                      />
+                      {/*  */}
                       <DetailItem
                         label="Room Type Code"
                         value={room.RoomTypeCode}
@@ -882,74 +860,6 @@ const HotelBookings = () => {
                       </div>
                     )}
 
-                    {/* Price Breakup */}
-                    <div className="mt-5 rounded-2xl bg-white/5 border border-white/10 p-4">
-                      <h4 className="text-yellow-200 text-sm mb-3">
-                        Room Price Breakup
-                      </h4>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <DetailItem
-                          label="Currency"
-                          value={room.PriceBreakUp?.CurrencyCode}
-                        />
-                        <DetailItem
-                          label="Room Rate"
-                          value={formatMoney(room.PriceBreakUp?.RoomRate)}
-                        />
-                        <DetailItem
-                          label="Room Tax"
-                          value={formatMoney(room.PriceBreakUp?.RoomTax)}
-                        />
-                        <DetailItem
-                          label="Extra Guest Charges"
-                          value={formatMoney(
-                            room.PriceBreakUp?.RoomExtraGuestCharges,
-                          )}
-                        />
-                        <DetailItem
-                          label="Child Charges"
-                          value={formatMoney(
-                            room.PriceBreakUp?.RoomChildCharges,
-                          )}
-                        />
-                        <DetailItem
-                          label="Service Fee"
-                          value={formatMoney(room.PriceBreakUp?.ServiceFee)}
-                        />
-                        <DetailItem
-                          label="Agent Commission"
-                          value={formatMoney(
-                            room.PriceBreakUp?.AgentCommission,
-                          )}
-                        />
-                      </div>
-
-                      {!!room.PriceBreakUp?.TaxBreakup?.length && (
-                        <div className="mt-4 overflow-x-auto">
-                          <table className="w-full min-w-130 text-sm">
-                            <thead>
-                              <tr className="border-b border-white/10 text-left text-gray-400">
-                                <th className="py-2 pr-3">Tax Type</th>
-                                <th className="py-2 pr-3">Tax Amount</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {room.PriceBreakUp.TaxBreakup.map((tax, i) => (
-                                <tr key={i} className="border-b border-white/5">
-                                  <td className="py-2 pr-3 text-white">
-                                    {tax.TaxType || "N/A"}
-                                  </td>
-                                  <td className="py-2 pr-3 text-gray-300">
-                                    {formatMoney(tax.TaxAmount)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
 
                     {/* Passengers */}
                     {!!room.HotelPassenger?.length && (
@@ -1333,17 +1243,6 @@ const HotelBookings = () => {
                 </DetailSection>
 
                 {/* Full Raw JSON */}
-                <DetailSection title="Full Raw Booking JSON">
-                  <details className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <summary className="cursor-pointer text-sm text-yellow-300 font-semibold">
-                      Show / Hide Raw JSON
-                    </summary>
-
-                    <pre className="mt-4 max-h-125 overflow-auto rounded-xl bg-black/40 p-4 text-xs text-gray-300">
-                      {JSON.stringify(hotelDetail, null, 2)}
-                    </pre>
-                  </details>
-                </DetailSection>
               </div>
             )}
           </div>
