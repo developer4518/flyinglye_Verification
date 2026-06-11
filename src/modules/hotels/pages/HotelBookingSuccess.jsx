@@ -1540,4 +1540,3 @@ const ActionButton = ({ children, onClick, variant = "gold" }) => {
 };
 
 export default HotelBookingSuccess;
-

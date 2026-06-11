@@ -154,6 +154,15 @@ const HotelReviewBooking = () => {
         supplements: reviewData.supplements || [],
         roomAmenities: reviewData.roomAmenities || [],
         rateConditions: reviewData.rateConditions || [],
+
+        hotelFacilities:
+          reviewData.hotelFacilities ||
+          reviewData.hotelResult?.HotelFacilities ||
+          reviewData.hotelResult?.Facilities ||
+          reviewData.hotel?.HotelFacilities ||
+          reviewData.hotel?.Facilities ||
+          reviewData.hotel?.facilities ||
+          [],
       };
 
       localStorage.setItem(
