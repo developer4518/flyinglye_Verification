@@ -5,10 +5,165 @@ import { useState } from "react";
 import { privateApi } from "../../../services/api";
 import { useHotelStore } from "../../../store/hotelStore";
 
+const pickFirst = (...values) => {
+  return values.find(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== "" &&
+      String(value).trim().toLowerCase() !== "n/a",
+  );
+};
+
+const findDeepValueByKeys = (obj, keywords = [], maxDepth = 6) => {
+  const visited = new WeakSet();
+
+  const search = (value, depth = 0) => {
+    if (!value || depth > maxDepth) return "";
+
+    if (typeof value !== "object") return "";
+
+    if (visited.has(value)) return "";
+    visited.add(value);
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = search(item, depth + 1);
+        if (found) return found;
+      }
+      return "";
+    }
+
+    for (const [key, val] of Object.entries(value)) {
+      const keyLower = String(key).toLowerCase();
+
+      const isMatchingKey = keywords.some((keyword) =>
+        keyLower.includes(keyword.toLowerCase()),
+      );
+
+      if (
+        isMatchingKey &&
+        val !== undefined &&
+        val !== null &&
+        String(val).trim() !== "" &&
+        typeof val !== "object"
+      ) {
+        return String(val).trim();
+      }
+    }
+
+    for (const val of Object.values(value)) {
+      const found = search(val, depth + 1);
+      if (found) return found;
+    }
+
+    return "";
+  };
+
+  return search(obj);
+};
+
+const getHotelAddressFromReviewData = (data = {}) => {
+  const directAddress = pickFirst(
+    data?.hotelAddress,
+
+    data?.hotel?.hotel_address,
+    data?.hotel?.address,
+    data?.hotel?.Address,
+    data?.hotel?.HotelAddress,
+    data?.hotel?.AddressLine,
+    data?.hotel?.HotelAddressLine,
+    data?.hotel?.Location,
+    data?.hotel?.HotelLocation,
+
+    data?.hotel?.hotel_raw?.Address,
+    data?.hotel?.hotel_raw?.HotelAddress,
+    data?.hotel?.hotel_raw?.AddressLine,
+    data?.hotel?.hotel_raw?.HotelAddressLine,
+    data?.hotel?.hotel_raw?.Location,
+    data?.hotel?.hotel_raw?.HotelLocation,
+
+    data?.hotelResult?.Address,
+    data?.hotelResult?.HotelAddress,
+    data?.hotelResult?.AddressLine,
+    data?.hotelResult?.HotelAddressLine,
+    data?.hotelResult?.Location,
+    data?.hotelResult?.HotelLocation,
+
+    data?.prebookData?.raw?.HotelResult?.[0]?.Address,
+    data?.prebookData?.raw?.HotelResult?.[0]?.HotelAddress,
+    data?.prebookData?.raw?.HotelResult?.[0]?.AddressLine,
+    data?.prebookData?.raw?.HotelResult?.[0]?.HotelLocation,
+
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Address,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.HotelAddress,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.AddressLine,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.HotelLocation,
+  );
+
+  if (directAddress) return directAddress;
+
+  const deepAddress = findDeepValueByKeys(data, [
+    "hoteladdress",
+    "addressline",
+    "address",
+    "location",
+  ]);
+
+  if (deepAddress) return deepAddress;
+
+  const fallbackLocation = pickFirst(
+    data?.hotel?.city_name,
+    data?.hotel?.CityName,
+    data?.hotel?.city,
+    data?.hotel?.City,
+    data?.hotelResult?.CityName,
+    data?.hotelResult?.City,
+  );
+
+  return fallbackLocation || "";
+};
+
+const getHotelFacilitiesFromReviewData = (data = {}) => {
+  return (
+    data?.hotelFacilities ||
+    data?.hotelResult?.HotelFacilities ||
+    data?.hotelResult?.Facilities ||
+    data?.hotelResult?.HotelFacility ||
+    data?.hotel?.HotelFacilities ||
+    data?.hotel?.Facilities ||
+    data?.hotel?.facilities ||
+    data?.hotel?.hotel_facilities ||
+    data?.hotel?.hotel_raw?.HotelFacilities ||
+    data?.hotel?.hotel_raw?.Facilities ||
+    data?.prebookData?.raw?.HotelResult?.[0]?.HotelFacilities ||
+    data?.prebookData?.raw?.HotelResult?.[0]?.Facilities ||
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.HotelFacilities ||
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Facilities ||
+    []
+  );
+};
+
+const getHotelNormsFromReviewData = (data = {}) => {
+  return (
+    data?.hotelNorms ||
+    data?.HotelNorms ||
+    data?.hotelResult?.HotelNorms ||
+    data?.hotel?.HotelNorms ||
+    data?.hotel?.hotel_norms ||
+    data?.hotel?.hotel_raw?.HotelNorms ||
+    data?.roomData?.HotelNorms ||
+    data?.prebookData?.raw?.HotelResult?.[0]?.HotelNorms ||
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.HotelNorms ||
+    []
+  );
+};
+
 const HotelReviewBooking = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { setGuestDetails } = useHotelStore();
+  const { setGuestDetails, selectedHotel, selectedRoom, prebookData } =
+    useHotelStore();
 
   const stateData = location.state;
 
@@ -20,7 +175,56 @@ const HotelReviewBooking = () => {
     }
   })();
 
-  const reviewData = stateData || storedData;
+  const baseReviewData = stateData || storedData;
+
+  const reviewData = baseReviewData
+    ? {
+        ...baseReviewData,
+
+        hotel: {
+          ...(selectedHotel || {}),
+          ...(baseReviewData?.hotel || {}),
+          hotel_raw: {
+            ...(selectedHotel?.hotel_raw || selectedHotel?.rawHotel || {}),
+            ...(baseReviewData?.hotel?.hotel_raw || {}),
+          },
+        },
+
+        roomData:
+          baseReviewData?.roomData ||
+          selectedRoom ||
+          baseReviewData?.prebookData?.room ||
+          {},
+
+        prebookData: baseReviewData?.prebookData || prebookData || {},
+
+        hotelResult:
+          baseReviewData?.hotelResult ||
+          prebookData?.raw?.HotelResult?.[0] ||
+          prebookData?.raw?.Response?.HotelResult?.[0] ||
+          {},
+
+        hotelAddress:
+          baseReviewData?.hotelAddress ||
+          getHotelAddressFromReviewData({
+            ...baseReviewData,
+            hotel: {
+              ...(selectedHotel || {}),
+              ...(baseReviewData?.hotel || {}),
+              hotel_raw: {
+                ...(selectedHotel?.hotel_raw || selectedHotel?.rawHotel || {}),
+                ...(baseReviewData?.hotel?.hotel_raw || {}),
+              },
+            },
+            prebookData: baseReviewData?.prebookData || prebookData || {},
+            hotelResult:
+              baseReviewData?.hotelResult ||
+              prebookData?.raw?.HotelResult?.[0] ||
+              prebookData?.raw?.Response?.HotelResult?.[0] ||
+              {},
+          }),
+      }
+    : null;
 
   const [loading, setLoading] = useState(false);
 
@@ -62,7 +266,14 @@ const HotelReviewBooking = () => {
 
   const formatRoomName = (roomData) => {
     if (Array.isArray(roomData?.Name)) return roomData.Name[0];
-    return roomData?.Name || "Standard Room";
+
+    return (
+      roomData?.room_name ||
+      roomData?.RoomTypeName ||
+      roomData?.RoomName ||
+      roomData?.Name ||
+      "Standard Room"
+    );
   };
 
   const formatSupplementText = (supplement) => {
@@ -118,11 +329,17 @@ const HotelReviewBooking = () => {
     try {
       setLoading(true);
 
-      console.log(
-        "FINAL HOTEL PAYLOAD:",
-        JSON.stringify(reviewData.finalPayload, null, 2),
-      );
-
+      console.log("SELECTED HOTEL FROM STORE:", selectedHotel);
+      console.log("SELECTED ROOM FROM STORE:", selectedRoom);
+      console.log("PREBOOK DATA FROM STORE:", prebookData);
+      console.log("FINAL MERGED REVIEW DATA:", reviewData);
+      console.log("FINAL HOTEL ADDRESS SAVED:", {
+        hotelAddress:
+          reviewData?.hotelAddress || getHotelAddressFromReviewData(reviewData),
+        hotel: reviewData?.hotel,
+        selectedHotel,
+        prebookData,
+      });
       const res = await privateApi.post(
         "/api/hotels/hotels/book/",
         reviewData.finalPayload,
@@ -140,6 +357,13 @@ const HotelReviewBooking = () => {
         roomData: reviewData.roomData || {},
         hotelResult: reviewData.hotelResult || {},
 
+        hotelAddress:
+          reviewData?.hotelAddress ||
+          getHotelAddressFromReviewData(reviewData) ||
+          reviewData?.hotel?.city_name ||
+          reviewData?.hotel?.CityName ||
+          "",
+
         checkIn: reviewData.checkIn,
         checkOut: reviewData.checkOut,
         net: reviewData.net,
@@ -156,13 +380,11 @@ const HotelReviewBooking = () => {
         rateConditions: reviewData.rateConditions || [],
 
         hotelFacilities:
-          reviewData.hotelFacilities ||
-          reviewData.hotelResult?.HotelFacilities ||
-          reviewData.hotelResult?.Facilities ||
-          reviewData.hotel?.HotelFacilities ||
-          reviewData.hotel?.Facilities ||
-          reviewData.hotel?.facilities ||
-          [],
+          reviewData?.hotelFacilities ||
+          getHotelFacilitiesFromReviewData(reviewData),
+
+        hotelNorms:
+          reviewData?.hotelNorms || getHotelNormsFromReviewData(reviewData),
       };
 
       localStorage.setItem(
@@ -254,6 +476,12 @@ const HotelReviewBooking = () => {
               <h2 className="text-2xl font-bold text-yellow-400">
                 {hotel?.hotel_name || hotel?.HotelName || "Hotel Booking"}
               </h2>
+
+              <p className="mt-2 text-sm text-gray-400">
+                {reviewData?.hotelAddress ||
+                  getHotelAddressFromReviewData(reviewData) ||
+                  "Address not available"}
+              </p>
 
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-xl bg-[#0B0B0F] p-4">

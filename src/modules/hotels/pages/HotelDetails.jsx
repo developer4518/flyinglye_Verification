@@ -1450,16 +1450,16 @@ const HotelDetails = () => {
 
               <div className="relative flex flex-wrap items-start justify-between gap-4 mb-5">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-yellow-300/80">
+                  {/* <p className="text-xs uppercase tracking-[0.3em] text-yellow-300/80">
                     Amenities
-                  </p>
+                  </p> */}
 
                   <h2 className="mt-1 text-xl font-bold text-yellow-300">
                     Hotel Facilities
                   </h2>
 
                   <p className="mt-1 text-sm text-gray-400">
-                    Popular amenities and services available at this property.
+                    Popular Facilities and services available at this property.
                   </p>
                 </div>
 

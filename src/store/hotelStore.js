@@ -7,14 +7,109 @@ const normalizeChildAges = (children = 0, ages = []) => {
 
   return Array.from({ length: count }, (_, index) => {
     const age = Number(cleanAges[index]);
-
-    // Child age allowed: 1 to 12
     return age >= 1 && age <= 12 ? age : "";
   });
 };
 
 const getFirstArray = (...values) => {
   return values.find((value) => Array.isArray(value)) || [];
+};
+
+const pickFirst = (...values) => {
+  return values.find(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== "" &&
+      String(value).trim().toLowerCase() !== "n/a",
+  );
+};
+
+const getHotelAddress = (hotel = {}) => {
+  return (
+    pickFirst(
+      hotel.hotel_address,
+      hotel.address,
+      hotel.Address,
+      hotel.HotelAddress,
+      hotel.AddressLine,
+      hotel.HotelAddressLine,
+      hotel.Location,
+      hotel.HotelLocation,
+
+      hotel.hotel_raw?.hotel_address,
+      hotel.hotel_raw?.address,
+      hotel.hotel_raw?.Address,
+      hotel.hotel_raw?.HotelAddress,
+      hotel.hotel_raw?.AddressLine,
+      hotel.hotel_raw?.HotelAddressLine,
+      hotel.hotel_raw?.Location,
+      hotel.hotel_raw?.HotelLocation,
+
+      hotel.rawHotel?.hotel_address,
+      hotel.rawHotel?.address,
+      hotel.rawHotel?.Address,
+      hotel.rawHotel?.HotelAddress,
+      hotel.rawHotel?.AddressLine,
+      hotel.rawHotel?.HotelAddressLine,
+      hotel.rawHotel?.Location,
+      hotel.rawHotel?.HotelLocation,
+    ) || ""
+  );
+};
+
+const getHotelCity = (hotel = {}) => {
+  return (
+    pickFirst(
+      hotel.city_name,
+      hotel.CityName,
+      hotel.city,
+      hotel.City,
+
+      hotel.hotel_raw?.city_name,
+      hotel.hotel_raw?.CityName,
+      hotel.hotel_raw?.city,
+      hotel.hotel_raw?.City,
+
+      hotel.rawHotel?.city_name,
+      hotel.rawHotel?.CityName,
+      hotel.rawHotel?.city,
+      hotel.rawHotel?.City,
+    ) || ""
+  );
+};
+
+const getHotelFacilities = (hotel = {}) => {
+  return (
+    hotel.hotel_facilities ||
+    hotel.facilities ||
+    hotel.Facilities ||
+    hotel.HotelFacilities ||
+    hotel.HotelFacility ||
+    hotel.hotel_raw?.hotel_facilities ||
+    hotel.hotel_raw?.facilities ||
+    hotel.hotel_raw?.Facilities ||
+    hotel.hotel_raw?.HotelFacilities ||
+    hotel.hotel_raw?.HotelFacility ||
+    hotel.rawHotel?.hotel_facilities ||
+    hotel.rawHotel?.facilities ||
+    hotel.rawHotel?.Facilities ||
+    hotel.rawHotel?.HotelFacilities ||
+    hotel.rawHotel?.HotelFacility ||
+    []
+  );
+};
+
+const getHotelNorms = (hotel = {}) => {
+  return (
+    hotel.hotel_norms ||
+    hotel.HotelNorms ||
+    hotel.hotel_raw?.hotel_norms ||
+    hotel.hotel_raw?.HotelNorms ||
+    hotel.rawHotel?.hotel_norms ||
+    hotel.rawHotel?.HotelNorms ||
+    []
+  );
 };
 
 const getRoomName = (room = {}) => {
@@ -34,30 +129,80 @@ const normalizeRoom = (room = {}, index = 0) => {
   const bookingCode =
     room.booking_code || room.BookingCode || rawRoom?.BookingCode || null;
 
+  const roomName = getRoomName(room);
+
+  const totalFare =
+    Number(
+      room.price ??
+        room.TotalFare ??
+        room.Price?.PublishedPrice ??
+        rawRoom?.TotalFare ??
+        rawRoom?.Price?.PublishedPrice ??
+        0,
+    ) || 0;
+
+  const totalTax =
+    Number(
+      room.tax ??
+        room.TotalTax ??
+        room.Price?.Tax ??
+        rawRoom?.TotalTax ??
+        rawRoom?.Price?.Tax ??
+        0,
+    ) || 0;
+
+  const currency = room.currency || room.Currency || rawRoom?.Currency || "INR";
+
+  const inclusion =
+    room.inclusion || room.Inclusion || rawRoom?.Inclusion || "";
+
+  const meal = room.meal || room.MealType || rawRoom?.MealType || "";
+
+  const roomPromotion =
+    room.room_promotion || room.RoomPromotion || rawRoom?.RoomPromotion || [];
+
+  const cancelPolicies =
+    room.cancel_policies ||
+    room.CancelPolicies ||
+    rawRoom?.CancelPolicies ||
+    [];
+
+  const rateConditions =
+    room.rate_conditions ||
+    room.RateConditions ||
+    rawRoom?.RateConditions ||
+    [];
+
+  const supplements =
+    room.supplements || room.Supplements || rawRoom?.Supplements || [];
+
+  const amenities =
+    room.amenities ||
+    room.Amenities ||
+    room.RoomAmenities ||
+    rawRoom?.Amenities ||
+    rawRoom?.RoomAmenities ||
+    [];
+
   return {
     id: `${bookingCode || index}`,
 
-    room_name: getRoomName(room),
+    room_name: roomName,
+    Name: room.Name || rawRoom?.Name || roomName,
+    RoomTypeName: room.RoomTypeName || rawRoom?.RoomTypeName || roomName,
 
-    price:
-      Number(
-        room.price ??
-          room.TotalFare ??
-          room.Price?.PublishedPrice ??
-          rawRoom?.TotalFare ??
-          0,
-      ) || 0,
+    price: totalFare,
+    TotalFare: totalFare,
 
-    tax:
-      Number(
-        room.tax ?? room.TotalTax ?? room.Price?.Tax ?? rawRoom?.TotalTax ?? 0,
-      ) || 0,
+    tax: totalTax,
+    TotalTax: totalTax,
 
     published_price:
       room.published_price ??
       room.PublishedPrice ??
       room.Price?.PublishedPrice ??
       rawRoom?.PublishedPrice ??
+      rawRoom?.Price?.PublishedPrice ??
       null,
 
     offered_price:
@@ -65,36 +210,37 @@ const normalizeRoom = (room = {}, index = 0) => {
       room.OfferedPrice ??
       room.Price?.OfferedPrice ??
       rawRoom?.OfferedPrice ??
+      rawRoom?.Price?.OfferedPrice ??
       null,
 
-    currency: room.currency || room.Currency || rawRoom?.Currency || "INR",
+    currency,
+    Currency: currency,
 
-    meal: room.meal || room.MealType || rawRoom?.MealType || "",
+    meal,
+    MealType: meal,
 
     refundable:
       room.refundable ?? room.IsRefundable ?? rawRoom?.IsRefundable ?? false,
+    IsRefundable:
+      room.refundable ?? room.IsRefundable ?? rawRoom?.IsRefundable ?? false,
 
-    inclusion: room.inclusion || room.Inclusion || rawRoom?.Inclusion || "",
+    inclusion,
+    Inclusion: inclusion,
 
-    room_promotion:
-      room.room_promotion || room.RoomPromotion || rawRoom?.RoomPromotion || [],
+    room_promotion: roomPromotion,
+    RoomPromotion: roomPromotion,
 
-    cancel_policies:
-      room.cancel_policies ||
-      room.CancelPolicies ||
-      rawRoom?.CancelPolicies ||
-      [],
+    cancel_policies: cancelPolicies,
+    CancelPolicies: cancelPolicies,
 
-    rate_conditions:
-      room.rate_conditions ||
-      room.RateConditions ||
-      rawRoom?.RateConditions ||
-      [],
+    rate_conditions: rateConditions,
+    RateConditions: rateConditions,
 
-    supplements:
-      room.supplements || room.Supplements || rawRoom?.Supplements || [],
+    supplements,
+    Supplements: supplements,
 
-    amenities: room.amenities || room.Amenities || rawRoom?.Amenities || [],
+    amenities,
+    Amenities: amenities,
 
     booking_code: bookingCode,
     BookingCode: bookingCode,
@@ -108,6 +254,7 @@ const normalizeHotel = (hotel = {}) => {
     hotel.rooms,
     hotel.Rooms,
     hotel.hotel_raw?.Rooms,
+    hotel.rawHotel?.Rooms,
     hotel.HotelRooms,
   ).map(normalizeRoom);
 
@@ -116,12 +263,31 @@ const normalizeHotel = (hotel = {}) => {
       ? [...rooms].sort((a, b) => Number(a.price) - Number(b.price))[0]
       : null;
 
+  const address = getHotelAddress(hotel);
+  const cityName = getHotelCity(hotel);
+  const facilities = getHotelFacilities(hotel);
+  const norms = getHotelNorms(hotel);
+
   return {
     hotel_code: hotel.hotel_code || hotel.HotelCode || hotel.code || "",
     HotelCode: hotel.hotel_code || hotel.HotelCode || hotel.code || "",
 
     hotel_name: hotel.hotel_name || hotel.HotelName || hotel.name || "Hotel",
     HotelName: hotel.hotel_name || hotel.HotelName || hotel.name || "Hotel",
+
+    hotel_address: address,
+    address,
+    Address: address,
+    HotelAddress: address,
+
+    city_name: cityName,
+    CityName: cityName,
+
+    hotel_facilities: facilities,
+    HotelFacilities: facilities,
+
+    hotel_norms: norms,
+    HotelNorms: norms,
 
     nationality: hotel.nationality || hotel.Nationality || "",
     currency:
@@ -131,22 +297,33 @@ const normalizeHotel = (hotel = {}) => {
       hotel.image ||
       hotel.HotelPicture ||
       hotel.hotel_picture ||
+      hotel.hotel_raw?.HotelPicture ||
+      hotel.rawHotel?.HotelPicture ||
       "https://api.flyinglyte.com/media/hotels/default.jpg",
 
-    images: Array.isArray(hotel.images) ? hotel.images : [],
-    has_image: Boolean(hotel.has_image),
+    images: Array.isArray(hotel.images)
+      ? hotel.images
+      : Array.isArray(hotel.Images)
+        ? hotel.Images
+        : [],
 
-    rating: Number(hotel.rating || hotel.StarRating || hotel.star_rating || 4),
+    has_image: Boolean(hotel.has_image || hotel.HotelPicture),
+
+    rating: Number(
+      hotel.rating ||
+        hotel.HotelRating ||
+        hotel.StarRating ||
+        hotel.star_rating ||
+        4,
+    ),
 
     rooms,
     room_count: Number(hotel.room_count || rooms.length || 0),
     raw_room_count: Number(hotel.raw_room_count || rooms.length || 0),
 
-    // Keep API data for reference only
     pax_rooms: Array.isArray(hotel.pax_rooms) ? hotel.pax_rooms : [],
     api_child_ages: Array.isArray(hotel.child_ages) ? hotel.child_ages : [],
 
-    // Cheapest/default room for card display
     price: cheapestRoom?.price || 0,
     tax: cheapestRoom?.tax || 0,
     meal: cheapestRoom?.meal || "",
@@ -196,40 +373,122 @@ const normalizeHotelResponse = (response) => {
 const compactRoomForStorage = (room) => {
   if (!room) return null;
 
+  const normalizedRoom = normalizeRoom(room);
+
   return {
-    room_name:
-      room.room_name || room.Name || room.RoomTypeName || "Standard Room",
-    booking_code: room.booking_code || room.BookingCode || null,
-    BookingCode: room.booking_code || room.BookingCode || null,
-    price: Number(room.price || room.TotalFare || 0),
-    tax: Number(room.tax || room.TotalTax || 0),
-    meal: room.meal || room.MealType || "",
-    refundable: room.refundable ?? room.IsRefundable ?? false,
-    inclusion: room.inclusion || room.Inclusion || "",
-    currency: room.currency || room.Currency || "INR",
+    room_name: normalizedRoom.room_name,
+    Name: normalizedRoom.Name,
+    RoomTypeName: normalizedRoom.RoomTypeName,
+
+    booking_code: normalizedRoom.booking_code,
+    BookingCode: normalizedRoom.BookingCode,
+
+    price: normalizedRoom.price,
+    TotalFare: normalizedRoom.TotalFare,
+
+    tax: normalizedRoom.tax,
+    TotalTax: normalizedRoom.TotalTax,
+
+    published_price: normalizedRoom.published_price,
+    offered_price: normalizedRoom.offered_price,
+
+    meal: normalizedRoom.meal,
+    MealType: normalizedRoom.MealType,
+
+    refundable: normalizedRoom.refundable,
+    IsRefundable: normalizedRoom.IsRefundable,
+
+    inclusion: normalizedRoom.inclusion,
+    Inclusion: normalizedRoom.Inclusion,
+
+    currency: normalizedRoom.currency,
+    Currency: normalizedRoom.Currency,
+
+    RoomPromotion: normalizedRoom.RoomPromotion,
+    CancelPolicies: normalizedRoom.CancelPolicies,
+    RateConditions: normalizedRoom.RateConditions,
+    Supplements: normalizedRoom.Supplements,
+    Amenities: normalizedRoom.Amenities,
+
+    room_raw: {
+      BookingCode:
+        normalizedRoom.room_raw?.BookingCode || normalizedRoom.BookingCode,
+      Name: normalizedRoom.room_raw?.Name || normalizedRoom.Name,
+      TotalFare: normalizedRoom.room_raw?.TotalFare || normalizedRoom.TotalFare,
+      TotalTax: normalizedRoom.room_raw?.TotalTax || normalizedRoom.TotalTax,
+      Inclusion: normalizedRoom.room_raw?.Inclusion || normalizedRoom.Inclusion,
+      RoomPromotion:
+        normalizedRoom.room_raw?.RoomPromotion || normalizedRoom.RoomPromotion,
+      CancelPolicies:
+        normalizedRoom.room_raw?.CancelPolicies ||
+        normalizedRoom.CancelPolicies,
+      RateConditions:
+        normalizedRoom.room_raw?.RateConditions ||
+        normalizedRoom.RateConditions,
+      Supplements:
+        normalizedRoom.room_raw?.Supplements || normalizedRoom.Supplements,
+      Amenities: normalizedRoom.room_raw?.Amenities || normalizedRoom.Amenities,
+    },
   };
 };
 
 const compactHotelForStorage = (hotel) => {
   if (!hotel) return null;
 
+  const normalizedHotel = normalizeHotel(hotel);
+
   return {
-    hotel_code: hotel.hotel_code || hotel.HotelCode || "",
-    HotelCode: hotel.hotel_code || hotel.HotelCode || "",
-    hotel_name: hotel.hotel_name || hotel.HotelName || "Hotel",
-    HotelName: hotel.hotel_name || hotel.HotelName || "Hotel",
-    image: hotel.image || hotel.HotelPicture || "",
-    rating: hotel.rating || hotel.StarRating || 4,
-    currency: hotel.currency || hotel.Currency || "INR",
-    booking_code: hotel.booking_code || hotel.BookingCode || null,
-    BookingCode: hotel.booking_code || hotel.BookingCode || null,
-    selected_room: compactRoomForStorage(hotel.selected_room),
+    hotel_code: normalizedHotel.hotel_code,
+    HotelCode: normalizedHotel.HotelCode,
+
+    hotel_name: normalizedHotel.hotel_name,
+    HotelName: normalizedHotel.HotelName,
+
+    hotel_address: normalizedHotel.hotel_address,
+    address: normalizedHotel.address,
+    Address: normalizedHotel.Address,
+    HotelAddress: normalizedHotel.HotelAddress,
+
+    city_name: normalizedHotel.city_name,
+    CityName: normalizedHotel.CityName,
+
+    image: normalizedHotel.image,
+    images: normalizedHotel.images,
+    rating: normalizedHotel.rating,
+    currency: normalizedHotel.currency,
+
+    hotel_facilities: normalizedHotel.hotel_facilities,
+    HotelFacilities: normalizedHotel.HotelFacilities,
+
+    hotel_norms: normalizedHotel.hotel_norms,
+    HotelNorms: normalizedHotel.HotelNorms,
+
+    booking_code: normalizedHotel.booking_code,
+    BookingCode: normalizedHotel.BookingCode,
+
+    selected_room: compactRoomForStorage(normalizedHotel.selected_room),
+
+    hotel_raw: {
+      Address: normalizedHotel.Address,
+      HotelAddress: normalizedHotel.HotelAddress,
+      AddressLine:
+        normalizedHotel.hotel_raw?.AddressLine ||
+        normalizedHotel.rawHotel?.AddressLine ||
+        "",
+      Location:
+        normalizedHotel.hotel_raw?.Location ||
+        normalizedHotel.rawHotel?.Location ||
+        "",
+      CityName: normalizedHotel.CityName,
+      HotelFacilities: normalizedHotel.HotelFacilities,
+      HotelNorms: normalizedHotel.HotelNorms,
+      HotelPicture:
+        normalizedHotel.hotel_raw?.HotelPicture ||
+        normalizedHotel.rawHotel?.HotelPicture ||
+        normalizedHotel.image,
+    },
   };
 };
-
-/* ===================== */
-/* INITIAL STATE */
-/* ===================== */
 
 const initialSearch = {
   city: "",
@@ -246,13 +505,9 @@ const initialSearch = {
   },
 };
 
-/* ===================== */
-/* STORE */
-/* ===================== */
-
 export const useHotelStore = create(
   persist(
-    (set, get) => ({
+    (set) => ({
       search: initialSearch,
 
       hotels: [],
@@ -272,10 +527,6 @@ export const useHotelStore = create(
 
       loading: false,
       error: null,
-
-      /* ===================== */
-      /* SEARCH */
-      /* ===================== */
 
       setSearch: (searchData = {}) =>
         set((state) => {
@@ -302,10 +553,8 @@ export const useHotelStore = create(
                 adults: Number(mergedGuests.adults) || 1,
                 children,
                 rooms: Number(mergedGuests.rooms) || 1,
-
                 childAges: normalizedFlatChildAges,
 
-                // Keep room-wise child ages also
                 roomGuests: Array.isArray(mergedGuests.roomGuests)
                   ? mergedGuests.roomGuests.map((room, index) => {
                       const roomChildren = Number(
@@ -357,7 +606,6 @@ export const useHotelStore = create(
                 adults: Number(mergedGuests.adults) || 1,
                 children,
                 rooms: Number(mergedGuests.rooms) || 1,
-
                 childAges: normalizeChildAges(children, mergedGuests.childAges),
 
                 roomGuests: Array.isArray(mergedGuests.roomGuests)
@@ -403,17 +651,11 @@ export const useHotelStore = create(
               ...state.search,
               guests: {
                 ...state.search.guests,
-
-                // ✅ ONLY USER INPUT SHOULD UPDATE THIS
                 childAges: normalizeChildAges(children, ages),
               },
             },
           };
         }),
-
-      /* ===================== */
-      /* HOTEL SEARCH RESPONSE */
-      /* ===================== */
 
       setHotels: (hotelsResponse) =>
         set((state) => {
@@ -433,12 +675,7 @@ export const useHotelStore = create(
               nationality: meta.nationality || state.search.nationality,
               guests: {
                 ...state.search.guests,
-
-                // ✅ IMPORTANT:
-                // Do NOT use hotel.child_ages / pax_rooms child age from API.
-                // Always keep child age entered by user on search page.
                 childAges: normalizeChildAges(currentChildren, userChildAges),
-
                 roomGuests: Array.isArray(state.search.guests.roomGuests)
                   ? state.search.guests.roomGuests
                   : [],
@@ -446,10 +683,6 @@ export const useHotelStore = create(
             },
           };
         }),
-
-      /* ===================== */
-      /* HOTEL + ROOM SELECTION */
-      /* ===================== */
 
       setSelectedHotel: (hotel) =>
         set(() => ({
@@ -483,10 +716,6 @@ export const useHotelStore = create(
           };
         }),
 
-      /* ===================== */
-      /* PREBOOK / BOOK / DETAILS */
-      /* ===================== */
-
       setPrebookData: (data) =>
         set(() => ({
           prebookData: data,
@@ -512,10 +741,6 @@ export const useHotelStore = create(
           guestDetails: Array.isArray(guests) ? guests : [],
         })),
 
-      /* ===================== */
-      /* UI STATE */
-      /* ===================== */
-
       setLoading: (value) =>
         set(() => ({
           loading: Boolean(value),
@@ -525,10 +750,6 @@ export const useHotelStore = create(
         set(() => ({
           error,
         })),
-
-      /* ===================== */
-      /* RESET */
-      /* ===================== */
 
       resetFlow: () =>
         set(() => ({
@@ -601,6 +822,8 @@ export const useHotelStore = create(
         selectedHotel: compactHotelForStorage(state.selectedHotel),
         selectedRoom: compactRoomForStorage(state.selectedRoom),
         bookingCode: state.bookingCode,
+
+        prebookData: state.prebookData,
       }),
     },
   ),

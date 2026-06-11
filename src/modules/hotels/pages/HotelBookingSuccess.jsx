@@ -156,17 +156,20 @@ const getHotelResult = (saved) => {
     saved?.prebookData?.raw?.HotelResult?.[0] ||
     saved?.prebookData?.raw?.Response?.HotelResult?.[0] ||
     saved?.hotel?.hotel_raw ||
+    saved?.hotel?.rawHotel ||
     {}
   );
 };
 
 const getRoomName = (room, fallbackRoomData, index) => {
   const name =
+    room?.room_name ||
     room?.RoomTypeName ||
     room?.RoomName ||
     room?.RoomType ||
     room?.Name?.[0] ||
     room?.Name ||
+    fallbackRoomData?.room_name ||
     fallbackRoomData?.Name?.[0] ||
     fallbackRoomData?.RoomName ||
     fallbackRoomData?.RoomTypeName ||
@@ -365,6 +368,16 @@ const getFacilityText = (facility) => {
   );
 };
 
+const pickFirst = (...values) => {
+  return values.find(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== "" &&
+      String(value).trim().toLowerCase() !== "n/a",
+  );
+};
+
 const HotelBookingSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -426,6 +439,7 @@ const HotelBookingSuccess = () => {
         mergedSaved?.hotel ||
         finalBooking?.HotelDetails ||
         finalBooking?.HotelDetail ||
+        finalBooking?.Hotel ||
         {};
 
       const finalGuests =
@@ -450,6 +464,11 @@ const HotelBookingSuccess = () => {
       setSavedData(mergedSaved);
       setHotel(finalHotel);
       setGuestDetails(finalGuests);
+
+      console.log("SUCCESS PAGE SAVED DATA:", mergedSaved);
+      console.log("SUCCESS PAGE HOTEL:", finalHotel);
+      console.log("SUCCESS PAGE BOOKING:", finalBooking);
+      console.log("SUCCESS PAGE HOTEL ADDRESS:", mergedSaved?.hotelAddress);
     } catch (err) {
       console.error("BOOKING LOAD ERROR:", err);
     } finally {
@@ -563,18 +582,68 @@ const HotelBookingSuccess = () => {
     "Hotel Name N/A";
 
   const hotelAddress =
-    hotel?.address ||
-    hotel?.Address ||
-    hotel?.HotelAddress ||
-    savedData?.hotel?.address ||
-    savedData?.hotel?.Address ||
-    savedData?.hotel?.HotelAddress ||
-    savedData?.hotelResult?.HotelAddress ||
-    savedData?.hotelResult?.Address ||
-    hotelResult?.HotelAddress ||
-    hotelResult?.Address ||
-    booking?.HotelAddress ||
-    "Address N/A";
+    pickFirst(
+      savedData?.hotelAddress,
+      savedData?.reviewBookingData?.hotelAddress,
+
+      savedData?.hotel?.hotel_address,
+      savedData?.hotel?.address,
+      savedData?.hotel?.Address,
+      savedData?.hotel?.HotelAddress,
+      savedData?.hotel?.AddressLine,
+      savedData?.hotel?.HotelAddressLine,
+      savedData?.hotel?.Location,
+      savedData?.hotel?.HotelLocation,
+
+      savedData?.hotel?.hotel_raw?.hotel_address,
+      savedData?.hotel?.hotel_raw?.address,
+      savedData?.hotel?.hotel_raw?.Address,
+      savedData?.hotel?.hotel_raw?.HotelAddress,
+      savedData?.hotel?.hotel_raw?.AddressLine,
+      savedData?.hotel?.hotel_raw?.HotelAddressLine,
+      savedData?.hotel?.hotel_raw?.Location,
+      savedData?.hotel?.hotel_raw?.HotelLocation,
+
+      hotel?.hotel_address,
+      hotel?.address,
+      hotel?.Address,
+      hotel?.HotelAddress,
+      hotel?.AddressLine,
+      hotel?.HotelAddressLine,
+      hotel?.Location,
+      hotel?.HotelLocation,
+
+      hotel?.hotel_raw?.hotel_address,
+      hotel?.hotel_raw?.address,
+      hotel?.hotel_raw?.Address,
+      hotel?.hotel_raw?.HotelAddress,
+      hotel?.hotel_raw?.AddressLine,
+      hotel?.hotel_raw?.HotelAddressLine,
+      hotel?.hotel_raw?.Location,
+      hotel?.hotel_raw?.HotelLocation,
+
+      hotelResult?.hotel_address,
+      hotelResult?.address,
+      hotelResult?.Address,
+      hotelResult?.HotelAddress,
+      hotelResult?.AddressLine,
+      hotelResult?.HotelAddressLine,
+      hotelResult?.Location,
+      hotelResult?.HotelLocation,
+
+      booking?.HotelAddress,
+      booking?.Address,
+      booking?.AddressLine,
+      booking?.HotelAddressLine,
+      booking?.Location,
+
+      savedData?.hotel?.city_name,
+      savedData?.hotel?.CityName,
+      hotel?.city_name,
+      hotel?.CityName,
+      hotelResult?.CityName,
+      booking?.CityName,
+    ) || "Address N/A";
 
   const cityName =
     hotel?.city_name ||
@@ -945,7 +1014,13 @@ const HotelBookingSuccess = () => {
                     )}
                   </div>
 
-                  <p className="mt-2 text-sm leading-6 text-gray-400">
+                  <p
+                    className={`mt-2 text-sm leading-6 ${
+                      hotelAddress === "Address N/A"
+                        ? "text-red-300"
+                        : "text-gray-400"
+                    }`}
+                  >
                     {hotelAddress}
                   </p>
 
@@ -1379,49 +1454,41 @@ const HotelBookingSuccess = () => {
               </div>
             )}
 
-            <SectionCard>
-              <SectionTitle icon="💰" title="Sale Summary" />
+            {/* Price Summary */}
+            {/* Price Summary */}
+            <div className="sticky top-24 h-fit rounded-2xl border border-gray-800 bg-[#15151C] p-6">
+              <h3 className="mb-5 text-xl font-bold text-yellow-300">
+                Price Summary
+              </h3>
 
-              <div className="space-y-4 p-5 text-sm">
-                <p className="font-bold text-white">
-                  {getRoomName(rooms[0], roomData, 0)}
-                </p>
+              <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-base font-semibold text-white">
+                    Total Paid
+                  </span>
 
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-                  <SummaryRow
-                    label="Published Rate"
-                    value={formatMoney(publishedRate, currency)}
-                  />
-
-                  <SummaryRow
-                    label="Offered Rate"
-                    value={formatMoney(offeredRate, currency)}
-                  />
-
-                  <SummaryRow label="No. of Rooms" value={totalRooms} />
-
-                  <SummaryRow label="Tax" value={formatMoney(tax, currency)} />
-
-                  <SummaryRow
-                    label="Commission"
-                    value={formatMoney(commission, currency)}
-                  />
-
-                  <SummaryRow label="TDS" value={formatMoney(tds, currency)} />
-
-                  <SummaryRow label="GST" value={formatMoney(gst, currency)} />
-                </div>
-
-                <div className="rounded-3xl bg-gradient-to-r from-yellow-400 to-orange-400 p-4 text-black shadow-lg shadow-yellow-500/10">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="font-black">Grand Total</span>
-                    <span className="text-xl font-black">
-                      {formatMoney(netAmount, currency)}
-                    </span>
-                  </div>
+                  <span className="text-2xl font-black text-yellow-400">
+                    {formatMoney(netAmount, currency)}
+                  </span>
                 </div>
               </div>
-            </SectionCard>
+
+              <div className="mt-6 grid grid-cols-1 gap-3">
+                <button
+                  onClick={handleVoucherClick}
+                  className="w-full rounded-xl bg-gradient-to-r from-yellow-400 to-orange-400 py-3 text-base font-bold text-black transition hover:scale-[1.01]"
+                >
+                  View Voucher
+                </button>
+
+                <button
+                  onClick={handleInvoiceClick}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 text-base font-bold text-white transition hover:bg-white/[0.08]"
+                >
+                  View Invoice
+                </button>
+              </div>
+            </div>
 
             <SectionCard>
               <SectionTitle icon="📊" title="Stay Summary" />

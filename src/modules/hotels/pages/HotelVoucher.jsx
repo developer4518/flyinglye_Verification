@@ -13,11 +13,107 @@ const safeJsonParse = (value, fallback = {}) => {
   }
 };
 
-const formatDate = (dateValue) => {
-  if (!dateValue) return "N/A";
+const pickFirst = (...values) => {
+  return values.find((value) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === "object") return false;
 
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return dateValue;
+    const text = String(value).trim();
+    return text && text.toLowerCase() !== "n/a";
+  });
+};
+
+const pickFirstArray = (...values) => {
+  return values.find((value) => Array.isArray(value) && value.length > 0) || [];
+};
+
+const cleanText = (value) => {
+  if (!value) return "";
+  if (Array.isArray(value))
+    return value.map(cleanText).filter(Boolean).join(", ");
+
+  if (typeof value === "object") {
+    return (
+      value?.Name ||
+      value?.Description ||
+      value?.FacilityName ||
+      value?.AmenityName ||
+      value?.PromotionName ||
+      value?.SupplementName ||
+      value?.Type ||
+      ""
+    );
+  }
+
+  return String(value)
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&nbsp;", " ")
+    .trim();
+};
+
+const getFirstValue = (...values) => {
+  for (const value of values) {
+    const cleaned = cleanText(value);
+    if (cleaned) return cleaned;
+  }
+
+  return "";
+};
+
+const normalizeArray = (value, options = {}) => {
+  const { splitComma = true } = options;
+
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.flat(Infinity).map(cleanText).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    let text = value.split("|").join("\n");
+
+    if (splitComma) {
+      text = text.split(",").join("\n");
+    }
+
+    return text
+      .split("\n")
+      .map((item) => cleanText(item))
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const parseDateValue = (dateValue) => {
+  if (!dateValue) return null;
+
+  const value = String(dateValue).trim();
+  const datePart = value.split(" ")[0];
+  const parts = datePart.split("-");
+
+  let date;
+
+  if (parts.length === 3) {
+    const [a, b, c] = parts;
+
+    if (a.length === 4) {
+      date = new Date(Number(a), Number(b) - 1, Number(c));
+    } else if (c.length === 4) {
+      date = new Date(Number(c), Number(b) - 1, Number(a));
+    }
+  }
+
+  if (!date) date = new Date(dateValue);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatDate = (dateValue) => {
+  const date = parseDateValue(dateValue);
+
+  if (!date) return dateValue || "N/A";
 
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -27,47 +123,31 @@ const formatDate = (dateValue) => {
 };
 
 const getNights = (checkIn, checkOut) => {
-  if (!checkIn || !checkOut) return "N/A";
+  const inDate = parseDateValue(checkIn);
+  const outDate = parseDateValue(checkOut);
 
-  const inDate = new Date(checkIn);
-  const outDate = new Date(checkOut);
-
-  if (Number.isNaN(inDate.getTime()) || Number.isNaN(outDate.getTime())) {
-    return "N/A";
-  }
+  if (!inDate || !outDate) return "N/A";
 
   const diff = Math.ceil((outDate - inDate) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : "N/A";
 };
 
-const normalizeArray = (value) => {
-  if (!value) return [];
+const formatMoney = (value, currency = "INR") => {
+  const amount = Number(value || 0);
 
-  if (Array.isArray(value)) {
-    return value.flat(Infinity).filter(Boolean);
+  if (!amount) return "";
+
+  if (currency === "INR") {
+    return `₹ ${Math.round(amount).toLocaleString("en-IN")}`;
   }
 
-  if (typeof value === "string") {
-    return value
-      .split("|")
-      .join("\n")
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  return [];
-};
-
-const cleanText = (value) => {
-  if (!value) return "";
-  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
-  if (typeof value === "object") return "";
-  return String(value).trim();
+  return `${currency} ${Math.round(amount).toLocaleString("en-IN")}`;
 };
 
 const getRoomData = (saved, bookingData) => {
   return (
+    saved?.roomData ||
+    saved?.reviewBookingData?.roomData ||
     saved?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
     saved?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
     saved?.prebookData?.room ||
@@ -81,9 +161,12 @@ const getRoomData = (saved, bookingData) => {
 
 const getHotelResult = (saved, bookingData) => {
   return (
+    saved?.hotelResult ||
+    saved?.reviewBookingData?.hotelResult ||
     saved?.prebookData?.raw?.HotelResult?.[0] ||
     saved?.prebookData?.raw?.Response?.HotelResult?.[0] ||
     saved?.hotel?.hotel_raw ||
+    saved?.hotel?.rawHotel ||
     bookingData?.HotelResult?.[0] ||
     bookingData?.Response?.HotelResult?.[0] ||
     {}
@@ -96,12 +179,154 @@ const getGuestName = (guest) => {
   } ${guest?.LastName || guest?.lastName || guest?.Last || ""}`.trim();
 };
 
-const getFirstValue = (...values) => {
-  for (const value of values) {
-    const cleaned = cleanText(value);
-    if (cleaned) return cleaned;
+const getHotelAddress = ({
+  savedData = {},
+  hotel = {},
+  hotelResult = {},
+  booking = {},
+}) => {
+  return getFirstValue(
+    savedData?.hotelAddress,
+    savedData?.reviewBookingData?.hotelAddress,
+
+    savedData?.hotel?.hotel_address,
+    savedData?.hotel?.address,
+    savedData?.hotel?.Address,
+    savedData?.hotel?.HotelAddress,
+    savedData?.hotel?.AddressLine,
+    savedData?.hotel?.HotelAddressLine,
+    savedData?.hotel?.Location,
+    savedData?.hotel?.HotelLocation,
+
+    savedData?.hotel?.hotel_raw?.hotel_address,
+    savedData?.hotel?.hotel_raw?.address,
+    savedData?.hotel?.hotel_raw?.Address,
+    savedData?.hotel?.hotel_raw?.HotelAddress,
+    savedData?.hotel?.hotel_raw?.AddressLine,
+    savedData?.hotel?.hotel_raw?.HotelAddressLine,
+    savedData?.hotel?.hotel_raw?.Location,
+    savedData?.hotel?.hotel_raw?.HotelLocation,
+
+    hotel?.hotel_address,
+    hotel?.address,
+    hotel?.Address,
+    hotel?.HotelAddress,
+    hotel?.AddressLine,
+    hotel?.HotelAddressLine,
+    hotel?.Location,
+    hotel?.HotelLocation,
+
+    hotel?.hotel_raw?.hotel_address,
+    hotel?.hotel_raw?.address,
+    hotel?.hotel_raw?.Address,
+    hotel?.hotel_raw?.HotelAddress,
+    hotel?.hotel_raw?.AddressLine,
+    hotel?.hotel_raw?.HotelAddressLine,
+    hotel?.hotel_raw?.Location,
+    hotel?.hotel_raw?.HotelLocation,
+
+    hotelResult?.hotel_address,
+    hotelResult?.address,
+    hotelResult?.Address,
+    hotelResult?.HotelAddress,
+    hotelResult?.AddressLine,
+    hotelResult?.HotelAddressLine,
+    hotelResult?.Location,
+    hotelResult?.HotelLocation,
+
+    booking?.HotelAddress,
+    booking?.Address,
+    booking?.AddressLine,
+    booking?.HotelAddressLine,
+    booking?.Location,
+  );
+};
+
+const getRoomName = (room = {}, fallback = {}) => {
+  const name =
+    room?.room_name ||
+    room?.Name?.[0] ||
+    room?.Name ||
+    room?.RoomName ||
+    room?.RoomTypeName ||
+    room?.RoomType ||
+    fallback?.room_name ||
+    fallback?.Name?.[0] ||
+    fallback?.Name ||
+    fallback?.RoomName ||
+    fallback?.RoomTypeName ||
+    fallback?.RoomType;
+
+  return Array.isArray(name) ? name[0] : name || "N/A";
+};
+
+const getRoomInclusion = (room = {}, fallback = {}) => {
+  return getFirstValue(
+    room?.inclusion,
+    room?.Inclusion,
+    room?.MealType,
+    room?.MealPlan,
+    fallback?.inclusion,
+    fallback?.Inclusion,
+    fallback?.MealType,
+    fallback?.MealPlan,
+  );
+};
+
+const getPromotionText = (promotion) => {
+  if (!promotion) return "";
+  if (typeof promotion === "string") return promotion;
+
+  return (
+    promotion?.Description ||
+    promotion?.Name ||
+    promotion?.PromotionName ||
+    "Promotion available"
+  );
+};
+
+const getSupplementText = (supplement, currency = "INR") => {
+  if (!supplement) return "";
+  if (typeof supplement === "string") return supplement;
+
+  const title =
+    supplement?.Description ||
+    supplement?.Name ||
+    supplement?.SupplementName ||
+    supplement?.SupplementDescription ||
+    supplement?.Type ||
+    supplement?.ChargeType ||
+    "Supplement";
+
+  const amount =
+    supplement?.Price ||
+    supplement?.Amount ||
+    supplement?.Charge ||
+    supplement?.SupplementPrice ||
+    supplement?.SupplementCharge;
+
+  if (amount !== undefined && amount !== null && amount !== "") {
+    return `${title} - ${formatMoney(amount, supplement?.Currency || currency)}`;
   }
-  return "";
+
+  return title;
+};
+
+const getCancellationChargeText = (policy, currency = "INR") => {
+  const type = String(
+    policy?.ChargeType || policy?.chargeType || "",
+  ).toLowerCase();
+  const charge = Number(policy?.CancellationCharge ?? policy?.Charge ?? 0);
+
+  if (type === "percentage") return `${charge}%`;
+
+  if (type === "fixed") {
+    if (charge === 0) return "Free";
+    return formatMoney(charge, currency);
+  }
+
+  if (charge === 0) return "Free";
+  return charge ? formatMoney(charge, currency) : "N/A";
 };
 
 const HotelVoucher = () => {
@@ -119,7 +344,10 @@ const HotelVoucher = () => {
   );
 
   const state = location.state || {};
-  const savedData = state.savedData || savedLocalData;
+  const savedData = {
+    ...savedLocalData,
+    ...(state.savedData || {}),
+  };
 
   const rawBooking =
     state.booking ||
@@ -140,14 +368,6 @@ const HotelVoucher = () => {
     booking?.Hotel ||
     {};
 
-  const guestDetails =
-    state.guestDetails ||
-    savedData?.guestList ||
-    booking?.HotelPassenger ||
-    booking?.Passengers ||
-    booking?.GuestDetails ||
-    [];
-
   const roomData = useMemo(
     () => getRoomData(savedData, booking),
     [savedData, booking],
@@ -158,24 +378,67 @@ const HotelVoucher = () => {
     [savedData, booking],
   );
 
-  const roomName = useMemo(() => {
-    const name =
-      roomData?.Name?.[0] ||
-      roomData?.RoomName ||
-      roomData?.RoomTypeName ||
-      roomData?.RoomType ||
-      roomData?.Name ||
-      booking?.HotelRoomsDetails?.[0]?.RoomTypeName;
+  const bookingRooms = useMemo(() => {
+    const finalPayloadRooms = savedData?.finalPayload?.HotelRoomsDetails || [];
+    const bookingDetailsRooms = booking?.HotelRoomsDetails || [];
+    const savedRooms = savedData?.rooms || savedData?.Rooms || [];
 
-    return Array.isArray(name) ? name[0] : name || "N/A";
-  }, [roomData, booking]);
+    const rooms = pickFirstArray(
+      bookingDetailsRooms,
+      finalPayloadRooms,
+      savedRooms,
+    );
+
+    if (rooms.length > 0) return rooms;
+
+    return [roomData].filter(Boolean);
+  }, [savedData, booking, roomData]);
+
+  const guestDetails = useMemo(() => {
+    const finalPayloadGuests =
+      savedData?.finalPayload?.HotelRoomsDetails?.flatMap(
+        (room) => room?.HotelPassenger || room?.HotelPassengers || [],
+      ) || [];
+
+    const bookingRoomGuests =
+      booking?.HotelRoomsDetails?.flatMap(
+        (room) => room?.HotelPassenger || room?.HotelPassengers || [],
+      ) || [];
+
+    return pickFirstArray(
+      state.guestDetails,
+      savedData?.guestList,
+      savedData?.guestDetails,
+      finalPayloadGuests,
+      booking?.HotelPassenger,
+      booking?.HotelPassengers,
+      booking?.Passengers,
+      booking?.GuestDetails,
+      bookingRoomGuests,
+    );
+  }, [state.guestDetails, savedData, booking]);
 
   const confirmationNo = getFirstValue(
     booking?.ConfirmationNo,
+    booking?.ConfirmationNumber,
     booking?.TBOConfirmationNo,
     booking?.BookingRefNo,
+    booking?.TBOReferenceNo,
     booking?.BookingId,
     bookingId,
+  );
+
+  const bookingReference = getFirstValue(
+    booking?.BookingRefNo,
+    booking?.TBOReferenceNo,
+    booking?.ReferenceNo,
+  );
+
+  const bookingStatus = getFirstValue(
+    booking?.HotelBookingStatus,
+    booking?.BookingStatus,
+    booking?.StatusDescription,
+    booking?.VoucherStatus ? "Vouchered" : "",
   );
 
   const hotelName = getFirstValue(
@@ -185,20 +448,30 @@ const HotelVoucher = () => {
     hotelResult?.HotelName,
   );
 
-  const hotelAddress = getFirstValue(
-    hotel?.address,
-    hotel?.Address,
-    booking?.HotelAddress,
-    hotelResult?.HotelAddress,
-    hotelResult?.Address,
-  );
+  const hotelAddress = getHotelAddress({
+    savedData,
+    hotel,
+    hotelResult,
+    booking,
+  });
 
   const hotelCity = getFirstValue(
     hotel?.city_name,
     hotel?.CityName,
     hotel?.city,
+    hotel?.City,
     booking?.CityName,
     hotelResult?.CityName,
+    savedData?.hotel?.city_name,
+    savedData?.hotel?.CityName,
+  );
+
+  const hotelRating = getFirstValue(
+    hotel?.rating,
+    hotel?.HotelRating,
+    hotel?.StarRating,
+    hotelResult?.HotelRating,
+    hotelResult?.StarRating,
   );
 
   const checkIn =
@@ -218,43 +491,76 @@ const HotelVoucher = () => {
   const nights = getNights(checkIn, checkOut);
 
   const leadGuest =
-    guestDetails.find((g) => g?.LeadPassenger) || guestDetails[0] || {};
+    guestDetails.find((guest) => guest?.LeadPassenger) || guestDetails[0] || {};
 
   const leadGuestName = getGuestName(leadGuest);
 
-  const adults = guestDetails.filter(
-    (g) => Number(g?.PaxType) === 1 || Number(g?.Age) >= 12,
-  );
+  const adults = guestDetails.filter((guest) => {
+    if (Number(guest?.PaxType) === 1) return true;
+    if (Number(guest?.PaxType) === 2) return false;
+    return Number(guest?.Age) >= 12;
+  });
 
-  const children = guestDetails.filter(
-    (g) => Number(g?.PaxType) === 2 || Number(g?.Age) < 12,
-  );
+  const children = guestDetails.filter((guest) => {
+    if (Number(guest?.PaxType) === 2) return true;
+    if (Number(guest?.PaxType) === 1) return false;
+    return Number(guest?.Age) > 0 && Number(guest?.Age) < 12;
+  });
 
-  const adultNames = adults.map(getGuestName).filter(Boolean).join(", ");
-  const childNames = children.map(getGuestName).filter(Boolean).join(", ");
+  const currency =
+    booking?.Currency ||
+    roomData?.Currency ||
+    roomData?.currency ||
+    savedData?.currency ||
+    savedData?.finalPayload?.Currency ||
+    "INR";
 
-  const inclusion = getFirstValue(
-    roomData?.Inclusion,
-    roomData?.MealType,
-    booking?.HotelRoomsDetails?.[0]?.MealType,
-  );
+  const netAmount =
+    savedData?.net ||
+    savedData?.finalPayload?.NetAmount ||
+    savedData?.reviewBookingData?.finalPayload?.NetAmount ||
+    booking?.NetAmount ||
+    booking?.TotalAmount ||
+    booking?.InvoiceAmount ||
+    roomData?.TotalFare ||
+    0;
 
-  const roomPromotion = getFirstValue(
-    roomData?.RoomPromotion?.[0],
-    roomData?.RoomPromotions?.[0],
-    roomData?.Promotion,
-  );
+  const totalTax =
+    roomData?.TotalTax ||
+    booking?.TotalTax ||
+    booking?.Tax ||
+    booking?.TotalGSTAmount ||
+    0;
 
-  const roomDescription = getFirstValue(
-    roomData?.RoomDescription,
-    roomData?.Description,
-    roomData?.RoomInfo,
-    booking?.HotelRoomsDetails?.[0]?.RoomDescription,
-    booking?.HotelRoomsDetails?.[0]?.Description,
-  );
+  const roomPromotions = useMemo(() => {
+    return pickFirstArray(
+      savedData?.roomPromotions,
+      savedData?.RoomPromotions,
+      savedData?.RoomPromotion,
+      roomData?.room_promotion,
+      roomData?.RoomPromotion,
+      roomData?.RoomPromotions,
+      roomData?.Promotion,
+      hotelResult?.RoomPromotion,
+      booking?.HotelRoomsDetails?.[0]?.RoomPromotion,
+    );
+  }, [savedData, roomData, hotelResult, booking]);
+
+  const supplements = useMemo(() => {
+    return pickFirstArray(
+      savedData?.supplements,
+      savedData?.Supplements,
+      roomData?.supplements,
+      roomData?.Supplements,
+      roomData?.Supplement,
+      booking?.HotelRoomsDetails?.[0]?.Supplements,
+    );
+  }, [savedData, roomData, booking]);
 
   const amenities = useMemo(() => {
     const list =
+      savedData?.roomAmenities ||
+      savedData?.RoomAmenities ||
       roomData?.Amenities ||
       roomData?.RoomAmenities ||
       roomData?.amenities ||
@@ -263,22 +569,32 @@ const HotelVoucher = () => {
       hotelResult?.HotelFacilities ||
       [];
 
-    if (Array.isArray(list)) return list.filter(Boolean);
+    return normalizeArray(list);
+  }, [savedData, roomData, hotel, hotelResult]);
 
-    if (typeof list === "string") {
-      return list
-        .split("|")
-        .join(",")
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
+  const hotelFacilities = useMemo(() => {
+    const list =
+      savedData?.hotelFacilities ||
+      savedData?.HotelFacilities ||
+      savedData?.facilities ||
+      savedData?.Facilities ||
+      hotel?.hotel_facilities ||
+      hotel?.HotelFacilities ||
+      hotel?.Facilities ||
+      hotel?.facilities ||
+      hotelResult?.HotelFacilities ||
+      hotelResult?.Facilities ||
+      booking?.HotelFacilities ||
+      booking?.Facilities ||
+      [];
 
-    return [];
-  }, [roomData, hotel, hotelResult]);
+    return normalizeArray(list);
+  }, [savedData, hotel, hotelResult, booking]);
 
   const hotelNorms = useMemo(() => {
     const norms =
+      savedData?.hotelNorms ||
+      savedData?.HotelNorms ||
       hotelResult?.HotelNorms ||
       hotel?.HotelNorms ||
       hotel?.hotel_norms ||
@@ -287,7 +603,7 @@ const HotelVoucher = () => {
       [];
 
     return normalizeArray(norms);
-  }, [hotelResult, hotel, roomData, booking]);
+  }, [savedData, hotelResult, hotel, roomData, booking]);
 
   const bookingTerms = useMemo(() => {
     return normalizeArray(
@@ -299,6 +615,35 @@ const HotelVoucher = () => {
         hotelResult?.TermsAndConditions,
     );
   }, [booking, roomData, hotelResult]);
+
+  const rateConditions = useMemo(() => {
+    const data =
+      savedData?.rateConditions ||
+      savedData?.RateConditions ||
+      savedData?.reviewBookingData?.rateConditions ||
+      savedData?.reviewBookingData?.RateConditions ||
+      roomData?.rate_conditions ||
+      roomData?.RateConditions ||
+      roomData?.room_raw?.RateConditions ||
+      hotelResult?.RateConditions ||
+      booking?.RateConditions ||
+      booking?.HotelRoomsDetails?.[0]?.RateConditions ||
+      booking?.HotelRoomsDetails?.[0]?.rateConditions ||
+      [];
+
+    return normalizeArray(data, { splitComma: false });
+  }, [savedData, roomData, hotelResult, booking]);
+
+  const cancelPolicies = useMemo(() => {
+    return pickFirstArray(
+      savedData?.cancellationPolicies,
+      savedData?.CancelPolicies,
+      roomData?.CancelPolicies,
+      roomData?.CancellationPolicies,
+      booking?.HotelRoomsDetails?.[0]?.CancelPolicies,
+      booking?.HotelRoomsDetails?.[0]?.CancellationPolicies,
+    );
+  }, [savedData, roomData, booking]);
 
   const specialRequest = getFirstValue(
     booking?.SpecialRequest,
@@ -346,6 +691,8 @@ const HotelVoucher = () => {
     booking?.AgencyPhone,
     booking?.Phone,
     booking?.ContactNo,
+    booking?.CustomerSupportPhone,
+    booking?.SupportPhone,
     booking?.AgencyDetails?.Phone,
     savedData?.agency?.phone,
     state?.agency?.phone,
@@ -384,9 +731,13 @@ const HotelVoucher = () => {
       `Hotel Voucher
 
 Hotel: ${hotelName || "N/A"}
+Address: ${hotelAddress || hotelCity || "N/A"}
 Confirmation No: ${confirmationNo || "N/A"}
+Booking Ref: ${bookingReference || "N/A"}
+Status: ${bookingStatus || "N/A"}
 Check In: ${formatDate(checkIn)}
-Check Out: ${formatDate(checkOut)}`,
+Check Out: ${formatDate(checkOut)}
+Lead Guest: ${leadGuestName || "N/A"}`,
     );
 
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -459,7 +810,7 @@ Check Out: ${formatDate(checkOut)}`,
   };
 
   return (
-    <div className="min-h-screen bg-(--bg-main) py-10 md:py-24 px-3 font-(--font-body) text-(--text-main)">
+    <div className="min-h-screen bg-[var(--bg-main)] px-3 py-10 font-[var(--font-body)] text-[var(--text-main)] md:py-24">
       <style>
         {`
           .voucher-wrapper {
@@ -565,14 +916,16 @@ Check Out: ${formatDate(checkOut)}`,
             border-right: 1px solid rgba(255, 255, 255, 0.08);
           }
 
-          .date-grid {
+          .date-grid,
+          .info-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 14px;
             align-items: start;
           }
 
-          .date-item {
+          .date-item,
+          .info-item {
             display: flex;
             gap: 6px;
             align-items: baseline;
@@ -614,7 +967,7 @@ Check Out: ${formatDate(checkOut)}`,
           }
 
           .guest-col {
-            width: 230px;
+            width: 260px;
           }
 
           .sno-cell {
@@ -635,6 +988,61 @@ Check Out: ${formatDate(checkOut)}`,
             font-size: 16px;
             line-height: 1.35;
           }
+            .rate-list {
+  padding-left: 28px;
+  padding-right: 18px;
+  margin: 14px 0 4px;
+  line-height: 1.6;
+}
+
+.rate-list li {
+  margin-bottom: 10px;
+  padding-left: 4px;
+  color: var(--text-muted);
+}
+
+.amount-box {
+  border: 1px solid rgba(201, 162, 77, 0.18);
+  border-radius: 18px;
+  background: rgba(248, 222, 130, 0.06);
+  overflow: hidden;
+}
+
+.amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.amount-row:last-child {
+  border-bottom: none;
+}
+
+.amount-row span {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.amount-row strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.amount-row small {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.amount-row.total strong {
+  color: var(--gold-main);
+  font-size: 18px;
+}
 
           .terms-list,
           .policy-list {
@@ -714,15 +1122,23 @@ Check Out: ${formatDate(checkOut)}`,
               border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             }
 
-            .date-grid {
+            .date-grid,
+            .info-grid {
               grid-template-columns: 1fr;
               gap: 8px;
             }
 
             .voucher-table {
-              min-width: 850px;
+              min-width: 900px;
             }
 
+            .terms-list,
+.policy-list,
+.rate-list {
+  padding-left: 24px;
+  padding-right: 6px;
+}
+  
             .terms-list,
             .policy-list {
               padding-left: 24px;
@@ -802,10 +1218,10 @@ Check Out: ${formatDate(checkOut)}`,
 
           <div className="voucher-actions no-print">
             <button onClick={handleEmail}>Email Voucher</button>
-            <span className="text-(--text-muted)">|</span>
+            <span className="text-[var(--text-muted)]">|</span>
 
             <button onClick={handlePrint}>Print Voucher</button>
-            <span className="text-(--text-muted)">|</span>
+            <span className="text-[var(--text-muted)]">|</span>
 
             <button onClick={handleGeneratePdf} disabled={pdfLoading}>
               {pdfLoading ? "Generating..." : "Generate PDF 🧾"}
@@ -813,14 +1229,32 @@ Check Out: ${formatDate(checkOut)}`,
           </div>
         </div>
 
-        {confirmationNo && (
-          <section className="voucher-row">
-            <div className="voucher-heading">Confirmation No</div>
-            <div className="voucher-cell font-semibold text-white">
-              {confirmationNo}
-            </div>
-          </section>
-        )}
+        <section className="voucher-row">
+          <div className="voucher-heading">Booking Details</div>
+
+          <div className="voucher-cell info-grid">
+            {confirmationNo && (
+              <div className="info-item">
+                <span className="voucher-gold">Confirmation No:</span>
+                <span className="text-white">{confirmationNo}</span>
+              </div>
+            )}
+
+            {bookingReference && (
+              <div className="info-item">
+                <span className="voucher-gold">Booking Ref:</span>
+                <span className="text-white">{bookingReference}</span>
+              </div>
+            )}
+
+            {bookingStatus && (
+              <div className="info-item">
+                <span className="voucher-gold">Status:</span>
+                <span className="text-white">{bookingStatus}</span>
+              </div>
+            )}
+          </div>
+        </section>
 
         {(hasHotelData || hasAgencyData) && (
           <section className="voucher-row voucher-grid-2">
@@ -828,24 +1262,27 @@ Check Out: ${formatDate(checkOut)}`,
               <div className="voucher-gold">Hotel Address Details</div>
 
               {hotelName && (
-                <div className="text-white font-semibold mt-1">{hotelName}</div>
+                <div className="mt-1 font-semibold text-white">
+                  {hotelName}
+                  {hotelRating ? ` (${hotelRating} Star)` : ""}
+                </div>
               )}
 
               {(hotelAddress || hotelCity) && (
                 <div>
-                  {hotelAddress}
+                  {hotelAddress || "Address not available"}
                   {hotelCity ? `, ${hotelCity}` : ""}
                 </div>
               )}
 
-              {(hotelName || hotelAddress) && (
+              {(hotelName || hotelAddress || hotelCity) && (
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    `${hotelName} ${hotelAddress}`,
+                    `${hotelName} ${hotelAddress} ${hotelCity}`,
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="gold-link inline-block mt-1"
+                  className="gold-link mt-1 inline-block"
                 >
                   View Map
                 </a>
@@ -857,7 +1294,7 @@ Check Out: ${formatDate(checkOut)}`,
                 <div className="voucher-gold">Agency Address Details</div>
 
                 {agencyName && (
-                  <div className="text-white font-semibold mt-1">
+                  <div className="mt-1 font-semibold text-white">
                     {agencyName}
                   </div>
                 )}
@@ -930,62 +1367,209 @@ Check Out: ${formatDate(checkOut)}`,
             </thead>
 
             <tbody>
-              <tr>
-                <td className="sno-cell">1</td>
+              {bookingRooms.map((room, index) => {
+                const roomGuests =
+                  room?.HotelPassenger ||
+                  room?.HotelPassengers ||
+                  guestDetails ||
+                  [];
 
-                <td>
-                  <div className="room-name">{roomName}</div>
+                const roomAdults = roomGuests.filter((guest) => {
+                  if (Number(guest?.PaxType) === 1) return true;
+                  if (Number(guest?.PaxType) === 2) return false;
+                  return Number(guest?.Age) >= 12;
+                });
 
-                  {inclusion && <div>Incl : {inclusion}</div>}
+                const roomChildren = roomGuests.filter((guest) => {
+                  if (Number(guest?.PaxType) === 2) return true;
+                  if (Number(guest?.PaxType) === 1) return false;
+                  return Number(guest?.Age) > 0 && Number(guest?.Age) < 12;
+                });
 
-                  {roomPromotion && (
-                    <div className="red-text mt-1">{roomPromotion}</div>
-                  )}
+                const roomAdultNames = roomAdults
+                  .map(getGuestName)
+                  .filter(Boolean)
+                  .join(", ");
 
-                  {(roomDescription || amenities.length > 0) && (
-                    <div className="room-description">
-                      {roomDescription && (
-                        <>
-                          <p>
-                            <strong>Room Description:</strong>
-                          </p>
-                          <p>{roomDescription}</p>
-                        </>
+                const roomChildNames = roomChildren
+                  .map(getGuestName)
+                  .filter(Boolean)
+                  .join(", ");
+
+                const roomName = getRoomName(room, roomData);
+                const inclusion = getRoomInclusion(room, roomData);
+
+                const roomPromotionText =
+                  getPromotionText(room?.RoomPromotion?.[0]) ||
+                  getPromotionText(room?.room_promotion?.[0]) ||
+                  getPromotionText(roomPromotions?.[0]);
+
+                const roomDescription = getFirstValue(
+                  room?.RoomDescription,
+                  room?.Description,
+                  room?.RoomInfo,
+                  roomData?.RoomDescription,
+                  roomData?.Description,
+                  roomData?.RoomInfo,
+                );
+
+                return (
+                  <tr key={index}>
+                    <td className="sno-cell">{index + 1}</td>
+
+                    <td>
+                      <div className="room-name">{roomName}</div>
+
+                      {inclusion && <div>Incl : {inclusion}</div>}
+
+                      {roomPromotionText && (
+                        <div className="red-text mt-1">{roomPromotionText}</div>
                       )}
 
-                      {amenities.length > 0 && (
-                        <p>
-                          <strong>Amenities</strong> - {amenities.join(", ")}
-                        </p>
+                      {(roomDescription || amenities.length > 0) && (
+                        <div className="room-description">
+                          {roomDescription && (
+                            <>
+                              <p>
+                                <strong>Room Description:</strong>
+                              </p>
+                              <p>{roomDescription}</p>
+                            </>
+                          )}
+
+                          {amenities.length > 0 && (
+                            <p>
+                              <strong>Amenities</strong> -{" "}
+                              {amenities.join(", ")}
+                            </p>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
-                </td>
+                    </td>
 
-                <td className="guest-cell">
-                  {(adults.length > 0 || children.length > 0) && (
-                    <div className="text-white font-semibold">
-                      {adults.length > 0 ? `${adults.length} Adult(s)` : ""}
-                      {children.length > 0
-                        ? `${adults.length > 0 ? ", " : ""}${
-                            children.length
-                          } Child`
-                        : ""}
-                    </div>
-                  )}
+                    <td className="guest-cell">
+                      {(roomAdults.length > 0 || roomChildren.length > 0) && (
+                        <div className="font-semibold text-white">
+                          {roomAdults.length > 0
+                            ? `${roomAdults.length} Adult(s)`
+                            : ""}
+                          {roomChildren.length > 0
+                            ? `${roomAdults.length > 0 ? ", " : ""}${
+                                roomChildren.length
+                              } Child`
+                            : ""}
+                        </div>
+                      )}
 
-                  {adultNames && <div>Adults: {adultNames}</div>}
-                  {childNames && <div>Children: {childNames}</div>}
-                </td>
-              </tr>
+                      {roomAdultNames && <div>Adults: {roomAdultNames}</div>}
+                      {roomChildNames && <div>Children: {roomChildNames}</div>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>
 
+        {(roomPromotions.length > 0 || supplements.length > 0) && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              {roomPromotions.length > 0 && (
+                <>
+                  <h2 className="voucher-gold mb-2 text-lg">Room Promotions</h2>
+
+                  <ul className="terms-list list-disc">
+                    {roomPromotions.map((promotion, index) => (
+                      <li key={index}>{getPromotionText(promotion)}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {supplements.length > 0 && (
+                <>
+                  <h2 className="voucher-gold mb-2 mt-4 text-lg">
+                    Supplements
+                  </h2>
+
+                  <ul className="terms-list list-disc">
+                    {supplements.map((supplement, index) => (
+                      <li key={index}>
+                        {getSupplementText(supplement, currency)}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        {cancelPolicies.length > 0 && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold mb-3 text-lg">Cancellation Policy</h2>
+
+              <div className="table-scroll">
+                <table className="voucher-table">
+                  <thead>
+                    <tr>
+                      <th>Cancelled On or After</th>
+                      <th>Cancelled On or Before</th>
+                      <th>Charges</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {cancelPolicies.map((policy, index) => (
+                      <tr key={index}>
+                        <td>
+                          {formatDate(policy?.FromDate || policy?.fromDate)}
+                        </td>
+                        <td>
+                          {formatDate(
+                            policy?.ToDate ||
+                              policy?.toDate ||
+                              policy?.CancelledOnOrBefore ||
+                              checkOut ||
+                              policy?.FromDate,
+                          )}
+                        </td>
+                        <td>{getCancellationChargeText(policy, currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {(netAmount || totalTax) && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold mb-3 text-lg">Amount Details</h2>
+
+              <div className="amount-box">
+                {netAmount ? (
+                  <div className="amount-row total">
+                    <span>
+                      Net Amount
+                      <small>Inclusive of all taxes</small>
+                    </span>
+
+                    <strong>{formatMoney(netAmount, currency)}</strong>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        )}
+
         {specialRequest && (
           <section className="voucher-row">
             <div className="voucher-cell">
-              <h2 className="voucher-gold text-lg mb-4">Package Details:</h2>
+              <h2 className="voucher-gold mb-4 text-lg">Package Details:</h2>
 
               <div className="voucher-gold text-sm">
                 Special Service Request:
@@ -999,7 +1583,7 @@ Check Out: ${formatDate(checkOut)}`,
         {remarks && (
           <section className="voucher-row">
             <div className="voucher-cell">
-              <h2 className="voucher-gold text-lg mb-2">Remarks</h2>
+              <h2 className="voucher-gold mb-2 text-lg">Remarks</h2>
               <p>{remarks}</p>
             </div>
           </section>
@@ -1008,8 +1592,26 @@ Check Out: ${formatDate(checkOut)}`,
         {agentRemarks && (
           <section className="voucher-row">
             <div className="voucher-cell">
-              <h2 className="voucher-gold text-lg mb-2">Agent Remarks</h2>
+              <h2 className="voucher-gold mb-2 text-lg">Agent Remarks</h2>
               <p>{agentRemarks}</p>
+            </div>
+          </section>
+        )}
+        {rateConditions.length > 0 && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold text-lg">Rate Conditions</h2>
+
+              <ol className="rate-list">
+                {rateConditions.map((condition, index) => (
+                  <li
+                    key={index}
+                    dangerouslySetInnerHTML={{
+                      __html: cleanText(condition),
+                    }}
+                  />
+                ))}
+              </ol>
             </div>
           </section>
         )}
@@ -1044,9 +1646,23 @@ Check Out: ${formatDate(checkOut)}`,
           </section>
         )}
 
+        {hotelFacilities.length > 0 && (
+          <section className="voucher-row">
+            <div className="voucher-cell">
+              <h2 className="voucher-gold text-lg">Hotel Facilities</h2>
+
+              <ul className="policy-list list-disc">
+                {hotelFacilities.map((facility, index) => (
+                  <li key={index}>{facility}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+
         {(contactPhone || contactEmail) && (
           <section className="voucher-cell">
-            <h2 className="voucher-gold text-lg mb-2">Contact Details:</h2>
+            <h2 className="voucher-gold mb-2 text-lg">Contact Details:</h2>
 
             {contactPhone && (
               <div>
@@ -1069,7 +1685,7 @@ Check Out: ${formatDate(checkOut)}`,
         )}
       </div>
 
-      <div className="no-print max-w-262.5 mx-auto mt-5 flex justify-end">
+      <div className="no-print mx-auto mt-5 flex max-w-[1050px] justify-end">
         <button onClick={() => navigate(-1)} className="back-btn">
           Back
         </button>
