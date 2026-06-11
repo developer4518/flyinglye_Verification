@@ -726,7 +726,7 @@ const HotelResults = () => {
                           </p>
 
                           <p className="text-xs text-gray-400">
-                            + ₹ {formatPrice(hotel.tax)} taxes
+                           inclusive of all taxes
                           </p>
 
                           <button

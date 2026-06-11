@@ -2,7 +2,6 @@
 
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { privateApi } from "../../../services/api";
 import { useHotelStore } from "../../../store/hotelStore";
 
 const HotelBooking = () => {
@@ -64,7 +63,6 @@ const HotelBooking = () => {
 
   const formatDate = (value) => {
     const date = parseDateValue(value);
-
     if (!date) return value || "-";
 
     return date.toLocaleDateString("en-GB", {
@@ -342,7 +340,7 @@ const HotelBooking = () => {
           Email: "",
           Phoneno: "",
           PaxType: 1,
-          LeadPassenger: list.length === 0,
+          LeadPassenger: i === 0,
           Age: "",
         });
       }
@@ -368,12 +366,12 @@ const HotelBooking = () => {
 
   const [guestList, setGuestList] = useState(initialGuests);
   const [corporatePAN, setCorporatePAN] = useState("");
-  const [loading, setLoading] = useState(false);
 
   if (!preBook) {
     return (
       <div className="min-h-screen bg-[#0B0B0F] p-10 text-center text-white">
         <h2 className="mb-4 text-xl text-red-400">⚠️ Session Expired</h2>
+
         <button
           onClick={() => navigate("/")}
           className="rounded-lg bg-yellow-400 px-5 py-2 text-black"
@@ -385,15 +383,54 @@ const HotelBooking = () => {
   }
 
   const updateGuest = (index, field, value) => {
-    const updated = [...guestList];
-    updated[index][field] = value;
-    setGuestList(updated);
+    setGuestList((prev) =>
+      prev.map((guest, guestIndex) =>
+        guestIndex === index ? { ...guest, [field]: value } : guest,
+      ),
+    );
+  };
+
+  const updateLeadPassenger = (selectedIndex) => {
+    const selectedGuest = guestList[selectedIndex];
+
+    if (selectedGuest.PaxType !== 1) {
+      alert("Only adult passenger can be selected as room lead");
+      return;
+    }
+
+    setGuestList((prev) =>
+      prev.map((guest, index) => {
+        if (guest.RoomIndex !== selectedGuest.RoomIndex) return guest;
+
+        return {
+          ...guest,
+          LeadPassenger: index === selectedIndex,
+        };
+      }),
+    );
+  };
+
+  const getRoomGuestNumber = (currentIndex) => {
+    const currentGuest = guestList[currentIndex];
+
+    return (
+      guestList
+        .slice(0, currentIndex + 1)
+        .filter((guest) => guest.RoomIndex === currentGuest.RoomIndex).length ||
+      1
+    );
   };
 
   const cleanNameInput = (value) => value.replace(/[^A-Za-z ]/g, "");
 
   const normalizeName = (name) =>
     name.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const formatName = (name) =>
+    normalizeName(name)
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
 
   const isValidName = (name) => /^[A-Za-z ]{3,}$/.test(name.trim());
 
@@ -416,6 +453,22 @@ const HotelBooking = () => {
 
     if (isPANRequired && !isValidPAN(corporatePAN.trim().toUpperCase())) {
       return "Valid PAN number is required";
+    }
+
+    for (let roomIndex = 0; roomIndex < normalizedRooms.length; roomIndex++) {
+      const roomPassengers = guestList.filter(
+        (guest) => guest.RoomIndex === roomIndex,
+      );
+
+      const roomLeads = roomPassengers.filter((guest) => guest.LeadPassenger);
+
+      if (roomLeads.length !== 1) {
+        return `Room ${roomIndex + 1}: Please select exactly one lead passenger`;
+      }
+
+      if (roomLeads[0]?.PaxType !== 1) {
+        return `Room ${roomIndex + 1}: Lead passenger must be an adult`;
+      }
     }
 
     for (let i = 0; i < guestList.length; i++) {
@@ -457,11 +510,11 @@ const HotelBooking = () => {
 
       if (g.LeadPassenger) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g.Email.trim())) {
-          return "Valid email required";
+          return `Room ${g.RoomIndex + 1}: Valid lead passenger email required`;
         }
 
         if (!/^[0-9]{10}$/.test(g.Phoneno)) {
-          return "Valid 10-digit phone required";
+          return `Room ${g.RoomIndex + 1}: Valid 10-digit lead passenger phone required`;
         }
       }
 
@@ -519,25 +572,19 @@ const HotelBooking = () => {
     try {
       const finalPAN = corporatePAN.trim().toUpperCase();
 
-      const cleanedGuests = guestList.map((g, i) => {
+      const cleanedGuests = guestList.map((g) => {
         const passenger = {
           RoomIndex: g.RoomIndex,
           Title: g.PaxType === 2 ? "Mstr" : g.Title,
-          FirstName: normalizeName(g.FirstName)
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" "),
+          FirstName: formatName(g.FirstName),
           MiddleName: "",
-          LastName: normalizeName(g.LastName)
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" "),
+          LastName: formatName(g.LastName),
           PaxType: g.PaxType,
           Age: Number(g.Age),
-          LeadPassenger: i === 0,
+          LeadPassenger: Boolean(g.LeadPassenger),
         };
 
-        if (i === 0) {
+        if (g.LeadPassenger) {
           passenger.Email = g.Email.trim();
           passenger.Phoneno = g.Phoneno.trim();
         }
@@ -674,7 +721,6 @@ const HotelBooking = () => {
             </p>
           </div>
 
-          {/* Cancellation Charges */}
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">🕒</span>
@@ -743,7 +789,6 @@ const HotelBooking = () => {
             </div>
           </div>
 
-          {/* Room Promotions */}
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">🏷️</span>
@@ -775,7 +820,6 @@ const HotelBooking = () => {
             </div>
           </div>
 
-          {/* Supplements */}
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">➕</span>
@@ -813,7 +857,6 @@ const HotelBooking = () => {
             </div>
           </div>
 
-          {/* Room Amenities */}
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">🛏️</span>
@@ -858,7 +901,6 @@ const HotelBooking = () => {
             </div>
           </div>
 
-          {/* Hotel Rate Condition */}
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">📋</span>
@@ -918,12 +960,25 @@ const HotelBooking = () => {
               className="rounded-2xl border border-gray-800 bg-[#15151C] p-6"
             >
               <h3 className="mb-4 text-yellow-300">
-                Room {guest.RoomIndex + 1} - Guest {index + 1}{" "}
+                Room {guest.RoomIndex + 1} - Guest {getRoomGuestNumber(index)}{" "}
                 {guest.LeadPassenger && "(Lead)"}{" "}
                 <span className="text-sm text-gray-500">
                   {guest.PaxType === 1 ? "Adult" : "Child"}
                 </span>
               </h3>
+
+              {guest.PaxType === 1 && (
+                <label className="mb-4 flex w-fit cursor-pointer items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-4 py-2 text-sm text-yellow-200">
+                  <input
+                    type="radio"
+                    name={`room-lead-${guest.RoomIndex}`}
+                    checked={guest.LeadPassenger}
+                    onChange={() => updateLeadPassenger(index)}
+                    className="accent-yellow-400"
+                  />
+                  Lead passenger for Room {guest.RoomIndex + 1}
+                </label>
+              )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <select
@@ -995,7 +1050,7 @@ const HotelBooking = () => {
                 {guest.LeadPassenger && (
                   <>
                     <input
-                      placeholder="Email"
+                      placeholder={`Lead Email - Room ${guest.RoomIndex + 1}`}
                       className="input"
                       value={guest.Email}
                       onChange={(e) =>
@@ -1004,7 +1059,7 @@ const HotelBooking = () => {
                     />
 
                     <input
-                      placeholder="Phone"
+                      placeholder={`Lead Phone - Room ${guest.RoomIndex + 1}`}
                       className="input"
                       value={guest.Phoneno}
                       maxLength={10}
@@ -1028,7 +1083,13 @@ const HotelBooking = () => {
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span>Net</span>
+              <span>
+                Total Amount{" "}
+                <p className="text-xs text-gray-200">
+                  (Inclusive of all taxes)
+                </p>
+              </span>
+
               <span>₹ {Math.round(net)}</span>
             </div>
 

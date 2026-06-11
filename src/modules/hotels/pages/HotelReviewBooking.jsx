@@ -470,7 +470,10 @@ const HotelReviewBooking = () => {
 
             <div className="space-y-3 text-sm">
               <div className="flex justify-between text-gray-300">
-                <span>Net Amount</span>
+                <span>Total Amount{" "}
+                <p className="text-xs  text-gray-200">
+                  (Inclusive of all taxes)
+                </p></span>
                 <span>₹ {Math.round(Number(net || 0))}</span>
               </div>
 
