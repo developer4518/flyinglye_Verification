@@ -1,7 +1,7 @@
 "use client";
 
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { sendHotelChangeRequest } from "../../../services/sendHotelChangeRequest";
 
 const safeJsonParse = (value, fallback = {}) => {
@@ -27,10 +27,16 @@ const splitTextList = (value, separator = ",") => {
     return value
       .flatMap((item) => {
         if (!item) return [];
-        if (typeof item === "string") return item.split(separator);
+
+        if (typeof item === "string") {
+          return item
+            .split(separator)
+            .map((text) => text.trim())
+            .filter(Boolean);
+        }
+
         return [item];
       })
-      .map((item) => (typeof item === "string" ? item.trim() : item))
       .filter(Boolean);
   }
 
@@ -40,8 +46,8 @@ const splitTextList = (value, separator = ",") => {
     .filter(Boolean);
 };
 
-const formatDate = (dateValue) => {
-  if (!dateValue) return "N/A";
+const parseDateValue = (dateValue) => {
+  if (!dateValue) return null;
 
   const value = String(dateValue).trim();
   const datePart = value.split(" ")[0];
@@ -60,7 +66,13 @@ const formatDate = (dateValue) => {
   }
 
   if (!date) date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return dateValue;
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatDate = (dateValue) => {
+  const date = parseDateValue(dateValue);
+
+  if (!date) return dateValue || "N/A";
 
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -80,14 +92,10 @@ const formatMoney = (value, currency = "INR") => {
 };
 
 const getNights = (checkIn, checkOut) => {
-  if (!checkIn || !checkOut) return 1;
+  const inDate = parseDateValue(checkIn);
+  const outDate = parseDateValue(checkOut);
 
-  const inDate = new Date(checkIn);
-  const outDate = new Date(checkOut);
-
-  if (Number.isNaN(inDate.getTime()) || Number.isNaN(outDate.getTime())) {
-    return 1;
-  }
+  if (!inDate || !outDate) return 1;
 
   const diff = Math.ceil((outDate - inDate) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : 1;
@@ -130,12 +138,12 @@ const getStatusClass = (status = "") => {
 const getRoomData = (saved, bookingData) => {
   return (
     saved?.roomData ||
+    saved?.reviewBookingData?.roomData ||
     saved?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
     saved?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
     saved?.prebookData?.room ||
     saved?.selectedRoom ||
     saved?.room ||
-    saved?.reviewBookingData?.roomData ||
     bookingData?.HotelRoomsDetails?.[0] ||
     {}
   );
@@ -144,10 +152,10 @@ const getRoomData = (saved, bookingData) => {
 const getHotelResult = (saved) => {
   return (
     saved?.hotelResult ||
+    saved?.reviewBookingData?.hotelResult ||
     saved?.prebookData?.raw?.HotelResult?.[0] ||
     saved?.prebookData?.raw?.Response?.HotelResult?.[0] ||
     saved?.hotel?.hotel_raw ||
-    saved?.reviewBookingData?.hotelResult ||
     {}
   );
 };
@@ -317,6 +325,7 @@ const getSupplementText = (item, currency = "INR") => {
     item?.SupplementDescription ||
     item?.SupplementName ||
     item?.Type ||
+    item?.ChargeType ||
     "Supplement";
 
   const amount =
@@ -341,6 +350,18 @@ const getPromotionText = (promotion) => {
     promotion?.Name ||
     promotion?.PromotionName ||
     "Promotion available"
+  );
+};
+
+const getFacilityText = (facility) => {
+  if (typeof facility === "string") return facility;
+
+  return (
+    facility?.Name ||
+    facility?.Description ||
+    facility?.FacilityName ||
+    facility?.Facility ||
+    "Facility"
   );
 };
 
@@ -381,7 +402,7 @@ const HotelBookingSuccess = () => {
         reviewBookingData: reviewSaved,
       };
 
-      let bookingData =
+      const bookingData =
         location.state?.booking ||
         location.state?.bookingResponse ||
         location.state?.fullResponse ||
@@ -495,6 +516,7 @@ const HotelBookingSuccess = () => {
     booking?.currency ||
     roomData?.Currency ||
     savedData?.currency ||
+    savedData?.finalPayload?.Currency ||
     "INR";
 
   const netAmount =
@@ -572,6 +594,8 @@ const HotelBookingSuccess = () => {
     const norms =
       savedData?.hotelNorms ||
       savedData?.HotelNorms ||
+      savedData?.reviewBookingData?.hotelNorms ||
+      savedData?.reviewBookingData?.HotelNorms ||
       hotelResult?.HotelNorms ||
       hotel?.HotelNorms ||
       hotel?.hotel_norms ||
@@ -584,6 +608,32 @@ const HotelBookingSuccess = () => {
 
     return [];
   }, [savedData, hotelResult, hotel, roomData, booking]);
+
+  const hotelFacilities = useMemo(() => {
+    const data =
+      savedData?.hotelFacilities ||
+      savedData?.HotelFacilities ||
+      savedData?.facilities ||
+      savedData?.Facilities ||
+      savedData?.reviewBookingData?.hotelFacilities ||
+      savedData?.reviewBookingData?.HotelFacilities ||
+      savedData?.reviewBookingData?.facilities ||
+      savedData?.hotelResult?.HotelFacilities ||
+      savedData?.hotelResult?.Facilities ||
+      savedData?.hotelResult?.HotelFacility ||
+      hotelResult?.HotelFacilities ||
+      hotelResult?.Facilities ||
+      hotelResult?.HotelFacility ||
+      hotel?.HotelFacilities ||
+      hotel?.Facilities ||
+      hotel?.facilities ||
+      hotel?.hotel_facilities ||
+      booking?.HotelFacilities ||
+      booking?.Facilities ||
+      [];
+
+    return flatArray(splitTextList(data));
+  }, [savedData, hotelResult, hotel, booking]);
 
   const amenities = useMemo(() => {
     const list =
@@ -720,6 +770,11 @@ const HotelBookingSuccess = () => {
   const handleChangeRequest = async () => {
     if (changeMsg) return;
 
+    if (!booking?.BookingId) {
+      setChangeError("Booking ID missing");
+      return;
+    }
+
     const remarks = window.prompt("Enter cancellation/change request reason");
     if (!remarks) return;
 
@@ -756,7 +811,7 @@ const HotelBookingSuccess = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] px-4 text-center font-[var(--font-body)] text-[var(--gold-soft)]">
+      <div className="flex min-h-screen items-center justify-center bg-[#07070A] px-4 text-center text-yellow-300">
         Loading booking details...
       </div>
     );
@@ -764,19 +819,19 @@ const HotelBookingSuccess = () => {
 
   if (!booking) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-main)] p-6 text-center font-[var(--font-body)] text-[var(--text-main)]">
-        <div className="rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#07070A] p-6 text-center text-white">
+        <div className="max-w-md rounded-3xl border border-red-400/20 bg-red-400/10 p-8 shadow-2xl shadow-black/40">
           <h2 className="mb-3 text-2xl font-bold text-red-300">
             Booking not found
           </h2>
 
-          <p className="mb-6 text-sm text-[var(--text-muted)]">
+          <p className="mb-6 text-sm text-gray-400">
             No booking response was found for this page.
           </p>
 
           <button
             onClick={() => navigate("/")}
-            className="rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] px-6 py-3 font-bold text-black shadow-lg shadow-yellow-500/10"
+            className="rounded-xl bg-gradient-to-r from-yellow-400 to-orange-400 px-6 py-3 font-bold text-black"
           >
             Go Home
           </button>
@@ -786,11 +841,14 @@ const HotelBookingSuccess = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] px-3 py-24 font-[var(--font-body)] text-[var(--text-main)] md:px-8">
+    <div className="min-h-screen bg-[#07070A] px-3 py-20 text-white sm:px-5 md:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-card)] shadow-2xl shadow-black/40">
-          <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-5 md:px-7">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#111118] shadow-2xl shadow-black/50">
+          <div className="relative overflow-hidden bg-gradient-to-r from-[#17171F] via-[#211B12] to-[#2B160A] px-5 py-6 md:px-8">
+            <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-yellow-400/10 blur-3xl" />
+            <div className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-orange-400/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <span
@@ -808,19 +866,19 @@ const HotelBookingSuccess = () => {
                   )}
 
                   {booking?.ResponseStatus !== undefined && (
-                    <span className="rounded-full border border-[var(--gold-dark)]/40 bg-[var(--gold-dark)]/10 px-3 py-1 text-xs font-bold text-[var(--gold-soft)]">
+                    <span className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-bold text-yellow-300">
                       Response: {booking.ResponseStatus}
                     </span>
                   )}
                 </div>
 
-                <h1 className="font-[var(--font-heading)] text-2xl tracking-wide text-[var(--gold-main)] md:text-3xl">
+                <h1 className="text-3xl font-black tracking-tight text-yellow-400 md:text-4xl">
                   Booking Confirmed
                 </h1>
 
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                <p className="mt-2 text-sm text-gray-300">
                   Booking ID:{" "}
-                  <span className="font-semibold text-white">{bookingId}</span>
+                  <span className="font-bold text-white">{bookingId}</span>
                 </p>
               </div>
 
@@ -868,31 +926,31 @@ const HotelBookingSuccess = () => {
 
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <div className="rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-card)] p-5 shadow-xl shadow-black/30 md:p-6">
+            <div className="rounded-[2rem] border border-white/10 bg-[#111118] p-5 shadow-xl shadow-black/30 md:p-6">
               <div className="flex flex-col gap-5 md:flex-row md:items-start">
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border border-[var(--gold-dark)]/30 bg-[var(--gold-dark)]/10 text-5xl text-[var(--gold-soft)]">
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border border-yellow-400/30 bg-yellow-400/10 text-5xl">
                   🏨
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-[var(--font-heading)] text-2xl tracking-wide text-white">
+                    <h2 className="text-2xl font-black tracking-tight text-white">
                       {hotelName}
                     </h2>
 
                     {hotelRating && (
-                      <span className="rounded-full border border-[var(--gold-dark)]/40 bg-[var(--gold-dark)]/10 px-3 py-1 text-xs font-bold text-[var(--gold-soft)]">
+                      <span className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-bold text-yellow-300">
                         {hotelRating} Star
                       </span>
                     )}
                   </div>
 
-                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                  <p className="mt-2 text-sm leading-6 text-gray-400">
                     {hotelAddress}
                   </p>
 
                   {cityName && (
-                    <p className="mt-2 text-sm font-semibold text-[var(--gold-soft)]">
+                    <p className="mt-2 text-sm font-semibold text-yellow-300">
                       📍 {cityName}
                     </p>
                   )}
@@ -947,11 +1005,11 @@ const HotelBookingSuccess = () => {
                   return (
                     <div
                       key={index}
-                      className="rounded-3xl border border-[var(--border-soft)] bg-white/[0.03] p-4"
+                      className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-yellow-400/30"
                     >
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-[var(--gold-soft)]">
+                          <p className="text-sm font-bold text-yellow-300">
                             Room {index + 1}
                           </p>
 
@@ -959,7 +1017,7 @@ const HotelBookingSuccess = () => {
                             {roomName}
                           </h3>
 
-                          <p className="mt-2 text-sm text-[var(--text-muted)]">
+                          <p className="mt-2 text-sm text-gray-400">
                             Inclusion:{" "}
                             <span className="font-semibold text-white">
                               {inclusion}
@@ -980,7 +1038,7 @@ const HotelBookingSuccess = () => {
                           )}
                         </div>
 
-                        <div className="rounded-2xl border border-[var(--border-soft)] bg-black/20 px-4 py-3 text-sm text-[var(--text-muted)]">
+                        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-300">
                           <p className="font-bold text-white">
                             👤 {adults} Adult{Number(adults) !== 1 ? "s" : ""}
                           </p>
@@ -994,12 +1052,6 @@ const HotelBookingSuccess = () => {
                     </div>
                   );
                 })}
-
-                {roomPromotions.length === 0 && (
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Room promotion not available from previous response.
-                  </p>
-                )}
 
                 {supplements.length > 0 && (
                   <div className="rounded-3xl border border-orange-400/20 bg-orange-400/10 p-4">
@@ -1027,9 +1079,9 @@ const HotelBookingSuccess = () => {
                   guestsByRoom.map((roomGroup, roomIndex) => (
                     <div
                       key={roomIndex}
-                      className="rounded-3xl border border-[var(--border-soft)] bg-white/[0.03] p-4"
+                      className="rounded-3xl border border-white/10 bg-white/[0.03] p-4"
                     >
-                      <p className="mb-3 font-bold text-[var(--gold-soft)]">
+                      <p className="mb-3 font-bold text-yellow-300">
                         Room {roomGroup.roomIndex + 1}
                       </p>
 
@@ -1038,10 +1090,10 @@ const HotelBookingSuccess = () => {
                           roomGroup.guests.map((guest, guestIndex) => (
                             <div
                               key={guestIndex}
-                              className="grid grid-cols-1 gap-3 rounded-2xl border border-[var(--border-soft)] bg-black/20 p-3 md:grid-cols-12 md:items-center"
+                              className="grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-black/20 p-3 md:grid-cols-12 md:items-center"
                             >
                               <div className="md:col-span-3">
-                                <span className="rounded-full border border-[var(--gold-dark)]/30 bg-[var(--gold-dark)]/10 px-3 py-1 text-xs font-bold text-[var(--gold-soft)]">
+                                <span className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-bold text-yellow-300">
                                   {getPaxTypeLabel(guest)} {guestIndex + 1}
                                 </span>
                               </div>
@@ -1052,7 +1104,7 @@ const HotelBookingSuccess = () => {
                                 </p>
 
                                 {guest?.Age && (
-                                  <p className="text-xs text-[var(--text-muted)]">
+                                  <p className="text-xs text-gray-400">
                                     Age: {guest.Age}
                                   </p>
                                 )}
@@ -1068,7 +1120,7 @@ const HotelBookingSuccess = () => {
 
                               {guest?.LeadPassenger &&
                                 (guest?.Email || guest?.Phoneno) && (
-                                  <div className="grid gap-2 border-t border-[var(--border-soft)] pt-3 text-xs text-[var(--text-muted)] sm:grid-cols-2 md:col-span-12">
+                                  <div className="grid gap-2 border-t border-white/10 pt-3 text-xs text-gray-400 sm:grid-cols-2 md:col-span-12">
                                     {guest?.Email && <p>📧 {guest.Email}</p>}
                                     {guest?.Phoneno && (
                                       <p>📞 {guest.Phoneno}</p>
@@ -1078,7 +1130,7 @@ const HotelBookingSuccess = () => {
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-[var(--text-muted)]">
+                          <p className="text-sm text-gray-400">
                             Guest details not available for this room.
                           </p>
                         )}
@@ -1086,7 +1138,7 @@ const HotelBookingSuccess = () => {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-[var(--text-muted)]">
+                  <p className="text-sm text-gray-400">
                     No guest details available.
                   </p>
                 )}
@@ -1097,14 +1149,14 @@ const HotelBookingSuccess = () => {
               <SectionTitle icon="🕘" title="Cancellation Charges" />
 
               <div className="p-5">
-                <p className="mb-4 text-sm font-semibold text-[var(--text-muted)]">
+                <p className="mb-4 text-sm font-semibold text-gray-400">
                   {getRoomName(rooms[0], roomData, 0)}
                 </p>
 
-                <div className="overflow-hidden rounded-3xl border border-[var(--border-soft)]">
+                <div className="overflow-hidden rounded-3xl border border-white/10">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[720px] text-sm">
-                      <thead className="bg-white/[0.04] text-[var(--gold-soft)]">
+                      <thead className="bg-white/[0.04] text-yellow-300">
                         <tr>
                           <th className="p-4 text-left font-bold">
                             Cancelled on or After
@@ -1116,7 +1168,7 @@ const HotelBookingSuccess = () => {
                         </tr>
                       </thead>
 
-                      <tbody className="divide-y divide-[var(--border-soft)] text-[var(--text-muted)]">
+                      <tbody className="divide-y divide-white/10 text-gray-400">
                         {cancelPolicies.length > 0 ? (
                           cancelPolicies.map((policy, index) => (
                             <tr key={index}>
@@ -1165,7 +1217,7 @@ const HotelBookingSuccess = () => {
                   </div>
                 </div>
 
-                <p className="mt-4 text-sm text-[var(--text-muted)]">
+                <p className="mt-4 text-sm text-gray-400">
                   <span className="font-semibold text-red-300">Note:</span>{" "}
                   Early check out may attract full cancellation charges if
                   specified by the supplier.
@@ -1182,7 +1234,7 @@ const HotelBookingSuccess = () => {
                     {amenities.map((amenity, index) => (
                       <span
                         key={index}
-                        className="rounded-full border border-[var(--border-soft)] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-[var(--text-muted)]"
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-gray-300"
                       >
                         {typeof amenity === "string"
                           ? amenity
@@ -1191,8 +1243,32 @@ const HotelBookingSuccess = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-[var(--text-muted)]">
+                  <p className="text-sm text-gray-400">
                     Room amenities not available from previous response.
+                  </p>
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard>
+              <SectionTitle icon="🏨" title="Hotel Facilities" />
+
+              <div className="p-5">
+                {hotelFacilities.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {hotelFacilities.map((facility, index) => (
+                      <div
+                        key={index}
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm font-semibold text-gray-300"
+                      >
+                        <span className="mr-2 text-yellow-300">✓</span>
+                        {getFacilityText(facility)}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    Hotel facilities not available from previous response.
                   </p>
                 )}
               </div>
@@ -1203,11 +1279,11 @@ const HotelBookingSuccess = () => {
 
               <div className="p-5">
                 {hotelNorms.length > 0 ? (
-                  <div className="space-y-3 text-sm text-[var(--text-muted)]">
+                  <div className="space-y-3 text-sm text-gray-400">
                     {hotelNorms.map((norm, index) => (
                       <div
                         key={index}
-                        className="rounded-2xl border border-[var(--border-soft)] bg-white/[0.03] p-3"
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                         dangerouslySetInnerHTML={{
                           __html: `${index + 1}. ${cleanHtml(norm)}`,
                         }}
@@ -1215,7 +1291,7 @@ const HotelBookingSuccess = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-[var(--text-muted)]">
+                  <p className="text-sm text-gray-400">
                     Hotel norms not available from previous response.
                   </p>
                 )}
@@ -1227,11 +1303,11 @@ const HotelBookingSuccess = () => {
 
               <div className="p-5">
                 {rateConditions.length > 0 ? (
-                  <ol className="list-decimal space-y-3 pl-5 text-sm leading-6 text-[var(--text-muted)]">
+                  <ol className="list-decimal space-y-3 pl-5 text-sm leading-6 text-gray-400">
                     {rateConditions.map((condition, index) => (
                       <li
                         key={index}
-                        className="rounded-2xl border border-[var(--border-soft)] bg-white/[0.03] p-3"
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                         dangerouslySetInnerHTML={{
                           __html: cleanHtml(condition),
                         }}
@@ -1239,7 +1315,7 @@ const HotelBookingSuccess = () => {
                     ))}
                   </ol>
                 ) : (
-                  <p className="text-sm text-[var(--text-muted)]">
+                  <p className="text-sm text-gray-400">
                     Rate conditions not available from previous response.
                   </p>
                 )}
@@ -1249,7 +1325,7 @@ const HotelBookingSuccess = () => {
             <SectionCard>
               <SectionTitle icon="📝" title="Remark" />
 
-              <div className="p-5 text-sm text-[var(--text-muted)]">
+              <div className="p-5 text-sm text-gray-400">
                 {booking?.Remark || booking?.Remarks || "Remark not available."}
               </div>
             </SectionCard>
@@ -1291,14 +1367,12 @@ const HotelBookingSuccess = () => {
             </SectionCard>
 
             {supportPhone && (
-              <div className="rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-card)] p-5 shadow-xl shadow-black/30">
-                <p className="text-sm text-[var(--text-muted)]">
-                  Support Contact
-                </p>
+              <div className="rounded-[2rem] border border-white/10 bg-[#111118] p-5 shadow-xl shadow-black/30">
+                <p className="text-sm text-gray-400">Support Contact</p>
 
                 <a
                   href={`tel:${supportPhone}`}
-                  className="mt-1 block text-lg font-black text-[var(--gold-main)] hover:underline"
+                  className="mt-1 block text-lg font-black text-yellow-400 hover:underline"
                 >
                   {supportPhone}
                 </a>
@@ -1313,7 +1387,7 @@ const HotelBookingSuccess = () => {
                   {getRoomName(rooms[0], roomData, 0)}
                 </p>
 
-                <div className="rounded-3xl border border-[var(--border-soft)] bg-white/[0.03] p-4">
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
                   <SummaryRow
                     label="Published Rate"
                     value={formatMoney(publishedRate, currency)}
@@ -1338,7 +1412,7 @@ const HotelBookingSuccess = () => {
                   <SummaryRow label="GST" value={formatMoney(gst, currency)} />
                 </div>
 
-                <div className="rounded-3xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] p-4 text-black">
+                <div className="rounded-3xl bg-gradient-to-r from-yellow-400 to-orange-400 p-4 text-black shadow-lg shadow-yellow-500/10">
                   <div className="flex items-center justify-between gap-4">
                     <span className="font-black">Grand Total</span>
                     <span className="text-xl font-black">
@@ -1381,7 +1455,7 @@ const HotelBookingSuccess = () => {
 
 const SectionCard = ({ children }) => {
   return (
-    <section className="overflow-hidden rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-card)] shadow-xl shadow-black/30">
+    <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#111118] shadow-xl shadow-black/30">
       {children}
     </section>
   );
@@ -1389,13 +1463,11 @@ const SectionCard = ({ children }) => {
 
 const SectionTitle = ({ icon, title }) => {
   return (
-    <div className="border-b border-[var(--border-soft)] bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-4">
+    <div className="border-b border-white/10 bg-gradient-to-r from-[#16161D] via-[#1D1A12] to-[#1F120B] px-5 py-4">
       <div className="flex items-center gap-2">
         <span className="text-lg">{icon}</span>
 
-        <h3 className="font-[var(--font-heading)] tracking-wide text-[var(--gold-main)]">
-          {title}
-        </h3>
+        <h3 className="font-bold tracking-wide text-yellow-400">{title}</h3>
       </div>
     </div>
   );
@@ -1403,8 +1475,8 @@ const SectionTitle = ({ icon, title }) => {
 
 const SummaryRow = ({ label, value }) => {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[var(--border-soft)] py-3 last:border-b-0">
-      <span className="text-[var(--text-muted)]">{label}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-white/10 py-3 last:border-b-0">
+      <span className="text-gray-400">{label}</span>
       <span className="font-bold text-white">{value}</span>
     </div>
   );
@@ -1412,8 +1484,8 @@ const SummaryRow = ({ label, value }) => {
 
 const InfoTile = ({ label, value }) => {
   return (
-    <div className="rounded-3xl border border-[var(--border-soft)] bg-white/[0.03] p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         {label}
       </p>
 
@@ -1424,14 +1496,14 @@ const InfoTile = ({ label, value }) => {
 
 const DateTile = ({ label, value, icon }) => {
   return (
-    <div className="rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-card)] p-5 shadow-xl shadow-black/30">
+    <div className="rounded-[2rem] border border-white/10 bg-[#111118] p-5 shadow-xl shadow-black/30">
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--gold-dark)]/30 bg-[var(--gold-dark)]/10 text-xl">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/30 bg-yellow-400/10 text-xl">
           {icon}
         </div>
 
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
             {label}
           </p>
 
@@ -1444,10 +1516,10 @@ const DateTile = ({ label, value, icon }) => {
 
 const MiniStat = ({ label, value }) => {
   return (
-    <div className="rounded-2xl border border-[var(--border-soft)] bg-white/[0.03] p-4 text-center">
-      <p className="text-2xl font-black text-[var(--gold-main)]">{value}</p>
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">
+      <p className="text-2xl font-black text-yellow-400">{value}</p>
 
-      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
         {label}
       </p>
     </div>
@@ -1457,8 +1529,8 @@ const MiniStat = ({ label, value }) => {
 const ActionButton = ({ children, onClick, variant = "gold" }) => {
   const className =
     variant === "dark"
-      ? "rounded-xl border border-[var(--border-soft)] bg-white/[0.04] px-4 py-2 text-sm font-bold text-white transition hover:bg-white/[0.08]"
-      : "rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] px-4 py-2 text-sm font-bold text-black shadow-lg shadow-yellow-500/10 transition hover:scale-[1.02] active:scale-[0.98]";
+      ? "rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-white transition hover:bg-white/[0.08]"
+      : "rounded-xl bg-gradient-to-r from-yellow-400 to-orange-400 px-4 py-2 text-sm font-bold text-black shadow-lg shadow-yellow-500/10 transition hover:scale-[1.02] active:scale-[0.98]";
 
   return (
     <button onClick={onClick} className={className}>
@@ -1468,3 +1540,4 @@ const ActionButton = ({ children, onClick, variant = "gold" }) => {
 };
 
 export default HotelBookingSuccess;
+
