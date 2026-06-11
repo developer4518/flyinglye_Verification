@@ -128,18 +128,36 @@ const HotelReviewBooking = () => {
         reviewData.finalPayload,
       );
 
+      const bookingSuccessData = {
+        ...reviewData,
+
+        guestList: reviewData.guestList || [],
+        bookingCode: reviewData.bookingCode,
+        hotel: reviewData.hotel,
+        roomData: reviewData.roomData,
+        hotelResult: reviewData.hotelResult,
+
+        checkIn: reviewData.checkIn,
+        checkOut: reviewData.checkOut,
+        net: reviewData.net,
+
+        isPANRequired: reviewData.isPANRequired,
+        corporatePAN: reviewData.corporatePAN,
+
+        finalPayload: reviewData.finalPayload,
+
+        cancellationPolicies: reviewData.cancellationPolicies || [],
+        roomPromotions: reviewData.roomPromotions || [],
+        supplements: reviewData.supplements || [],
+        roomAmenities: reviewData.roomAmenities || [],
+        rateConditions: reviewData.rateConditions || [],
+
+        bookingResponse: res.data,
+      };
+
       localStorage.setItem(
         "hotelBookingData",
-        JSON.stringify({
-          guestList: reviewData.guestList,
-          bookingCode: reviewData.bookingCode,
-          hotel: reviewData.hotel,
-          checkIn: reviewData.checkIn,
-          checkOut: reviewData.checkOut,
-          net: reviewData.net,
-          isPANRequired: reviewData.isPANRequired,
-          bookingResponse: res.data,
-        }),
+        JSON.stringify(bookingSuccessData),
       );
 
       setGuestDetails(reviewData.guestList || []);
@@ -147,7 +165,10 @@ const HotelReviewBooking = () => {
       localStorage.removeItem("reviewBookingData");
 
       navigate("/hotel-booking-success", {
-        state: { booking: res.data },
+        state: {
+          booking: res.data,
+          savedData: bookingSuccessData,
+        },
       });
     } catch (err) {
       console.log("BOOK ERROR:", err?.response?.data || err);
@@ -470,10 +491,12 @@ const HotelReviewBooking = () => {
 
             <div className="space-y-3 text-sm">
               <div className="flex justify-between text-gray-300">
-                <span>Total Amount{" "}
-                <p className="text-xs  text-gray-200">
-                  (Inclusive of all taxes)
-                </p></span>
+                <span>
+                  Total Amount{" "}
+                  <p className="text-xs  text-gray-200">
+                    (Inclusive of all taxes)
+                  </p>
+                </span>
                 <span>₹ {Math.round(Number(net || 0))}</span>
               </div>
 

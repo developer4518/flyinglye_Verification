@@ -372,9 +372,12 @@ const HotelBookingSuccess = () => {
         {},
       );
 
+      const stateSaved = location.state?.savedData || {};
+
       const mergedSaved = {
         ...reviewSaved,
         ...bookingSaved,
+        ...stateSaved,
         reviewBookingData: reviewSaved,
       };
 
@@ -395,6 +398,7 @@ const HotelBookingSuccess = () => {
         bookingData;
 
       const finalHotel =
+        stateSaved?.hotel ||
         bookingSaved?.hotel ||
         reviewSaved?.hotel ||
         finalBooking?.HotelDetails ||
@@ -402,6 +406,7 @@ const HotelBookingSuccess = () => {
         {};
 
       const finalGuests =
+        stateSaved?.guestList ||
         bookingSaved?.guestList ||
         reviewSaved?.guestList ||
         reviewSaved?.finalPayload?.HotelRoomsDetails?.flatMap(
@@ -479,7 +484,7 @@ const HotelBookingSuccess = () => {
     booking?.ReferenceNo ||
     "N/A";
 
-  const traceId = booking?.TraceId || savedData?.traceId || "N/A";
+  // const traceId = booking?.TraceId || savedData?.traceId || "N/A";
 
   const currency =
     booking?.Currency ||
@@ -721,7 +726,7 @@ const HotelBookingSuccess = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-main)] px-4 text-center font-[var(--font-body)] text-[var(--gold-soft)]">
+      <div className="flex min-h-screen items-center justify-center bg-(--bg-main) px-4 text-center font-(--font-body) text-(--gold-soft)">
         Loading booking details...
       </div>
     );
@@ -729,19 +734,19 @@ const HotelBookingSuccess = () => {
 
   if (!booking) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-main)] p-6 text-center font-[var(--font-body)] text-[var(--text-main)]">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-main) p-6 text-center font-(--font-body) text-(--text-main)">
         <div className="rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
           <h2 className="mb-3 text-2xl font-bold text-red-300">
             Booking not found
           </h2>
 
-          <p className="mb-6 text-sm text-[var(--text-muted)]">
+          <p className="mb-6 text-sm text-(--text-muted)">
             No booking response was found for this page.
           </p>
 
           <button
             onClick={() => navigate("/")}
-            className="rounded-xl bg-gradient-to-r from-[var(--color-start)] to-[var(--color-end)] px-6 py-3 font-bold text-black shadow-lg shadow-yellow-500/10"
+            className="rounded-xl bg-linear-to-r from-start to-end px-6 py-3 font-bold text-black shadow-lg shadow-yellow-500/10"
           >
             Go Home
           </button>
@@ -751,10 +756,10 @@ const HotelBookingSuccess = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] px-3 py-24 font-[var(--font-body)] text-[var(--text-main)] md:px-8">
+    <div className="min-h-screen bg-(--bg-main) px-3 py-24 font-(--font-body) text-(--text-main) md:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[2rem] border border-[var(--border-soft)] bg-[var(--bg-card)] shadow-2xl shadow-black/40">
-          <div className="bg-gradient-to-r from-[var(--bg-primary)] via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-5 md:px-7">
+        <div className="overflow-hidden rounded-4xl border border-(--border-soft) bg-(--bg-card) shadow-2xl shadow-black/40">
+          <div className="bg-linear-to-r from-(--bg-primary) via-[var(--bg-via)] to-[var(--bg-secondary)] px-5 py-5 md:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -828,7 +833,7 @@ const HotelBookingSuccess = () => {
             <InfoTile label="Confirmation No" value={confirmationNo} />
             <InfoTile label="Booking Reference" value={bookingRefNo} />
             <InfoTile label="Invoice Number" value={invoiceNumber} />
-            <InfoTile label="Trace ID" value={traceId} />
+            {/* <InfoTile label="Trace ID" value={traceId} /> */}
           </div>
         </div>
 
