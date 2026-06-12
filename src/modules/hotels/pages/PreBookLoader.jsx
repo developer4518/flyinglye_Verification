@@ -710,11 +710,11 @@ const PrebookLoader = () => {
         type, supplements and room availability.
       </p>
 
-      {bookingCode && (
+      {/* {bookingCode && (
         <p className="text-gray-600 text-xs mt-4 text-center break-all max-w-md">
           BookingCode: {bookingCode}
         </p>
-      )}
+      )} */}
     </div>
   );
 };
