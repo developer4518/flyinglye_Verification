@@ -208,6 +208,95 @@ const getPackageFareFlags = (data = {}) => {
   };
 };
 
+const GST_FIELDS = [
+  "GSTCompanyAddress",
+  "GSTCompanyContactNumber",
+  "GSTCompanyName",
+  "GSTNumber",
+  "GSTCompanyEmail",
+];
+
+const emptyGSTDetails = {
+  GSTCompanyAddress: "",
+  GSTCompanyContactNumber: "",
+  GSTCompanyName: "",
+  GSTNumber: "",
+  GSTCompanyEmail: "",
+};
+
+const getGSTAllowed = (data = {}) => {
+  const validation = getBlockValidationFromReviewData(data);
+
+  return toBoolean(
+    pickFirstValue(
+      validation?.GSTAllowed,
+      validation?.gstAllowed,
+      validation?.IsGSTAllowed,
+      validation?.isGSTAllowed,
+
+      data?.GSTAllowed,
+      data?.gstAllowed,
+      data?.IsGSTAllowed,
+      data?.isGSTAllowed,
+
+      data?.roomData?.GSTAllowed,
+      data?.roomData?.gstAllowed,
+      data?.roomData?.IsGSTAllowed,
+
+      data?.hotelResult?.GSTAllowed,
+      data?.hotelResult?.gstAllowed,
+
+      data?.prebookData?.GSTAllowed,
+      data?.prebookData?.gstAllowed,
+
+      data?.prebookData?.raw?.GSTAllowed,
+      data?.prebookData?.raw?.Response?.GSTAllowed,
+
+      data?.prebookData?.raw?.HotelResult?.[0]?.GSTAllowed,
+      data?.prebookData?.raw?.Response?.HotelResult?.[0]?.GSTAllowed,
+
+      data?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0]?.GSTAllowed,
+      data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]
+        ?.GSTAllowed,
+
+      data?.finalPayload?.GSTAllowed,
+    ),
+  );
+};
+
+const hasAnyGSTValue = (gst = {}) => {
+  return GST_FIELDS.some((field) => String(gst?.[field] || "").trim() !== "");
+};
+
+const hasAllGSTValues = (gst = {}) => {
+  return GST_FIELDS.every((field) => String(gst?.[field] || "").trim() !== "");
+};
+
+const cleanGSTDetails = (gst = {}) => {
+  return {
+    GSTCompanyAddress: String(gst.GSTCompanyAddress || "").trim(),
+    GSTCompanyContactNumber: String(gst.GSTCompanyContactNumber || "").trim(),
+    GSTCompanyName: String(gst.GSTCompanyName || "").trim(),
+    GSTNumber: String(gst.GSTNumber || "")
+      .trim()
+      .toUpperCase(),
+    GSTCompanyEmail: String(gst.GSTCompanyEmail || "").trim(),
+  };
+};
+
+const addGSTToPassenger = (passenger = {}, gst = {}, gstAllowed = false) => {
+  if (!gstAllowed) return passenger;
+
+  const cleanedGST = cleanGSTDetails(gst);
+
+  if (!hasAnyGSTValue(cleanedGST)) return passenger;
+
+  return {
+    ...passenger,
+    ...cleanedGST,
+  };
+};
+
 const getHotelAddressFromReviewData = (data = {}) => {
   const directAddress = pickFirst(
     data?.hotelAddress,
@@ -497,6 +586,7 @@ const HotelReviewBooking = () => {
   const [loading, setLoading] = useState(false);
 
   const packageFareFlags = getPackageFareFlags(reviewData || {});
+  const gstAllowed = getGSTAllowed(reviewData || {});
 
   const [transportForm, setTransportForm] = useState(() => {
     const payload = reviewData?.finalPayload || {};
@@ -520,11 +610,36 @@ const HotelReviewBooking = () => {
     };
   });
 
+  const [gstForms, setGstForms] = useState(() => {
+    const guests = reviewData?.guestList || [];
+
+    return guests.map((guest) => ({
+      GSTCompanyAddress: guest?.GSTCompanyAddress || "",
+      GSTCompanyContactNumber: guest?.GSTCompanyContactNumber || "",
+      GSTCompanyName: guest?.GSTCompanyName || "",
+      GSTNumber: guest?.GSTNumber || "",
+      GSTCompanyEmail: guest?.GSTCompanyEmail || "",
+    }));
+  });
+
   const updateTransportField = (field, value) => {
     setTransportForm((prev) => ({
       ...prev,
       [field]: value,
     }));
+  };
+
+  const updateGSTField = (guestIndex, field, value) => {
+    setGstForms((prev) => {
+      const updated = [...prev];
+
+      updated[guestIndex] = {
+        ...(updated[guestIndex] || emptyGSTDetails),
+        [field]: value,
+      };
+
+      return updated;
+    });
   };
 
   const parseDateValue = (value) => {
@@ -620,36 +735,6 @@ const HotelReviewBooking = () => {
     return charge ? String(charge) : "-";
   };
 
-  const buildFinalBookingPayload = () => {
-    const payload = {
-      ...(reviewData?.finalPayload || {}),
-    };
-
-    if (packageFareFlags.isPackageFare) {
-      payload.IsPackageFare = true;
-    }
-
-    if (packageFareFlags.isPackageDetailsMandatory) {
-      payload.ArrivalTransport = {
-        ArrivalTransportType: Number(transportForm.arrivalTransportType),
-        TransportInfoId: String(transportForm.arrivalTransportInfoId || "").trim(),
-        Time: normalizeDateTimeForApi(transportForm.arrivalTime),
-      };
-    }
-
-    if (packageFareFlags.isDepartureDetailsMandatory) {
-      payload.DepartureTransport = {
-        DepartureTransportType: Number(transportForm.departureTransportType),
-        TransportInfoId: String(
-          transportForm.departureTransportInfoId || "",
-        ).trim(),
-        Time: normalizeDateTimeForApi(transportForm.departureTime),
-      };
-    }
-
-    return payload;
-  };
-
   const validatePackageTransportDetails = () => {
     if (packageFareFlags.isPackageDetailsMandatory) {
       if (!transportForm.arrivalTransportInfoId || !transportForm.arrivalTime) {
@@ -671,12 +756,127 @@ const HotelReviewBooking = () => {
     return true;
   };
 
+  const validateGSTDetails = () => {
+    if (!gstAllowed) return true;
+
+    for (let index = 0; index < gstForms.length; index += 1) {
+      const gst = cleanGSTDetails(gstForms[index]);
+
+      if (hasAnyGSTValue(gst) && !hasAllGSTValues(gst)) {
+        alert(
+          `Please fill all GST details for Guest ${
+            index + 1
+          }, or leave all GST fields empty.`,
+        );
+        return false;
+      }
+
+      if (
+        gst.GSTCompanyEmail &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gst.GSTCompanyEmail)
+      ) {
+        alert(`Please enter a valid GST company email for Guest ${index + 1}.`);
+        return false;
+      }
+
+      if (
+        gst.GSTNumber &&
+        !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
+          gst.GSTNumber,
+        )
+      ) {
+        alert(`Please enter a valid GST number for Guest ${index + 1}.`);
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const buildFinalBookingPayload = () => {
+    const payload = {
+      ...(reviewData?.finalPayload || {}),
+    };
+
+    if (packageFareFlags.isPackageFare) {
+      payload.IsPackageFare = true;
+    }
+
+    if (packageFareFlags.isPackageDetailsMandatory) {
+      payload.ArrivalTransport = {
+        ArrivalTransportType: Number(transportForm.arrivalTransportType),
+        TransportInfoId: String(
+          transportForm.arrivalTransportInfoId || "",
+        ).trim(),
+        Time: normalizeDateTimeForApi(transportForm.arrivalTime),
+      };
+    }
+
+    if (packageFareFlags.isDepartureDetailsMandatory) {
+      payload.DepartureTransport = {
+        DepartureTransportType: Number(transportForm.departureTransportType),
+        TransportInfoId: String(
+          transportForm.departureTransportInfoId || "",
+        ).trim(),
+        Time: normalizeDateTimeForApi(transportForm.departureTime),
+      };
+    }
+
+    if (gstAllowed) {
+      payload.GSTAllowed = true;
+
+      if (Array.isArray(payload.HotelRoomsDetails)) {
+        let passengerIndex = 0;
+
+        payload.HotelRoomsDetails = payload.HotelRoomsDetails.map((room) => {
+          const passengers = Array.isArray(room?.HotelPassenger)
+            ? room.HotelPassenger
+            : [];
+
+          const updatedPassengers = passengers.map((passenger) => {
+            const updatedPassenger = addGSTToPassenger(
+              passenger,
+              gstForms[passengerIndex],
+              gstAllowed,
+            );
+
+            passengerIndex += 1;
+
+            return updatedPassenger;
+          });
+
+          return {
+            ...room,
+            HotelPassenger: updatedPassengers,
+          };
+        });
+      }
+
+      if (Array.isArray(payload.HotelPassenger)) {
+        payload.HotelPassenger = payload.HotelPassenger.map(
+          (passenger, index) =>
+            addGSTToPassenger(passenger, gstForms[index], gstAllowed),
+        );
+      }
+
+      if (Array.isArray(payload.HotelPassengers)) {
+        payload.HotelPassengers = payload.HotelPassengers.map(
+          (passenger, index) =>
+            addGSTToPassenger(passenger, gstForms[index], gstAllowed),
+        );
+      }
+    }
+
+    return payload;
+  };
+
   const handleConfirmBooking = async () => {
     if (!reviewData?.finalPayload) {
       return alert("Booking payload missing");
     }
 
     if (!validatePackageTransportDetails()) return;
+    if (!validateGSTDetails()) return;
 
     try {
       setLoading(true);
@@ -687,6 +887,8 @@ const HotelReviewBooking = () => {
 
       console.log("FINAL BOOK PAYLOAD:", bookingPayload);
       console.log("PACKAGE FARE FLAGS:", packageFareFlags);
+      console.log("GST ALLOWED:", gstAllowed);
+      console.log("GST DETAILS:", gstForms);
 
       const res = await privateApi.post(
         "/api/hotels/hotels/book/",
@@ -724,6 +926,9 @@ const HotelReviewBooking = () => {
         isPackageFare: packageFareFlags.isPackageFare,
         isPackageDetailsMandatory: packageFareFlags.isPackageDetailsMandatory,
         departureDetailsMandatory: packageFareFlags.isDepartureDetailsMandatory,
+
+        gstAllowed,
+        gstDetails: gstForms,
 
         cancellationPolicies: reviewData.cancellationPolicies || [],
         roomPromotions: reviewData.roomPromotions || [],
@@ -942,10 +1147,9 @@ const HotelReviewBooking = () => {
 
                             <input
                               type="datetime-local"
-                              value={String(transportForm.arrivalTime || "").slice(
-                                0,
-                                16,
-                              )}
+                              value={String(
+                                transportForm.arrivalTime || "",
+                              ).slice(0, 16)}
                               onChange={(e) =>
                                 updateTransportField(
                                   "arrivalTime",
@@ -1098,6 +1302,131 @@ const HotelReviewBooking = () => {
                           <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-300 sm:grid-cols-2">
                             <p>Email: {guest.Email || "-"}</p>
                             <p>Phone: {guest.Phoneno || "-"}</p>
+                          </div>
+                        )}
+
+                        {gstAllowed && (
+                          <div className="mt-4 rounded-xl border border-blue-400/20 bg-blue-400/10 p-4">
+                            <div className="mb-4">
+                              <h5 className="text-sm font-semibold text-blue-200">
+                                GST Details Optional
+                              </h5>
+
+                              <p className="mt-1 text-xs text-gray-400">
+                                Fill these details only if GST invoice is
+                                required for this passenger.
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div>
+                                <label className="mb-1 block text-xs text-gray-400">
+                                  GST Company Name
+                                </label>
+
+                                <input
+                                  type="text"
+                                  value={gstForms[index]?.GSTCompanyName || ""}
+                                  onChange={(e) =>
+                                    updateGSTField(
+                                      index,
+                                      "GSTCompanyName",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Company name"
+                                  className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-blue-400"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs text-gray-400">
+                                  GST Number
+                                </label>
+
+                                <input
+                                  type="text"
+                                  value={gstForms[index]?.GSTNumber || ""}
+                                  onChange={(e) =>
+                                    updateGSTField(
+                                      index,
+                                      "GSTNumber",
+                                      e.target.value.toUpperCase(),
+                                    )
+                                  }
+                                  placeholder="GSTIN"
+                                  maxLength={15}
+                                  className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm uppercase text-white outline-none placeholder:text-gray-600 focus:border-blue-400"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs text-gray-400">
+                                  GST Company Contact Number
+                                </label>
+
+                                <input
+                                  type="tel"
+                                  value={
+                                    gstForms[index]
+                                      ?.GSTCompanyContactNumber || ""
+                                  }
+                                  onChange={(e) =>
+                                    updateGSTField(
+                                      index,
+                                      "GSTCompanyContactNumber",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Contact number"
+                                  className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-blue-400"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs text-gray-400">
+                                  GST Company Email
+                                </label>
+
+                                <input
+                                  type="email"
+                                  value={
+                                    gstForms[index]?.GSTCompanyEmail || ""
+                                  }
+                                  onChange={(e) =>
+                                    updateGSTField(
+                                      index,
+                                      "GSTCompanyEmail",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="company@example.com"
+                                  className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-blue-400"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2">
+                                <label className="mb-1 block text-xs text-gray-400">
+                                  GST Company Address
+                                </label>
+
+                                <textarea
+                                  rows={3}
+                                  value={
+                                    gstForms[index]?.GSTCompanyAddress || ""
+                                  }
+                                  onChange={(e) =>
+                                    updateGSTField(
+                                      index,
+                                      "GSTCompanyAddress",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Company billing address"
+                                  className="w-full resize-none rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-blue-400"
+                                />
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1300,6 +1629,13 @@ const HotelReviewBooking = () => {
               <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-xs text-yellow-100">
                 Package fare will be passed in booking request as{" "}
                 <b>IsPackageFare: true</b>.
+              </div>
+            )}
+
+            {gstAllowed && (
+              <div className="mt-4 rounded-xl border border-blue-400/20 bg-blue-400/10 p-4 text-xs text-blue-100">
+                GST is allowed for this room. GST details will be passed
+                passenger-wise only if filled.
               </div>
             )}
 
