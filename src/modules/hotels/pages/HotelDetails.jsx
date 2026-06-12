@@ -1179,13 +1179,13 @@ const HotelDetails = () => {
                                     </span>
                                   )}
                                 </div>
-
+{/* 
                                 <p className="mt-2 text-xs text-gray-500 break-all">
                                   Code:{" "}
                                   {roomItem.BookingCode ||
                                     roomItem.booking_code ||
                                     "N/A"}
-                                </p>
+                                </p> */}
 
                                 <button
                                   type="button"

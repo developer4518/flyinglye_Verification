@@ -25,7 +25,16 @@ const HotelBooking = () => {
     preBook?.raw?.Response?.HotelResult?.[0] ||
     {};
 
-  const validation = preBook?.validation || {};
+  const validationInfo =
+    preBook?.ValidationInfo ||
+    preBook?.validationInfo ||
+    preBook?.validation ||
+    preBook?.raw?.ValidationInfo ||
+    preBook?.raw?.Response?.ValidationInfo ||
+    preBook?.raw?.HotelResult?.[0]?.ValidationInfo ||
+    preBook?.raw?.Response?.HotelResult?.[0]?.ValidationInfo ||
+    roomData?.ValidationInfo ||
+    {};
 
   const bookingCode =
     preBook?.booking_code ||
@@ -36,6 +45,54 @@ const HotelBooking = () => {
     preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode;
 
   const net = Number(preBook?.net_amount || preBook?.NetAmount || 0);
+
+  const toBool = (value) =>
+    value === true || String(value).toLowerCase() === "true";
+
+  const validation = {
+    PanMandatory: toBool(
+      validationInfo?.PanMandatory ||
+        validationInfo?.PANMandatory ||
+        validationInfo?.PANRequired ||
+        validationInfo?.IsPANRequired,
+    ),
+
+    CorporateBokingAllowed: toBool(
+      validationInfo?.CorporateBokingAllowed ||
+        validationInfo?.CorporateBookingAllowed ||
+        validationInfo?.IsCorporateBookingAllowed,
+    ),
+
+    PanCountRequired: Number(validationInfo?.PanCountRequired || 0),
+
+    SamePaxNameAllowed: toBool(validationInfo?.SamePaxNameAllowed),
+    SpaceAllowed: toBool(validationInfo?.SpaceAllowed),
+    SpecialCharAllowed: toBool(validationInfo?.SpecialCharAllowed),
+    CharLimit: toBool(validationInfo?.CharLimit),
+
+    PaxNameMinLength: Number(validationInfo?.PaxNameMinLength || 0),
+    PaxNameMaxLength: Number(validationInfo?.PaxNameMaxLength || 0),
+
+    IsPackageFare: toBool(
+      validationInfo?.IsPackageFare ||
+        validationInfo?.PackageFare ||
+        validationInfo?.PackageFare,
+    ),
+
+    PackageDetailsMandatory: toBool(
+      validationInfo?.IsPackageDetailsMandatory ||
+        validationInfo?.PackageDetailsMandatory ||
+        validationInfo?.PackageDetailsRequired,
+    ),
+
+    DepartureDetailsMandatory: toBool(
+      validationInfo?.DepartureDetailsMandatory ||
+        validationInfo?.IsDepartureDetailsMandatory ||
+        validationInfo?.DepartureDetailsRequired,
+    ),
+
+    GSTAllowed: toBool(validationInfo?.GSTAllowed),
+  };
 
   const parseDateValue = (value) => {
     if (!value) return null;
@@ -72,9 +129,14 @@ const HotelBooking = () => {
     });
   };
 
+  const toApiDateTime = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString();
+  };
+
   const addDays = (date, days) => {
     if (!date) return null;
-
     const updatedDate = new Date(date);
     updatedDate.setDate(updatedDate.getDate() + days);
     return updatedDate;
@@ -85,17 +147,10 @@ const HotelBooking = () => {
       return value
         .flatMap((item) => {
           if (item === null || item === undefined) return [];
-
-          if (typeof item === "string") {
-            return item.split(separator);
-          }
-
+          if (typeof item === "string") return item.split(separator);
           return [item];
         })
-        .map((item) => {
-          if (typeof item === "string") return item.trim();
-          return item;
-        })
+        .map((item) => (typeof item === "string" ? item.trim() : item))
         .filter(Boolean);
     }
 
@@ -135,7 +190,6 @@ const HotelBooking = () => {
     if (nextPolicy?.FromDate) {
       const nextFromDate = parseDateValue(nextPolicy.FromDate);
       const previousDate = addDays(nextFromDate, -1);
-
       if (previousDate) return previousDate;
     }
 
@@ -168,7 +222,6 @@ const HotelBooking = () => {
 
   const formatSupplementText = (supplement) => {
     if (!supplement) return "";
-
     if (typeof supplement === "string") return supplement;
 
     const title =
@@ -232,16 +285,6 @@ const HotelBooking = () => {
 
     return charge ? String(charge) : "-";
   };
-
-  const isPANRequired =
-    Boolean(validation?.PANRequired) ||
-    Boolean(validation?.IsPANRequired) ||
-    Boolean(preBook?.PANRequired) ||
-    Boolean(preBook?.raw?.PANRequired) ||
-    Boolean(roomData?.PANRequired) ||
-    Boolean(hotel?.isInternational) ||
-    Boolean(hotel?.IsInternational) ||
-    Boolean(hotel?.is_international);
 
   const normalizeAgeArray = (ages = [], children = 0) => {
     const list = Array.isArray(ages) ? ages : [];
@@ -342,6 +385,8 @@ const HotelBooking = () => {
           PaxType: 1,
           LeadPassenger: i === 0,
           Age: "",
+          PAN: "",
+          ParentPAN: "",
         });
       }
 
@@ -357,6 +402,8 @@ const HotelBooking = () => {
           PaxType: 2,
           LeadPassenger: false,
           Age: room.ChildrenAges?.[i] ? String(room.ChildrenAges[i]) : "",
+          PAN: "",
+          ParentPAN: "",
         });
       }
     });
@@ -365,7 +412,28 @@ const HotelBooking = () => {
   }, [normalizedRooms]);
 
   const [guestList, setGuestList] = useState(initialGuests);
+  const [isCorporate, setIsCorporate] = useState(false);
   const [corporatePAN, setCorporatePAN] = useState("");
+
+  const [arrivalTransport, setArrivalTransport] = useState({
+    ArrivalTransportType: 0,
+    TransportInfoId: "",
+    Time: "",
+  });
+
+  const [departureTransport, setDepartureTransport] = useState({
+    DepartureTransportType: 0,
+    TransportInfoId: "",
+    Time: "",
+  });
+
+  const [gstDetails, setGstDetails] = useState({
+    GSTCompanyAddress: "",
+    GSTCompanyContactNumber: "",
+    GSTCompanyName: "",
+    GSTNumber: "",
+    GSTCompanyEmail: "",
+  });
 
   if (!preBook) {
     return (
@@ -421,38 +489,153 @@ const HotelBooking = () => {
     );
   };
 
-  const cleanNameInput = (value) => value.replace(/[^A-Za-z ]/g, "");
+  const cleanNameInput = (value) => {
+    if (validation.SpecialCharAllowed && validation.SpaceAllowed) return value;
+
+    if (validation.SpecialCharAllowed && !validation.SpaceAllowed) {
+      return value.replace(/\s/g, "");
+    }
+
+    if (!validation.SpecialCharAllowed && validation.SpaceAllowed) {
+      return value.replace(/[^A-Za-z ]/g, "");
+    }
+
+    return value.replace(/[^A-Za-z]/g, "");
+  };
 
   const normalizeName = (name) =>
-    name.trim().toLowerCase().replace(/\s+/g, " ");
+    String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
 
   const formatName = (name) =>
     normalizeName(name)
       .split(" ")
+      .filter(Boolean)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
 
-  const isValidName = (name) => /^[A-Za-z ]{3,}$/.test(name.trim());
+  const isValidPAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
 
-  const isDuplicateFirstName = (currentIndex, firstName) => {
-    const current = normalizeName(firstName);
+  const isValidGST = (gst) =>
+    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gst);
 
-    if (!current) return false;
+  const isValidNameByRules = (name) => {
+    const value = String(name || "").trim();
 
-    return guestList.some(
-      (guest, index) =>
-        index !== currentIndex && normalizeName(guest.FirstName) === current,
-    );
+    if (!value) return false;
+
+    if (!validation.SpaceAllowed && /\s/.test(value)) return false;
+
+    if (!validation.SpecialCharAllowed && /[^A-Za-z ]/.test(value)) {
+      return false;
+    }
+
+    if (validation.CharLimit) {
+      if (
+        validation.PaxNameMinLength &&
+        value.length < validation.PaxNameMinLength
+      ) {
+        return false;
+      }
+
+      if (
+        validation.PaxNameMaxLength &&
+        value.length > validation.PaxNameMaxLength
+      ) {
+        return false;
+      }
+    }
+
+    if (!validation.CharLimit && value.length < 2) return false;
+
+    return true;
   };
 
-  const isValidPAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
+  const getUniquePANCount = () => {
+    const pans = guestList
+      .flatMap((guest) => {
+        if (isCorporate) return [guest.PAN];
+
+        return [guest.PAN, guest.ParentPAN];
+      })
+      .map((pan) =>
+        String(pan || "")
+          .trim()
+          .toUpperCase(),
+      )
+      .filter((pan) => isValidPAN(pan));
+
+    if (isCorporate && isValidPAN(corporatePAN.trim().toUpperCase())) {
+      pans.push(corporatePAN.trim().toUpperCase());
+    }
+
+    return new Set(pans).size;
+  };
 
   const validateGuests = () => {
     if (!bookingCode) return "Booking code missing";
     if (!net || net <= 0) return "Net amount missing";
 
-    if (isPANRequired && !isValidPAN(corporatePAN.trim().toUpperCase())) {
-      return "Valid PAN number is required";
+    if (isCorporate) {
+      if (!validation.CorporateBokingAllowed) {
+        return "Corporate booking is not allowed for this hotel";
+      }
+
+      if (!isValidPAN(corporatePAN.trim().toUpperCase())) {
+        return "Valid Corporate PAN is required for corporate booking";
+      }
+    }
+
+    if (validation.PanCountRequired > 0) {
+      const uniquePANCount = getUniquePANCount();
+
+      if (uniquePANCount < validation.PanCountRequired) {
+        return `Minimum ${validation.PanCountRequired} unique PAN number required`;
+      }
+    }
+
+    if (validation.PackageDetailsMandatory) {
+      if (!arrivalTransport.TransportInfoId.trim()) {
+        return "Arrival transport number/details required";
+      }
+
+      if (!arrivalTransport.Time) {
+        return "Arrival transport time required";
+      }
+    }
+
+    if (validation.DepartureDetailsMandatory) {
+      if (!departureTransport.TransportInfoId.trim()) {
+        return "Departure transport number/details required";
+      }
+
+      if (!departureTransport.Time) {
+        return "Departure transport time required";
+      }
+    }
+
+    if (validation.GSTAllowed && isCorporate) {
+      if (!gstDetails.GSTCompanyName.trim()) {
+        return "GST company name is required";
+      }
+
+      if (!gstDetails.GSTCompanyAddress.trim()) {
+        return "GST company address is required";
+      }
+
+      if (!/^[0-9]{10}$/.test(gstDetails.GSTCompanyContactNumber)) {
+        return "Valid 10-digit GST company contact number required";
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gstDetails.GSTCompanyEmail)) {
+        return "Valid GST company email required";
+      }
+
+      if (!isValidGST(gstDetails.GSTNumber.trim().toUpperCase())) {
+        return "Valid GST number is required";
+      }
     }
 
     for (let roomIndex = 0; roomIndex < normalizedRooms.length; roomIndex++) {
@@ -471,6 +654,8 @@ const HotelBooking = () => {
       }
     }
 
+    const fullNameMap = new Map();
+
     for (let i = 0; i < guestList.length; i++) {
       const g = guestList[i];
 
@@ -478,16 +663,24 @@ const HotelBooking = () => {
         return `Guest ${i + 1}: First name and last name are required`;
       }
 
-      if (!isValidName(g.FirstName)) {
-        return `Guest ${i + 1}: First name must contain only alphabets and minimum 3 characters`;
+      if (!isValidNameByRules(g.FirstName)) {
+        return `Guest ${i + 1}: First name does not match hotel validation rules`;
       }
 
-      if (!isValidName(g.LastName)) {
-        return `Guest ${i + 1}: Last name must contain only alphabets and minimum 3 characters`;
+      if (!isValidNameByRules(g.LastName)) {
+        return `Guest ${i + 1}: Last name does not match hotel validation rules`;
       }
 
-      if (isDuplicateFirstName(i, g.FirstName)) {
-        return `Guest ${i + 1}: Same first name is not allowed for multiple guests`;
+      const fullName = `${normalizeName(g.FirstName)} ${normalizeName(
+        g.LastName,
+      )}`;
+
+      if (!validation.SamePaxNameAllowed) {
+        if (fullNameMap.has(fullName)) {
+          return `Guest ${i + 1}: Same passenger name is not allowed`;
+        }
+
+        fullNameMap.set(fullName, true);
       }
 
       if (!g.Age) {
@@ -518,18 +711,29 @@ const HotelBooking = () => {
         }
       }
 
-      if (
-        validation?.PaxNameMinLength &&
-        g.FirstName.trim().length < validation.PaxNameMinLength
-      ) {
-        return `Guest ${i + 1}: Name too short`;
-      }
+      if (validation.PanMandatory) {
+        const passengerPAN = String(g.PAN || "")
+          .trim()
+          .toUpperCase();
+        const parentPAN = String(g.ParentPAN || "")
+          .trim()
+          .toUpperCase();
 
-      if (
-        validation?.PaxNameMaxLength &&
-        g.FirstName.trim().length > validation.PaxNameMaxLength
-      ) {
-        return `Guest ${i + 1}: Name too long`;
+        if (passengerPAN && !isValidPAN(passengerPAN)) {
+          return `Guest ${i + 1}: Enter valid passenger PAN`;
+        }
+
+        if (parentPAN && !isValidPAN(parentPAN)) {
+          return `Guest ${i + 1}: Enter valid parent/guardian PAN`;
+        }
+
+        if (isCorporate && !passengerPAN) {
+          return `Guest ${i + 1}: Passenger PAN is required for corporate booking. Parent/Guardian PAN is not allowed for corporate booking`;
+        }
+
+        if (!isCorporate && !passengerPAN && !parentPAN) {
+          return `Guest ${i + 1}: Passenger PAN or Parent/Guardian PAN is required`;
+        }
       }
     }
 
@@ -570,7 +774,7 @@ const HotelBooking = () => {
     if (error) return alert(error);
 
     try {
-      const finalPAN = corporatePAN.trim().toUpperCase();
+      const finalCorporatePAN = corporatePAN.trim().toUpperCase();
 
       const cleanedGuests = guestList.map((g) => {
         const passenger = {
@@ -589,8 +793,28 @@ const HotelBooking = () => {
           passenger.Phoneno = g.Phoneno.trim();
         }
 
-        if (isPANRequired) {
-          passenger.PAN = finalPAN;
+        if (validation.PanMandatory) {
+          const passengerPAN = String(g.PAN || "")
+            .trim()
+            .toUpperCase();
+          const parentPAN = String(g.ParentPAN || "")
+            .trim()
+            .toUpperCase();
+
+          if (passengerPAN) {
+            passenger.PAN = passengerPAN;
+          } else if (!isCorporate && parentPAN) {
+            passenger.ParentPAN = parentPAN;
+          }
+        }
+
+        if (validation.GSTAllowed && isCorporate) {
+          passenger.GSTCompanyAddress = gstDetails.GSTCompanyAddress.trim();
+          passenger.GSTCompanyContactNumber =
+            gstDetails.GSTCompanyContactNumber.trim();
+          passenger.GSTCompanyName = gstDetails.GSTCompanyName.trim();
+          passenger.GSTNumber = gstDetails.GSTNumber.trim().toUpperCase();
+          passenger.GSTCompanyEmail = gstDetails.GSTCompanyEmail.trim();
         }
 
         return passenger;
@@ -613,10 +837,35 @@ const HotelBooking = () => {
         PaxRooms,
       };
 
-      if (isPANRequired) {
+      if (validation.PanMandatory) {
         finalPayload.PANRequired = true;
-        finalPayload.CorporateBooking = true;
-        finalPayload.CorporatePAN = finalPAN;
+      }
+
+      if (validation.IsPackageFare) {
+        finalPayload.IsPackageFare = true;
+      }
+
+      if (validation.PackageDetailsMandatory) {
+        finalPayload.ArrivalTransport = {
+          ArrivalTransportType: Number(arrivalTransport.ArrivalTransportType),
+          TransportInfoId: arrivalTransport.TransportInfoId.trim(),
+          Time: toApiDateTime(arrivalTransport.Time),
+        };
+      }
+
+      if (validation.DepartureDetailsMandatory) {
+        finalPayload.DepartureTransport = {
+          DepartureTransportType: Number(
+            departureTransport.DepartureTransportType,
+          ),
+          TransportInfoId: departureTransport.TransportInfoId.trim(),
+          Time: toApiDateTime(departureTransport.Time),
+        };
+      }
+
+      if (isCorporate) {
+        finalPayload.IsCorporate = true;
+        finalPayload.CorporatePAN = finalCorporatePAN;
       }
 
       const searchedRooms =
@@ -649,9 +898,9 @@ const HotelBooking = () => {
           throw new Error(
             `Child age mismatch before booking. Room ${
               index + 1
-            }: searched age ${searchAges.join(", ")} but booking age ${finalAges.join(
+            }: searched age ${searchAges.join(
               ", ",
-            )}`,
+            )} but booking age ${finalAges.join(", ")}`,
           );
         }
       });
@@ -670,8 +919,13 @@ const HotelBooking = () => {
         checkIn,
         checkOut,
         net,
-        isPANRequired,
-        corporatePAN: finalPAN,
+        validation,
+        validationInfo,
+        isCorporate,
+        corporatePAN: finalCorporatePAN,
+        gstDetails,
+        arrivalTransport,
+        departureTransport,
         cancellationPolicies,
         roomPromotions,
         supplements,
@@ -714,11 +968,43 @@ const HotelBooking = () => {
                 : roomData?.Name || "Standard Room"}
             </p>
 
-            <p className="mt-3 text-xs text-gray-500">
-              {isPANRequired
-                ? "International / PAN required booking"
-                : "Domestic booking"}
-            </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              {validation.PanMandatory && (
+                <span className="rounded-full border border-red-400/30 bg-red-400/10 px-3 py-1 text-red-200">
+                  PAN Mandatory
+                </span>
+              )}
+
+              {validation.IsPackageFare && (
+                <span className="rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1 text-blue-200">
+                  Package Fare
+                </span>
+              )}
+
+              {validation.PackageDetailsMandatory && (
+                <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-cyan-200">
+                  Arrival Details Required
+                </span>
+              )}
+
+              {validation.DepartureDetailsMandatory && (
+                <span className="rounded-full border border-orange-400/30 bg-orange-400/10 px-3 py-1 text-orange-200">
+                  Departure Details Required
+                </span>
+              )}
+
+              {validation.GSTAllowed && (
+                <span className="rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-green-200">
+                  GST Allowed
+                </span>
+              )}
+
+              {validation.CorporateBokingAllowed && (
+                <span className="rounded-full border border-purple-400/30 bg-purple-400/10 px-3 py-1 text-purple-200">
+                  Corporate Booking Allowed
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
@@ -865,33 +1151,15 @@ const HotelBooking = () => {
 
             <div className="p-5">
               {roomAmenities.length > 0 ? (
-                <div className="overflow-hidden rounded-xl border border-gray-800">
-                  <div className="grid grid-cols-1 md:grid-cols-[120px_1fr]">
-                    <div className="bg-[#202432] px-4 py-3 font-semibold text-gray-300 md:border-r md:border-gray-800">
-                      Room
-                    </div>
-
-                    <div className="bg-[#202432] px-4 py-3 font-semibold text-gray-300">
-                      Amenities
-                    </div>
-
-                    <div className="border-t border-gray-800 px-4 py-4 font-semibold text-white md:border-r">
-                      Room 1
-                    </div>
-
-                    <div className="border-t border-gray-800 px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {roomAmenities.map((amenity, index) => (
-                          <span
-                            key={index}
-                            className="rounded-full border border-gray-700 bg-[#0B0B0F] px-3 py-1.5 text-xs text-gray-300"
-                          >
-                            {amenity}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {roomAmenities.map((amenity, index) => (
+                    <span
+                      key={index}
+                      className="rounded-full border border-gray-700 bg-[#0B0B0F] px-3 py-1.5 text-xs text-gray-300"
+                    >
+                      {amenity}
+                    </span>
+                  ))}
                 </div>
               ) : (
                 <p className="text-sm text-gray-400">
@@ -913,7 +1181,7 @@ const HotelBooking = () => {
                   {rateConditions.map((condition, index) => (
                     <li
                       key={index}
-                      className="rounded-xl border border-white/10 bg-white/3 p-3 text-gray-300"
+                      className="rounded-xl border border-white/10 bg-white/5 p-3 text-gray-300"
                       dangerouslySetInnerHTML={{
                         __html: String(condition || "")
                           .replaceAll("&lt;", "<")
@@ -932,25 +1200,232 @@ const HotelBooking = () => {
             </div>
           </div>
 
-          {isPANRequired && (
+          {validation.CorporateBokingAllowed && (
             <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
-              <h3 className="mb-4 text-yellow-300">PAN Details</h3>
+              <h3 className="mb-4 text-yellow-300">Corporate Booking</h3>
 
-              <input
-                placeholder="Enter Corporate PAN"
-                className="input uppercase"
-                value={corporatePAN}
-                maxLength={10}
-                onChange={(e) =>
-                  setCorporatePAN(
-                    e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
-                  )
-                }
-              />
+              <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full border border-purple-400/30 bg-purple-400/10 px-4 py-2 text-sm text-purple-200">
+                <input
+                  type="checkbox"
+                  checked={isCorporate}
+                  onChange={(e) => setIsCorporate(e.target.checked)}
+                  className="accent-yellow-400"
+                />
+                Book as corporate customer
+              </label>
 
-              <p className="mt-2 text-xs text-gray-500">
-                This PAN will be sent as CorporatePAN and passenger PAN.
+              {isCorporate && (
+                <div className="mt-4">
+                  <input
+                    placeholder="Corporate PAN"
+                    className="input uppercase"
+                    value={corporatePAN}
+                    maxLength={10}
+                    onChange={(e) =>
+                      setCorporatePAN(
+                        e.target.value
+                          .replace(/[^A-Za-z0-9]/g, "")
+                          .toUpperCase(),
+                      )
+                    }
+                  />
+
+                  <p className="mt-2 text-xs text-gray-500">
+                    Corporate PAN must belong to the actual corporate customer.
+                    Do not use agency PAN, TBO PAN, or parent/guardian PAN for
+                    corporate booking.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {validation.IsPackageFare && (
+            <div className="rounded-2xl border border-blue-400/20 bg-blue-400/10 p-5">
+              <h3 className="font-semibold text-blue-200">Package Fare</h3>
+              <p className="mt-2 text-sm text-blue-100/80">
+                This room is marked as package fare. The book request will send{" "}
+                <span className="font-semibold">IsPackageFare: true</span>.
+                Transport details are required only when the hotel validation
+                asks for them.
               </p>
+            </div>
+          )}
+
+          {validation.PackageDetailsMandatory && (
+            <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
+              <h3 className="mb-4 text-yellow-300">
+                Arrival Transport Details
+              </h3>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <select
+                  className="input"
+                  value={arrivalTransport.ArrivalTransportType}
+                  onChange={(e) =>
+                    setArrivalTransport((prev) => ({
+                      ...prev,
+                      ArrivalTransportType: Number(e.target.value),
+                    }))
+                  }
+                >
+                  <option value={0}>Flight</option>
+                  <option value={1}>Surface</option>
+                </select>
+
+                <input
+                  placeholder={
+                    Number(arrivalTransport.ArrivalTransportType) === 0
+                      ? "Flight No. e.g. 6E 203"
+                      : "Surface details"
+                  }
+                  className="input"
+                  value={arrivalTransport.TransportInfoId}
+                  onChange={(e) =>
+                    setArrivalTransport((prev) => ({
+                      ...prev,
+                      TransportInfoId: e.target.value,
+                    }))
+                  }
+                />
+
+                <input
+                  type="datetime-local"
+                  className="input"
+                  value={arrivalTransport.Time}
+                  onChange={(e) =>
+                    setArrivalTransport((prev) => ({
+                      ...prev,
+                      Time: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          )}
+
+          {validation.DepartureDetailsMandatory && (
+            <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
+              <h3 className="mb-4 text-yellow-300">
+                Departure Transport Details
+              </h3>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <select
+                  className="input"
+                  value={departureTransport.DepartureTransportType}
+                  onChange={(e) =>
+                    setDepartureTransport((prev) => ({
+                      ...prev,
+                      DepartureTransportType: Number(e.target.value),
+                    }))
+                  }
+                >
+                  <option value={0}>Flight</option>
+                  <option value={1}>Surface</option>
+                </select>
+
+                <input
+                  placeholder={
+                    Number(departureTransport.DepartureTransportType) === 0
+                      ? "Flight No. e.g. AI 221"
+                      : "Surface details"
+                  }
+                  className="input"
+                  value={departureTransport.TransportInfoId}
+                  onChange={(e) =>
+                    setDepartureTransport((prev) => ({
+                      ...prev,
+                      TransportInfoId: e.target.value,
+                    }))
+                  }
+                />
+
+                <input
+                  type="datetime-local"
+                  className="input"
+                  value={departureTransport.Time}
+                  onChange={(e) =>
+                    setDepartureTransport((prev) => ({
+                      ...prev,
+                      Time: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          )}
+
+          {validation.GSTAllowed && isCorporate && (
+            <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
+              <h3 className="mb-4 text-yellow-300">GST Details</h3>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <input
+                  placeholder="GST Company Name"
+                  className="input"
+                  value={gstDetails.GSTCompanyName}
+                  onChange={(e) =>
+                    setGstDetails((prev) => ({
+                      ...prev,
+                      GSTCompanyName: e.target.value,
+                    }))
+                  }
+                />
+
+                <input
+                  placeholder="GST Number"
+                  className="input uppercase"
+                  value={gstDetails.GSTNumber}
+                  maxLength={15}
+                  onChange={(e) =>
+                    setGstDetails((prev) => ({
+                      ...prev,
+                      GSTNumber: e.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+
+                <input
+                  placeholder="GST Company Email"
+                  className="input"
+                  value={gstDetails.GSTCompanyEmail}
+                  onChange={(e) =>
+                    setGstDetails((prev) => ({
+                      ...prev,
+                      GSTCompanyEmail: e.target.value.trim(),
+                    }))
+                  }
+                />
+
+                <input
+                  placeholder="GST Company Contact Number"
+                  className="input"
+                  value={gstDetails.GSTCompanyContactNumber}
+                  maxLength={10}
+                  onChange={(e) =>
+                    setGstDetails((prev) => ({
+                      ...prev,
+                      GSTCompanyContactNumber: e.target.value.replace(
+                        /\D/g,
+                        "",
+                      ),
+                    }))
+                  }
+                />
+
+                <input
+                  placeholder="GST Company Address"
+                  className="input sm:col-span-2"
+                  value={gstDetails.GSTCompanyAddress}
+                  onChange={(e) =>
+                    setGstDetails((prev) => ({
+                      ...prev,
+                      GSTCompanyAddress: e.target.value,
+                    }))
+                  }
+                />
+              </div>
             </div>
           )}
 
@@ -1002,7 +1477,11 @@ const HotelBooking = () => {
                   placeholder="First Name"
                   className="input"
                   value={guest.FirstName}
-                  maxLength={30}
+                  maxLength={
+                    validation.CharLimit && validation.PaxNameMaxLength
+                      ? validation.PaxNameMaxLength
+                      : 50
+                  }
                   onChange={(e) =>
                     updateGuest(
                       index,
@@ -1016,7 +1495,11 @@ const HotelBooking = () => {
                   placeholder="Last Name"
                   className="input"
                   value={guest.LastName}
-                  maxLength={30}
+                  maxLength={
+                    validation.CharLimit && validation.PaxNameMaxLength
+                      ? validation.PaxNameMaxLength
+                      : 50
+                  }
                   onChange={(e) =>
                     updateGuest(
                       index,
@@ -1047,6 +1530,46 @@ const HotelBooking = () => {
                   />
                 </div>
 
+                {validation.PanMandatory && (
+                  <>
+                    <input
+                      placeholder={
+                        isCorporate ? "Passenger PAN required" : "Passenger PAN"
+                      }
+                      className="input uppercase"
+                      value={guest.PAN}
+                      maxLength={10}
+                      onChange={(e) =>
+                        updateGuest(
+                          index,
+                          "PAN",
+                          e.target.value
+                            .replace(/[^A-Za-z0-9]/g, "")
+                            .toUpperCase(),
+                        )
+                      }
+                    />
+
+                    {!isCorporate && (
+                      <input
+                        placeholder="Parent / Guardian PAN"
+                        className="input uppercase"
+                        value={guest.ParentPAN}
+                        maxLength={10}
+                        onChange={(e) =>
+                          updateGuest(
+                            index,
+                            "ParentPAN",
+                            e.target.value
+                              .replace(/[^A-Za-z0-9]/g, "")
+                              .toUpperCase(),
+                          )
+                        }
+                      />
+                    )}
+                  </>
+                )}
+
                 {guest.LeadPassenger && (
                   <>
                     <input
@@ -1074,10 +1597,17 @@ const HotelBooking = () => {
                   </>
                 )}
               </div>
+
+              {validation.PanMandatory && (
+                <p className="mt-3 text-xs text-gray-500">
+                  {isCorporate
+                    ? "For corporate booking, passenger PAN is required. Parent/Guardian PAN is not considered."
+                    : "If passenger PAN is provided, it will be used. Parent/Guardian PAN will be used only when passenger PAN is empty."}
+                </p>
+              )}
             </div>
           ))}
         </div>
-
         <div className="sticky top-24 h-fit rounded-2xl border border-gray-800 bg-[#15151C] p-6">
           <h3 className="mb-4 text-lg text-yellow-300">Price Summary</h3>
 
@@ -1099,6 +1629,118 @@ const HotelBooking = () => {
               <span>Total</span>
               <span className="text-yellow-400">₹ {Math.round(net)}</span>
             </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-xs text-gray-300">
+            <p className="font-semibold text-yellow-300">
+              Important Requirements
+            </p>
+
+            <ul className="mt-3 space-y-2">
+              <li className="flex gap-2">
+                <span
+                  className={
+                    validation.PanMandatory
+                      ? "text-yellow-300"
+                      : "text-gray-500"
+                  }
+                >
+                  •
+                </span>
+                <span>
+                  {validation.PanMandatory
+                    ? `PAN details are required for this booking${
+                        validation.PanCountRequired > 0
+                          ? ` (${validation.PanCountRequired} unique PAN required)`
+                          : ""
+                      }.`
+                    : "PAN details are not required for this booking."}
+                </span>
+              </li>
+
+              <li className="flex gap-2">
+                <span
+                  className={
+                    validation.CorporateBokingAllowed
+                      ? "text-yellow-300"
+                      : "text-red-300"
+                  }
+                >
+                  •
+                </span>
+                <span>
+                  {validation.CorporateBokingAllowed
+                    ? "Corporate booking is allowed for this hotel."
+                    : "Corporate booking is not allowed for this hotel."}
+                </span>
+              </li>
+
+              <li className="flex gap-2">
+                <span
+                  className={
+                    validation.IsPackageFare
+                      ? "text-yellow-300"
+                      : "text-gray-500"
+                  }
+                >
+                  •
+                </span>
+                <span>
+                  {validation.IsPackageFare
+                    ? "This room has package fare pricing."
+                    : "This room does not have package fare pricing."}
+                </span>
+              </li>
+
+              <li className="flex gap-2">
+                <span
+                  className={
+                    validation.PackageDetailsMandatory
+                      ? "text-yellow-300"
+                      : "text-gray-500"
+                  }
+                >
+                  •
+                </span>
+                <span>
+                  {validation.PackageDetailsMandatory
+                    ? "Arrival transport details are required."
+                    : "Arrival transport details are not required."}
+                </span>
+              </li>
+
+              <li className="flex gap-2">
+                <span
+                  className={
+                    validation.DepartureDetailsMandatory
+                      ? "text-yellow-300"
+                      : "text-gray-500"
+                  }
+                >
+                  •
+                </span>
+                <span>
+                  {validation.DepartureDetailsMandatory
+                    ? "Departure transport details are required."
+                    : "Departure transport details are not required."}
+                </span>
+              </li>
+
+              <li className="flex gap-2">
+                <span
+                  className={
+                    validation.GSTAllowed ? "text-yellow-300" : "text-gray-500"
+                  }
+                >
+                  •
+                </span>
+                <span>
+                  {validation.GSTAllowed
+                    ? "GST details can be added for corporate customer."
+                    : "GST details are not allowed for this booking."}
+                </span>
+              </li>
+            </ul>
           </div>
 
           <button
