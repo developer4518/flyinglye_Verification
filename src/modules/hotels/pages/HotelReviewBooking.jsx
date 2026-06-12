@@ -20,7 +20,6 @@ const findDeepValueByKeys = (obj, keywords = [], maxDepth = 6) => {
 
   const search = (value, depth = 0) => {
     if (!value || depth > maxDepth) return "";
-
     if (typeof value !== "object") return "";
 
     if (visited.has(value)) return "";
@@ -124,24 +123,132 @@ const getHotelAddressFromReviewData = (data = {}) => {
   return fallbackLocation || "";
 };
 
+const normalizeTextList = (value) => {
+  if (!value) return [];
+
+  if (typeof value === "string") {
+    return value
+      .split(/,|\|/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .flat(Infinity)
+      .flatMap((item) => normalizeTextList(item))
+      .filter(Boolean);
+  }
+
+  if (typeof value === "object") {
+    const text = pickFirst(
+      value?.Description,
+      value?.Name,
+      value?.FacilityName,
+      value?.Facility,
+      value?.HotelFacility,
+      value?.Amenity,
+      value?.Text,
+      value?.Value,
+      value?.Title,
+    );
+
+    if (text) return normalizeTextList(text);
+
+    return Object.values(value)
+      .flatMap((item) => normalizeTextList(item))
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const findDeepArrayByKeys = (obj, keywords = [], maxDepth = 7) => {
+  const visited = new WeakSet();
+
+  const search = (value, depth = 0) => {
+    if (!value || depth > maxDepth) return [];
+    if (typeof value !== "object") return [];
+
+    if (visited.has(value)) return [];
+    visited.add(value);
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = search(item, depth + 1);
+        if (found.length > 0) return found;
+      }
+      return [];
+    }
+
+    for (const [key, val] of Object.entries(value)) {
+      const keyLower = String(key).toLowerCase();
+
+      const isMatchingKey = keywords.some((keyword) =>
+        keyLower.includes(keyword.toLowerCase()),
+      );
+
+      if (isMatchingKey) {
+        const normalized = normalizeTextList(val);
+        if (normalized.length > 0) return normalized;
+      }
+    }
+
+    for (const val of Object.values(value)) {
+      const found = search(val, depth + 1);
+      if (found.length > 0) return found;
+    }
+
+    return [];
+  };
+
+  return search(obj);
+};
+
 const getHotelFacilitiesFromReviewData = (data = {}) => {
-  return (
+  const directFacilities = normalizeTextList(
     data?.hotelFacilities ||
-    data?.hotelResult?.HotelFacilities ||
-    data?.hotelResult?.Facilities ||
-    data?.hotelResult?.HotelFacility ||
-    data?.hotel?.HotelFacilities ||
-    data?.hotel?.Facilities ||
-    data?.hotel?.facilities ||
-    data?.hotel?.hotel_facilities ||
-    data?.hotel?.hotel_raw?.HotelFacilities ||
-    data?.hotel?.hotel_raw?.Facilities ||
-    data?.prebookData?.raw?.HotelResult?.[0]?.HotelFacilities ||
-    data?.prebookData?.raw?.HotelResult?.[0]?.Facilities ||
-    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.HotelFacilities ||
-    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Facilities ||
-    []
+      data?.hotelResult?.HotelFacilities ||
+      data?.hotelResult?.Facilities ||
+      data?.hotelResult?.HotelFacility ||
+      data?.hotelResult?.Amenities ||
+      data?.hotel?.HotelFacilities ||
+      data?.hotel?.Facilities ||
+      data?.hotel?.facilities ||
+      data?.hotel?.hotel_facilities ||
+      data?.hotel?.Amenities ||
+      data?.hotel?.amenities ||
+      data?.hotel?.hotel_raw?.HotelFacilities ||
+      data?.hotel?.hotel_raw?.Facilities ||
+      data?.hotel?.hotel_raw?.Amenities ||
+      data?.roomData?.HotelFacilities ||
+      data?.roomData?.Facilities ||
+      data?.prebookData?.HotelFacilities ||
+      data?.prebookData?.Facilities ||
+      data?.prebookData?.raw?.HotelResult?.[0]?.HotelFacilities ||
+      data?.prebookData?.raw?.HotelResult?.[0]?.Facilities ||
+      data?.prebookData?.raw?.HotelResult?.[0]?.Amenities ||
+      data?.prebookData?.raw?.Response?.HotelResult?.[0]?.HotelFacilities ||
+      data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Facilities ||
+      data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Amenities,
   );
+
+  const deepFacilities = findDeepArrayByKeys(data, [
+    "hotelfacilities",
+    "hotel_facilities",
+    "facilities",
+    "facility",
+    "amenities",
+    "amenity",
+  ]);
+
+  return Array.from(
+    new Set(
+      [...directFacilities, ...deepFacilities].map((item) =>
+        String(item).trim(),
+      ),
+    ),
+  ).filter(Boolean);
 };
 
 const getHotelNormsFromReviewData = (data = {}) => {
@@ -162,6 +269,7 @@ const getHotelNormsFromReviewData = (data = {}) => {
 const HotelReviewBooking = () => {
   const location = useLocation();
   const navigate = useNavigate();
+
   const { setGuestDetails, selectedHotel, selectedRoom, prebookData } =
     useHotelStore();
 
@@ -177,51 +285,69 @@ const HotelReviewBooking = () => {
 
   const baseReviewData = stateData || storedData;
 
+  const mergedHotel = {
+    ...(selectedHotel || {}),
+    ...(baseReviewData?.hotel || {}),
+    hotel_raw: {
+      ...(selectedHotel?.hotel_raw || selectedHotel?.rawHotel || {}),
+      ...(baseReviewData?.hotel?.hotel_raw || {}),
+    },
+  };
+
+  const mergedRoomData =
+    baseReviewData?.roomData ||
+    selectedRoom ||
+    baseReviewData?.prebookData?.room ||
+    {};
+
+  const mergedPrebookData = baseReviewData?.prebookData || prebookData || {};
+
+  const mergedHotelResult =
+    baseReviewData?.hotelResult ||
+    prebookData?.raw?.HotelResult?.[0] ||
+    prebookData?.raw?.Response?.HotelResult?.[0] ||
+    {};
+
   const reviewData = baseReviewData
     ? {
         ...baseReviewData,
 
-        hotel: {
-          ...(selectedHotel || {}),
-          ...(baseReviewData?.hotel || {}),
-          hotel_raw: {
-            ...(selectedHotel?.hotel_raw || selectedHotel?.rawHotel || {}),
-            ...(baseReviewData?.hotel?.hotel_raw || {}),
-          },
-        },
+        hotel: mergedHotel,
 
-        roomData:
-          baseReviewData?.roomData ||
-          selectedRoom ||
-          baseReviewData?.prebookData?.room ||
-          {},
+        roomData: mergedRoomData,
 
-        prebookData: baseReviewData?.prebookData || prebookData || {},
+        prebookData: mergedPrebookData,
 
-        hotelResult:
-          baseReviewData?.hotelResult ||
-          prebookData?.raw?.HotelResult?.[0] ||
-          prebookData?.raw?.Response?.HotelResult?.[0] ||
-          {},
+        hotelResult: mergedHotelResult,
 
         hotelAddress:
           baseReviewData?.hotelAddress ||
           getHotelAddressFromReviewData({
             ...baseReviewData,
-            hotel: {
-              ...(selectedHotel || {}),
-              ...(baseReviewData?.hotel || {}),
-              hotel_raw: {
-                ...(selectedHotel?.hotel_raw || selectedHotel?.rawHotel || {}),
-                ...(baseReviewData?.hotel?.hotel_raw || {}),
-              },
-            },
-            prebookData: baseReviewData?.prebookData || prebookData || {},
-            hotelResult:
-              baseReviewData?.hotelResult ||
-              prebookData?.raw?.HotelResult?.[0] ||
-              prebookData?.raw?.Response?.HotelResult?.[0] ||
-              {},
+            hotel: mergedHotel,
+            roomData: mergedRoomData,
+            prebookData: mergedPrebookData,
+            hotelResult: mergedHotelResult,
+          }),
+
+        hotelFacilities:
+          baseReviewData?.hotelFacilities ||
+          getHotelFacilitiesFromReviewData({
+            ...baseReviewData,
+            hotel: mergedHotel,
+            roomData: mergedRoomData,
+            prebookData: mergedPrebookData,
+            hotelResult: mergedHotelResult,
+          }),
+
+        hotelNorms:
+          baseReviewData?.hotelNorms ||
+          getHotelNormsFromReviewData({
+            ...baseReviewData,
+            hotel: mergedHotel,
+            roomData: mergedRoomData,
+            prebookData: mergedPrebookData,
+            hotelResult: mergedHotelResult,
           }),
       }
     : null;
@@ -329,6 +455,9 @@ const HotelReviewBooking = () => {
     try {
       setLoading(true);
 
+      const finalHotelFacilities = getHotelFacilitiesFromReviewData(reviewData);
+      const finalHotelNorms = getHotelNormsFromReviewData(reviewData);
+
       console.log("SELECTED HOTEL FROM STORE:", selectedHotel);
       console.log("SELECTED ROOM FROM STORE:", selectedRoom);
       console.log("PREBOOK DATA FROM STORE:", prebookData);
@@ -340,6 +469,8 @@ const HotelReviewBooking = () => {
         selectedHotel,
         prebookData,
       });
+      console.log("FINAL HOTEL FACILITIES SAVED:", finalHotelFacilities);
+
       const res = await privateApi.post(
         "/api/hotels/hotels/book/",
         reviewData.finalPayload,
@@ -379,12 +510,8 @@ const HotelReviewBooking = () => {
         roomAmenities: reviewData.roomAmenities || [],
         rateConditions: reviewData.rateConditions || [],
 
-        hotelFacilities:
-          reviewData?.hotelFacilities ||
-          getHotelFacilitiesFromReviewData(reviewData),
-
-        hotelNorms:
-          reviewData?.hotelNorms || getHotelNormsFromReviewData(reviewData),
+        hotelFacilities: finalHotelFacilities,
+        hotelNorms: finalHotelNorms,
       };
 
       localStorage.setItem(
@@ -448,6 +575,8 @@ const HotelReviewBooking = () => {
     rateConditions = [],
     finalPayload,
   } = reviewData;
+
+  const hotelFacilities = getHotelFacilitiesFromReviewData(reviewData);
 
   return (
     <div className="min-h-screen bg-[#0B0B0F] px-4 py-24 text-white md:px-10">
@@ -514,6 +643,38 @@ const HotelReviewBooking = () => {
               </div>
             </div>
 
+            {/* Hotel Facilities */}
+            {hotelFacilities.length > 0 && (
+              <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-yellow-300">
+                      Hotel Facilities
+                    </h3>
+
+                    <p className="mt-1 text-xs text-gray-500">
+                      Facilities provided by this hotel.
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-300">
+                    {hotelFacilities.length}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {hotelFacilities.map((facility, index) => (
+                    <span
+                      key={`${facility}-${index}`}
+                      className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-medium text-yellow-100"
+                    >
+                      {facility}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Guests */}
             <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
               <div className="bg-[#1E2230] px-5 py-3">
@@ -522,37 +683,43 @@ const HotelReviewBooking = () => {
 
               <div className="p-5">
                 <div className="space-y-4">
-                  {guestList.map((guest, index) => (
-                    <div
-                      key={index}
-                      className="rounded-xl border border-gray-800 bg-[#0B0B0F] p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h4 className="font-semibold text-white">
-                            {guest.Title} {guest.FirstName} {guest.LastName}
-                          </h4>
+                  {guestList.length > 0 ? (
+                    guestList.map((guest, index) => (
+                      <div
+                        key={index}
+                        className="rounded-xl border border-gray-800 bg-[#0B0B0F] p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <h4 className="font-semibold text-white">
+                              {guest.Title} {guest.FirstName} {guest.LastName}
+                            </h4>
 
-                          <p className="mt-1 text-xs text-gray-400">
-                            {guest.PaxType === 1 ? "Adult" : "Child"} • Age{" "}
-                            {guest.Age}
-                            {guest.LeadPassenger ? " • Lead Passenger" : ""}
-                          </p>
+                            <p className="mt-1 text-xs text-gray-400">
+                              {guest.PaxType === 1 ? "Adult" : "Child"} • Age{" "}
+                              {guest.Age}
+                              {guest.LeadPassenger ? " • Lead Passenger" : ""}
+                            </p>
+                          </div>
+
+                          <span className="rounded-full bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-300">
+                            Guest {index + 1}
+                          </span>
                         </div>
 
-                        <span className="rounded-full bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-300">
-                          Guest {index + 1}
-                        </span>
+                        {guest.LeadPassenger && (
+                          <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-300 sm:grid-cols-2">
+                            <p>Email: {guest.Email || "-"}</p>
+                            <p>Phone: {guest.Phoneno || "-"}</p>
+                          </div>
+                        )}
                       </div>
-
-                      {guest.LeadPassenger && (
-                        <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-300 sm:grid-cols-2">
-                          <p>Email: {guest.Email || "-"}</p>
-                          <p>Phone: {guest.Phoneno || "-"}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      Guest details are not available.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -681,7 +848,7 @@ const HotelReviewBooking = () => {
                 <div className="flex flex-wrap gap-2">
                   {roomAmenities.map((amenity, index) => (
                     <span
-                      key={index}
+                      key={`${amenity}-${index}`}
                       className="rounded-full border border-gray-700 bg-[#0B0B0F] px-3 py-1.5 text-xs text-gray-300"
                     >
                       {amenity}
@@ -731,10 +898,11 @@ const HotelReviewBooking = () => {
               <div className="flex justify-between text-gray-300">
                 <span>
                   Total Amount{" "}
-                  <p className="text-xs  text-gray-200">
+                  <p className="text-xs text-gray-200">
                     (Inclusive of all taxes)
                   </p>
                 </span>
+
                 <span>₹ {Math.round(Number(net || 0))}</span>
               </div>
 
