@@ -556,9 +556,19 @@ const HotelBooking = () => {
   const getUniquePANCount = () => {
     const pans = guestList
       .flatMap((guest) => {
-        if (isCorporate) return [guest.PAN];
+        const passengerPAN = guest.PAN;
 
-        return [guest.PAN, guest.ParentPAN];
+        if (isCorporate) {
+          return [passengerPAN];
+        }
+
+        // Parent / Guardian PAN is valid only for child passenger
+        if (guest.PaxType === 2) {
+          return [passengerPAN, guest.ParentPAN];
+        }
+
+        // Adult should only use own passenger PAN
+        return [passengerPAN];
       })
       .map((pan) =>
         String(pan || "")
@@ -715,6 +725,7 @@ const HotelBooking = () => {
         const passengerPAN = String(g.PAN || "")
           .trim()
           .toUpperCase();
+
         const parentPAN = String(g.ParentPAN || "")
           .trim()
           .toUpperCase();
@@ -728,11 +739,23 @@ const HotelBooking = () => {
         }
 
         if (isCorporate && !passengerPAN) {
-          return `Guest ${i + 1}: Passenger PAN is required for corporate booking. Parent/Guardian PAN is not allowed for corporate booking`;
+          return `Guest ${i + 1}: Passenger PAN is required for corporate booking`;
         }
 
-        if (!isCorporate && !passengerPAN && !parentPAN) {
-          return `Guest ${i + 1}: Passenger PAN or Parent/Guardian PAN is required`;
+        if (isCorporate && parentPAN) {
+          return `Guest ${i + 1}: Parent/Guardian PAN is not allowed for corporate booking`;
+        }
+
+        if (!isCorporate && g.PaxType === 1 && !passengerPAN) {
+          return `Guest ${i + 1}: Adult passenger PAN is required`;
+        }
+
+        if (!isCorporate && g.PaxType === 1 && parentPAN) {
+          return `Guest ${i + 1}: Parent/Guardian PAN is allowed only for child passenger`;
+        }
+
+        if (!isCorporate && g.PaxType === 2 && !passengerPAN && !parentPAN) {
+          return `Guest ${i + 1}: Child passenger PAN or Parent/Guardian PAN is required`;
         }
       }
     }
@@ -797,13 +820,17 @@ const HotelBooking = () => {
           const passengerPAN = String(g.PAN || "")
             .trim()
             .toUpperCase();
+
           const parentPAN = String(g.ParentPAN || "")
             .trim()
             .toUpperCase();
 
           if (passengerPAN) {
             passenger.PAN = passengerPAN;
-          } else if (!isCorporate && parentPAN) {
+          }
+
+          // Parent / Guardian PAN should be sent only for child and non-corporate booking
+          if (!isCorporate && g.PaxType === 2 && !passengerPAN && parentPAN) {
             passenger.ParentPAN = parentPAN;
           }
         }
@@ -1534,7 +1561,11 @@ const HotelBooking = () => {
                   <>
                     <input
                       placeholder={
-                        isCorporate ? "Passenger PAN required" : "Passenger PAN"
+                        guest.PaxType === 1
+                          ? "Adult Passenger PAN required"
+                          : isCorporate
+                            ? "Child Passenger PAN required"
+                            : "Child Passenger PAN"
                       }
                       className="input uppercase"
                       value={guest.PAN}
@@ -1550,9 +1581,9 @@ const HotelBooking = () => {
                       }
                     />
 
-                    {!isCorporate && (
+                    {!isCorporate && guest.PaxType === 2 && (
                       <input
-                        placeholder="Parent / Guardian PAN"
+                        placeholder="Parent / Guardian PAN for child"
                         className="input uppercase"
                         value={guest.ParentPAN}
                         maxLength={10}
@@ -1601,8 +1632,10 @@ const HotelBooking = () => {
               {validation.PanMandatory && (
                 <p className="mt-3 text-xs text-gray-500">
                   {isCorporate
-                    ? "For corporate booking, passenger PAN is required. Parent/Guardian PAN is not considered."
-                    : "If passenger PAN is provided, it will be used. Parent/Guardian PAN will be used only when passenger PAN is empty."}
+                    ? "For corporate booking, passenger PAN is required for each guest. Parent/Guardian PAN is not allowed."
+                    : guest.PaxType === 2
+                      ? "For child passengers, you can provide either child PAN or Parent/Guardian PAN."
+                      : "For adult passengers, only the passenger's own PAN is allowed."}
                 </p>
               )}
             </div>
@@ -1651,7 +1684,7 @@ const HotelBooking = () => {
                   {validation.PanMandatory
                     ? `PAN details are required for this booking${
                         validation.PanCountRequired > 0
-                          ? ` (${validation.PanCountRequired} unique PAN required)`
+                          ? ` (${validation.PanCountRequired} )`
                           : ""
                       }.`
                     : "PAN details are not required for this booking."}
@@ -1689,55 +1722,6 @@ const HotelBooking = () => {
                   {validation.IsPackageFare
                     ? "This room has package fare pricing."
                     : "This room does not have package fare pricing."}
-                </span>
-              </li>
-
-              <li className="flex gap-2">
-                <span
-                  className={
-                    validation.PackageDetailsMandatory
-                      ? "text-yellow-300"
-                      : "text-gray-500"
-                  }
-                >
-                  •
-                </span>
-                <span>
-                  {validation.PackageDetailsMandatory
-                    ? "Arrival transport details are required."
-                    : "Arrival transport details are not required."}
-                </span>
-              </li>
-
-              <li className="flex gap-2">
-                <span
-                  className={
-                    validation.DepartureDetailsMandatory
-                      ? "text-yellow-300"
-                      : "text-gray-500"
-                  }
-                >
-                  •
-                </span>
-                <span>
-                  {validation.DepartureDetailsMandatory
-                    ? "Departure transport details are required."
-                    : "Departure transport details are not required."}
-                </span>
-              </li>
-
-              <li className="flex gap-2">
-                <span
-                  className={
-                    validation.GSTAllowed ? "text-yellow-300" : "text-gray-500"
-                  }
-                >
-                  •
-                </span>
-                <span>
-                  {validation.GSTAllowed
-                    ? "GST details can be added for corporate customer."
-                    : "GST details are not allowed for this booking."}
                 </span>
               </li>
             </ul>
