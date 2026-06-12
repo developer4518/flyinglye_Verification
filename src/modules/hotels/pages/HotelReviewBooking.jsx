@@ -15,6 +15,70 @@ const pickFirst = (...values) => {
   );
 };
 
+const pickFirstValue = (...values) => {
+  return values.find(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== "" &&
+      String(value).trim().toLowerCase() !== "n/a",
+  );
+};
+
+const toBoolean = (value) => {
+  if (value === true || value === 1) return true;
+
+  const text = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  return text === "true" || text === "1" || text === "yes";
+};
+
+const normalizeDateTimeForApi = (value) => {
+  if (!value) return "";
+
+  const text = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) {
+    return `${text}:00`;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(text)) {
+    return text;
+  }
+
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+
+  const pad = (num) => String(num).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+    date.getSeconds(),
+  )}`;
+};
+
+const getDateTimeLocalDefault = (dateValue, fallbackTime = "12:00") => {
+  if (!dateValue) return "";
+
+  const datePart = String(dateValue).split(" ")[0].split("T")[0];
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return `${datePart}T${fallbackTime}`;
+  }
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const pad = (num) => String(num).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T${fallbackTime}`;
+};
+
 const findDeepValueByKeys = (obj, keywords = [], maxDepth = 6) => {
   const visited = new WeakSet();
 
@@ -60,6 +124,88 @@ const findDeepValueByKeys = (obj, keywords = [], maxDepth = 6) => {
   };
 
   return search(obj);
+};
+
+const getBlockValidationFromReviewData = (data = {}) => {
+  const sources = [
+    data?.validation,
+    data?.validationInfo,
+    data?.ValidationInfo,
+
+    data?.prebookData?.validation,
+    data?.prebookData?.validationInfo,
+    data?.prebookData?.ValidationInfo,
+
+    data?.prebookData?.raw?.validation,
+    data?.prebookData?.raw?.validationInfo,
+    data?.prebookData?.raw?.ValidationInfo,
+
+    data?.prebookData?.raw?.Response?.validation,
+    data?.prebookData?.raw?.Response?.validationInfo,
+    data?.prebookData?.raw?.Response?.ValidationInfo,
+
+    data?.prebookData?.raw?.HotelResult?.[0]?.validation,
+    data?.prebookData?.raw?.HotelResult?.[0]?.validationInfo,
+    data?.prebookData?.raw?.HotelResult?.[0]?.ValidationInfo,
+
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.validation,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.validationInfo,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.ValidationInfo,
+
+    data?.hotelResult?.validation,
+    data?.hotelResult?.validationInfo,
+    data?.hotelResult?.ValidationInfo,
+
+    data?.roomData?.validation,
+    data?.roomData?.validationInfo,
+    data?.roomData?.ValidationInfo,
+
+    data?.finalPayload,
+  ];
+
+  return sources.find((item) => item && typeof item === "object") || {};
+};
+
+const getPackageFareFlags = (data = {}) => {
+  const validation = getBlockValidationFromReviewData(data);
+
+  const isPackageFare = toBoolean(
+    pickFirstValue(
+      validation?.IsPackageFare,
+      validation?.isPackageFare,
+      data?.IsPackageFare,
+      data?.isPackageFare,
+      data?.finalPayload?.IsPackageFare,
+    ),
+  );
+
+  const isPackageDetailsMandatory = toBoolean(
+    pickFirstValue(
+      validation?.IsPackageDetailsMandatory,
+      validation?.isPackageDetailsMandatory,
+      data?.IsPackageDetailsMandatory,
+      data?.isPackageDetailsMandatory,
+      data?.finalPayload?.IsPackageDetailsMandatory,
+    ),
+  );
+
+  const isDepartureDetailsMandatory = toBoolean(
+    pickFirstValue(
+      validation?.DepartureDetailsMandatory,
+      validation?.departureDetailsMandatory,
+      validation?.IsDepartureDetailsMandatory,
+      validation?.isDepartureDetailsMandatory,
+      data?.DepartureDetailsMandatory,
+      data?.departureDetailsMandatory,
+      data?.finalPayload?.DepartureDetailsMandatory,
+    ),
+  );
+
+  return {
+    isPackageFare: isPackageFare || isPackageDetailsMandatory,
+    isPackageDetailsMandatory,
+    isDepartureDetailsMandatory,
+  };
 };
 
 const getHotelAddressFromReviewData = (data = {}) => {
@@ -311,13 +457,9 @@ const HotelReviewBooking = () => {
   const reviewData = baseReviewData
     ? {
         ...baseReviewData,
-
         hotel: mergedHotel,
-
         roomData: mergedRoomData,
-
         prebookData: mergedPrebookData,
-
         hotelResult: mergedHotelResult,
 
         hotelAddress:
@@ -353,6 +495,37 @@ const HotelReviewBooking = () => {
     : null;
 
   const [loading, setLoading] = useState(false);
+
+  const packageFareFlags = getPackageFareFlags(reviewData || {});
+
+  const [transportForm, setTransportForm] = useState(() => {
+    const payload = reviewData?.finalPayload || {};
+
+    return {
+      arrivalTransportType:
+        payload?.ArrivalTransport?.ArrivalTransportType ?? 0,
+      arrivalTransportInfoId:
+        payload?.ArrivalTransport?.TransportInfoId || "",
+      arrivalTime:
+        payload?.ArrivalTransport?.Time ||
+        getDateTimeLocalDefault(reviewData?.checkIn, "14:00"),
+
+      departureTransportType:
+        payload?.DepartureTransport?.DepartureTransportType ?? 0,
+      departureTransportInfoId:
+        payload?.DepartureTransport?.TransportInfoId || "",
+      departureTime:
+        payload?.DepartureTransport?.Time ||
+        getDateTimeLocalDefault(reviewData?.checkOut, "11:00"),
+    };
+  });
+
+  const updateTransportField = (field, value) => {
+    setTransportForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   const parseDateValue = (value) => {
     if (!value) return null;
@@ -447,33 +620,77 @@ const HotelReviewBooking = () => {
     return charge ? String(charge) : "-";
   };
 
+  const buildFinalBookingPayload = () => {
+    const payload = {
+      ...(reviewData?.finalPayload || {}),
+    };
+
+    if (packageFareFlags.isPackageFare) {
+      payload.IsPackageFare = true;
+    }
+
+    if (packageFareFlags.isPackageDetailsMandatory) {
+      payload.ArrivalTransport = {
+        ArrivalTransportType: Number(transportForm.arrivalTransportType),
+        TransportInfoId: String(transportForm.arrivalTransportInfoId || "").trim(),
+        Time: normalizeDateTimeForApi(transportForm.arrivalTime),
+      };
+    }
+
+    if (packageFareFlags.isDepartureDetailsMandatory) {
+      payload.DepartureTransport = {
+        DepartureTransportType: Number(transportForm.departureTransportType),
+        TransportInfoId: String(
+          transportForm.departureTransportInfoId || "",
+        ).trim(),
+        Time: normalizeDateTimeForApi(transportForm.departureTime),
+      };
+    }
+
+    return payload;
+  };
+
+  const validatePackageTransportDetails = () => {
+    if (packageFareFlags.isPackageDetailsMandatory) {
+      if (!transportForm.arrivalTransportInfoId || !transportForm.arrivalTime) {
+        alert("Arrival transport details are required for this package fare.");
+        return false;
+      }
+    }
+
+    if (packageFareFlags.isDepartureDetailsMandatory) {
+      if (
+        !transportForm.departureTransportInfoId ||
+        !transportForm.departureTime
+      ) {
+        alert("Departure transport details are required for this booking.");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const handleConfirmBooking = async () => {
     if (!reviewData?.finalPayload) {
       return alert("Booking payload missing");
     }
+
+    if (!validatePackageTransportDetails()) return;
 
     try {
       setLoading(true);
 
       const finalHotelFacilities = getHotelFacilitiesFromReviewData(reviewData);
       const finalHotelNorms = getHotelNormsFromReviewData(reviewData);
+      const bookingPayload = buildFinalBookingPayload();
 
-      console.log("SELECTED HOTEL FROM STORE:", selectedHotel);
-      console.log("SELECTED ROOM FROM STORE:", selectedRoom);
-      console.log("PREBOOK DATA FROM STORE:", prebookData);
-      console.log("FINAL MERGED REVIEW DATA:", reviewData);
-      console.log("FINAL HOTEL ADDRESS SAVED:", {
-        hotelAddress:
-          reviewData?.hotelAddress || getHotelAddressFromReviewData(reviewData),
-        hotel: reviewData?.hotel,
-        selectedHotel,
-        prebookData,
-      });
-      console.log("FINAL HOTEL FACILITIES SAVED:", finalHotelFacilities);
+      console.log("FINAL BOOK PAYLOAD:", bookingPayload);
+      console.log("PACKAGE FARE FLAGS:", packageFareFlags);
 
       const res = await privateApi.post(
         "/api/hotels/hotels/book/",
-        reviewData.finalPayload,
+        bookingPayload,
       );
 
       const bookingSuccessData = {
@@ -502,7 +719,11 @@ const HotelReviewBooking = () => {
         isPANRequired: reviewData.isPANRequired,
         corporatePAN: reviewData.corporatePAN,
 
-        finalPayload: reviewData.finalPayload,
+        finalPayload: bookingPayload,
+
+        isPackageFare: packageFareFlags.isPackageFare,
+        isPackageDetailsMandatory: packageFareFlags.isPackageDetailsMandatory,
+        departureDetailsMandatory: packageFareFlags.isDepartureDetailsMandatory,
 
         cancellationPolicies: reviewData.cancellationPolicies || [],
         roomPromotions: reviewData.roomPromotions || [],
@@ -565,7 +786,6 @@ const HotelReviewBooking = () => {
     checkOut,
     net,
     guestList = [],
-    bookingCode,
     isPANRequired,
     corporatePAN,
     cancellationPolicies = [],
@@ -600,7 +820,6 @@ const HotelReviewBooking = () => {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            {/* Hotel Details */}
             <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
               <h2 className="text-2xl font-bold text-yellow-400">
                 {hotel?.hotel_name || hotel?.HotelName || "Hotel Booking"}
@@ -633,17 +852,186 @@ const HotelReviewBooking = () => {
                     {formatRoomName(roomData)}
                   </p>
                 </div>
-
-                {/* <div className="rounded-xl bg-[#0B0B0F] p-4 sm:col-span-2">
-                  <p className="text-xs text-gray-500">Booking Code</p>
-                  <p className="mt-1 break-all text-sm font-semibold text-gray-300">
-                    {bookingCode || "-"}
-                  </p>
-                </div> */}
               </div>
             </div>
 
-            {/* Hotel Facilities */}
+            {packageFareFlags.isPackageFare && (
+              <div className="rounded-2xl border border-yellow-400/20 bg-[#15151C] p-6">
+                <div className="mb-5">
+                  <h3 className="font-semibold text-yellow-300">
+                    Package Fare Details
+                  </h3>
+
+                  <p className="mt-1 text-xs text-gray-400">
+                    This booking is marked as a package fare. Required transport
+                    details will be sent in the Book request.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-200">
+                    IsPackageFare: true
+                  </span>
+
+                  {packageFareFlags.isPackageDetailsMandatory && (
+                    <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-semibold text-orange-200">
+                      Arrival details mandatory
+                    </span>
+                  )}
+
+                  {packageFareFlags.isDepartureDetailsMandatory && (
+                    <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-semibold text-orange-200">
+                      Departure details mandatory
+                    </span>
+                  )}
+                </div>
+
+                {(packageFareFlags.isPackageDetailsMandatory ||
+                  packageFareFlags.isDepartureDetailsMandatory) && (
+                  <div className="mt-5 grid grid-cols-1 gap-5">
+                    {packageFareFlags.isPackageDetailsMandatory && (
+                      <div className="rounded-xl border border-gray-800 bg-[#0B0B0F] p-4">
+                        <h4 className="mb-4 font-semibold text-white">
+                          Arrival Transport
+                        </h4>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-400">
+                              Transport Type
+                            </label>
+
+                            <select
+                              value={transportForm.arrivalTransportType}
+                              onChange={(e) =>
+                                updateTransportField(
+                                  "arrivalTransportType",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none focus:border-yellow-400"
+                            >
+                              <option value={0}>Flight</option>
+                              <option value={1}>Surface</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-400">
+                              Transport Info ID / Flight No.
+                            </label>
+
+                            <input
+                              type="text"
+                              value={transportForm.arrivalTransportInfoId}
+                              onChange={(e) =>
+                                updateTransportField(
+                                  "arrivalTransportInfoId",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Example: AB 777"
+                              className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-yellow-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-400">
+                              Arrival Time
+                            </label>
+
+                            <input
+                              type="datetime-local"
+                              value={String(transportForm.arrivalTime || "").slice(
+                                0,
+                                16,
+                              )}
+                              onChange={(e) =>
+                                updateTransportField(
+                                  "arrivalTime",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none focus:border-yellow-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {packageFareFlags.isDepartureDetailsMandatory && (
+                      <div className="rounded-xl border border-gray-800 bg-[#0B0B0F] p-4">
+                        <h4 className="mb-4 font-semibold text-white">
+                          Departure Transport
+                        </h4>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-400">
+                              Transport Type
+                            </label>
+
+                            <select
+                              value={transportForm.departureTransportType}
+                              onChange={(e) =>
+                                updateTransportField(
+                                  "departureTransportType",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none focus:border-yellow-400"
+                            >
+                              <option value={0}>Flight</option>
+                              <option value={1}>Surface</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-400">
+                              Transport Info ID / Flight No.
+                            </label>
+
+                            <input
+                              type="text"
+                              value={transportForm.departureTransportInfoId}
+                              onChange={(e) =>
+                                updateTransportField(
+                                  "departureTransportInfoId",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Example: AB 777"
+                              className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-yellow-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-400">
+                              Departure Time
+                            </label>
+
+                            <input
+                              type="datetime-local"
+                              value={String(
+                                transportForm.departureTime || "",
+                              ).slice(0, 16)}
+                              onChange={(e) =>
+                                updateTransportField(
+                                  "departureTime",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full rounded-lg border border-gray-700 bg-[#15151C] px-3 py-2 text-sm text-white outline-none focus:border-yellow-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {hotelFacilities.length > 0 && (
               <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
                 <div className="mb-4 flex items-center justify-between gap-3">
@@ -675,7 +1063,6 @@ const HotelReviewBooking = () => {
               </div>
             )}
 
-            {/* Guests */}
             <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
               <div className="bg-[#1E2230] px-5 py-3">
                 <h3 className="font-semibold text-yellow-300">Guest Details</h3>
@@ -724,7 +1111,6 @@ const HotelReviewBooking = () => {
               </div>
             </div>
 
-            {/* PAN */}
             {isPANRequired && (
               <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
                 <h3 className="mb-3 font-semibold text-yellow-300">
@@ -740,7 +1126,6 @@ const HotelReviewBooking = () => {
               </div>
             )}
 
-            {/* Cancellation */}
             <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
               <div className="bg-[#1E2230] px-5 py-3">
                 <h3 className="font-semibold text-yellow-300">
@@ -791,7 +1176,6 @@ const HotelReviewBooking = () => {
               </div>
             </div>
 
-            {/* Promotions */}
             {roomPromotions.length > 0 && (
               <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
                 <h3 className="mb-4 font-semibold text-yellow-300">
@@ -816,7 +1200,6 @@ const HotelReviewBooking = () => {
               </div>
             )}
 
-            {/* Supplements */}
             {supplements.length > 0 && (
               <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
                 <h3 className="mb-4 font-semibold text-yellow-300">
@@ -838,7 +1221,6 @@ const HotelReviewBooking = () => {
               </div>
             )}
 
-            {/* Amenities */}
             {roomAmenities.length > 0 && (
               <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
                 <h3 className="mb-4 font-semibold text-yellow-300">
@@ -858,7 +1240,6 @@ const HotelReviewBooking = () => {
               </div>
             )}
 
-            {/* Rate Conditions */}
             {rateConditions.length > 0 && (
               <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
                 <div className="bg-[#1E2230] px-5 py-3">
@@ -888,7 +1269,6 @@ const HotelReviewBooking = () => {
             )}
           </div>
 
-          {/* Price Summary */}
           <div className="sticky top-24 h-fit rounded-2xl border border-gray-800 bg-[#15151C] p-6">
             <h3 className="mb-4 text-lg font-semibold text-yellow-300">
               Price Summary
@@ -915,6 +1295,13 @@ const HotelReviewBooking = () => {
                 </span>
               </div>
             </div>
+
+            {packageFareFlags.isPackageFare && (
+              <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-xs text-yellow-100">
+                Package fare will be passed in booking request as{" "}
+                <b>IsPackageFare: true</b>.
+              </div>
+            )}
 
             <button
               onClick={handleConfirmBooking}
