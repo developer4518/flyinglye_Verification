@@ -610,7 +610,6 @@ const PrebookLoader = () => {
         const lowerMessage = String(message).toLowerCase();
 
         if (
-          statusCode === 400 ||
           statusCode === 401 ||
           statusCode === 403 ||
           lowerMessage.includes("auth") ||
