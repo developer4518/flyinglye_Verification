@@ -55,8 +55,13 @@ const getSafeText = (...values) =>
     ?.toString()
     .trim();
 
-const formatPriceValue = (val) =>
-  Math.round(Number(val) || 0).toLocaleString("en-IN");
+const formatPriceValue = (val) => {
+  const num = Number(val) || 0;
+
+  return num.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
+};
 
 const cleanText = (value) => {
   return String(value || "")
@@ -1179,7 +1184,7 @@ const HotelDetails = () => {
                                     </span>
                                   )}
                                 </div>
-{/* 
+                                {/* 
                                 <p className="mt-2 text-xs text-gray-500 break-all">
                                   Code:{" "}
                                   {roomItem.BookingCode ||

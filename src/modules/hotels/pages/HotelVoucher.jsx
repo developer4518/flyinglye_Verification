@@ -137,11 +137,11 @@ const formatMoney = (value, currency = "INR") => {
 
   if (!amount) return "";
 
-  if (currency === "INR") {
-    return `₹ ${Math.round(amount).toLocaleString("en-IN")}`;
-  }
+  const formatted = amount.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
 
-  return `${currency} ${Math.round(amount).toLocaleString("en-IN")}`;
+  return currency === "INR" ? `₹ ${formatted}` : `${currency} ${formatted}`;
 };
 
 const getRoomData = (saved, bookingData) => {
@@ -1218,10 +1218,10 @@ Lead Guest: ${leadGuestName || "N/A"}`,
 
           <div className="voucher-actions no-print">
             <button onClick={handleEmail}>Email Voucher</button>
-            <span className="text-[var(--text-muted)]">|</span>
+            <span className="text-(--text-muted)">|</span>
 
             <button onClick={handlePrint}>Print Voucher</button>
-            <span className="text-[var(--text-muted)]">|</span>
+            <span className="text-(--text-muted)">|</span>
 
             <button onClick={handleGeneratePdf} disabled={pdfLoading}>
               {pdfLoading ? "Generating..." : "Generate PDF 🧾"}

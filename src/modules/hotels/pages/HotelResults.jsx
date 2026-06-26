@@ -22,7 +22,8 @@ const getRoomName = (room = {}) => {
 
 const formatPrice = (value) => {
   return Number(value || 0).toLocaleString("en-IN", {
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 };
 
@@ -726,7 +727,7 @@ const HotelResults = () => {
                           </p>
 
                           <p className="text-xs text-gray-400">
-                           inclusive of all taxes
+                            inclusive of all taxes
                           </p>
 
                           <button

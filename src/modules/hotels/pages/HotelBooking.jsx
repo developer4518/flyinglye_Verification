@@ -247,9 +247,11 @@ const HotelBooking = () => {
       "INR";
 
     if (amount !== undefined && amount !== null && amount !== "") {
-      return `${title} - ${currency === "INR" ? "₹" : currency} ${Math.round(
-        Number(amount),
-      )}`;
+      return `${title} - ${currency === "INR" ? "₹" : currency} ${Number(
+        amount,
+      ).toLocaleString("en-IN", {
+        maximumFractionDigits: 2,
+      })}`;
     }
 
     return title;
@@ -280,7 +282,9 @@ const HotelBooking = () => {
 
     if (type === "fixed") {
       if (charge === 0) return "Free Cancellation";
-      return `₹ ${Math.round(charge)}`;
+      return `₹ ${Number(charge).toLocaleString("en-IN", {
+        maximumFractionDigits: 2,
+      })}`;
     }
 
     return charge ? String(charge) : "-";
@@ -802,7 +806,7 @@ const HotelBooking = () => {
       const cleanedGuests = guestList.map((g) => {
         const passenger = {
           RoomIndex: g.RoomIndex,
-          Title: g.PaxType === 2 ? "Mstr" : g.Title,
+          Title: g.PaxType === 2 ? "" : g.Title,
           FirstName: formatName(g.FirstName),
           MiddleName: "",
           LastName: formatName(g.LastName),
@@ -1489,14 +1493,18 @@ const HotelBooking = () => {
                   disabled={guest.PaxType === 2}
                   onChange={(e) => updateGuest(index, "Title", e.target.value)}
                 >
-                  {guest.PaxType === 1 ? (
-                    <>
+                  {guest.PaxType === 1 && (
+                    <select
+                      className="input"
+                      value={guest.Title}
+                      onChange={(e) =>
+                        updateGuest(index, "Title", e.target.value)
+                      }
+                    >
                       <option value="Mr">Mr</option>
                       <option value="Mrs">Mrs</option>
                       <option value="Ms">Ms</option>
-                    </>
-                  ) : (
-                    <option value="Mstr">Mstr</option>
+                    </select>
                   )}
                 </select>
 
@@ -1653,14 +1661,24 @@ const HotelBooking = () => {
                 </p>
               </span>
 
-              <span>₹ {Math.round(net)}</span>
+              <span>
+                ₹{" "}
+                {net.toLocaleString("en-IN", {
+                  maximumFractionDigits: 2,
+                })}
+              </span>
             </div>
 
             <hr className="border-gray-700" />
 
             <div className="flex justify-between text-lg font-bold">
               <span>Total</span>
-              <span className="text-yellow-400">₹ {Math.round(net)}</span>
+              <span className="text-yellow-400">
+                ₹{" "}
+                {net.toLocaleString("en-IN", {
+                  maximumFractionDigits: 2,
+                })}
+              </span>
             </div>
           </div>
 

@@ -900,7 +900,7 @@ const HotelBookingSuccess = () => {
 
           <button
             onClick={() => navigate("/")}
-            className="rounded-xl bg-gradient-to-r from-yellow-400 to-orange-400 px-6 py-3 font-bold text-black"
+            className="rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 px-6 py-3 font-bold text-black"
           >
             Go Home
           </button>
@@ -912,8 +912,8 @@ const HotelBookingSuccess = () => {
   return (
     <div className="min-h-screen bg-[#07070A] px-3 py-20 text-white sm:px-5 md:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#111118] shadow-2xl shadow-black/50">
-          <div className="relative overflow-hidden bg-gradient-to-r from-[#17171F] via-[#211B12] to-[#2B160A] px-5 py-6 md:px-8">
+        <div className="overflow-hidden rounded-4xl border border-white/10 bg-[#111118] shadow-2xl shadow-black/50">
+          <div className="relative overflow-hidden bg-linear-to-r from-[#17171F] via-[#211B12] to-[#2B160A] px-5 py-6 md:px-8">
             <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-yellow-400/10 blur-3xl" />
             <div className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-orange-400/10 blur-3xl" />
 
@@ -1476,7 +1476,7 @@ const HotelBookingSuccess = () => {
               <div className="mt-6 grid grid-cols-1 gap-3">
                 <button
                   onClick={handleVoucherClick}
-                  className="w-full rounded-xl bg-gradient-to-r from-yellow-400 to-orange-400 py-3 text-base font-bold text-black transition hover:scale-[1.01]"
+                  className="w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 py-3 text-base font-bold text-black transition hover:scale-[1.01]"
                 >
                   View Voucher
                 </button>

@@ -3,6 +3,12 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { privateApi } from "../../../services/api";
 
+const formatPrice = (value) => {
+  return Number(value || 0).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
+};
+
 const HotelBookingDetails = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -140,9 +146,9 @@ const HotelBookingDetails = () => {
             {/* Room Price */}
             <div className="mt-4 text-sm text-gray-300">
               <p>
-                Room Price: ₹ {Math.round(room.PriceBreakUp?.RoomRate || 0)}
+                Room Price: ₹ {formatPrice(room.PriceBreakUp?.RoomRate || 0)}
               </p>
-              <p>Tax: ₹ {Math.round(room.PriceBreakUp?.RoomTax || 0)}</p>
+              <p>Tax: ₹ {formatPrice(room.PriceBreakUp?.RoomTax || 0)}</p>
             </div>
           </div>
         ))}
@@ -154,19 +160,19 @@ const HotelBookingDetails = () => {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Net Amount</span>
-              <span>₹ {Math.round(net)}</span>
+              <span>₹ {formatPrice(net)}</span>
             </div>
 
             <div className="flex justify-between">
               <span>Convenience Fee</span>
-              <span>₹ {Math.round(fee)}</span>
+              <span>₹ {formatPrice(fee)}</span>
             </div>
 
             <hr className="border-gray-700" />
 
             <div className="flex justify-between text-lg font-bold">
               <span>Total</span>
-              <span className="text-yellow-400">₹ {Math.round(total)}</span>
+              <span className="text-yellow-400">₹ {formatPrice(total)}</span>
             </div>
 
             {/* REFUND */}
@@ -175,7 +181,9 @@ const HotelBookingDetails = () => {
                 <span>Refund</span>
                 <span>
                   ₹{" "}
-                  {Math.round(data?.CancellationStatus?.[0]?.RefundAmount || 0)}
+                  {formatPrice(
+                    data?.CancellationStatus?.[0]?.RefundAmount || 0,
+                  )}
                 </span>
               </div>
             )}

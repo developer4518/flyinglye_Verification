@@ -7,12 +7,46 @@ import { useHotelStore } from "../../../store/hotelStore";
 
 const getSafeValue = (...values) => {
   return values.find(
-    (value) => value !== undefined && value !== null && value !== "",
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== "" &&
+      String(value).trim().toLowerCase() !== "n/a",
   );
 };
 
 const getFirstArray = (...values) => {
-  return values.find((value) => Array.isArray(value)) || [];
+  return values.find((value) => Array.isArray(value) && value.length > 0) || [];
+};
+
+const toNumber = (value, fallback = 0) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const extractTboErrorMessage = (
+  data,
+  fallback = "PreBook failed. Please try again.",
+) => {
+  return (
+    data?.raw?.Response?.Error?.ErrorMessage ||
+    data?.raw?.Error?.ErrorMessage ||
+    data?.raw?.Status?.Description ||
+    data?.data?.raw?.Response?.Error?.ErrorMessage ||
+    data?.data?.raw?.Error?.ErrorMessage ||
+    data?.data?.raw?.Status?.Description ||
+    data?.data?.Response?.Error?.ErrorMessage ||
+    data?.data?.Error?.ErrorMessage ||
+    data?.data?.message ||
+    data?.data?.error ||
+    data?.Response?.Error?.ErrorMessage ||
+    data?.Error?.ErrorMessage ||
+    data?.error?.ErrorMessage ||
+    data?.message ||
+    data?.error ||
+    data?.detail ||
+    fallback
+  );
 };
 
 const normalizeRoomGuests = (payload = {}, guests = {}, search = {}) => {
@@ -28,44 +62,76 @@ const normalizeRoomGuests = (payload = {}, guests = {}, search = {}) => {
             ? search.guests.roomGuests
             : [];
 
-  return rawRoomGuests.map((room, index) => {
-    const children = Number(room.Children ?? room.children ?? 0);
+  if (rawRoomGuests.length > 0) {
+    return rawRoomGuests.map((room, index) => {
+      const children = toNumber(room.Children ?? room.children, 0);
 
-    const ages =
-      room.ChildrenAges ||
-      room.ChildAges ||
-      room.childAges ||
-      room.childrenAges ||
-      [];
+      const rawAges =
+        room.ChildrenAges ||
+        room.ChildAges ||
+        room.childAges ||
+        room.childrenAges ||
+        [];
 
-    const cleanAges = Array.isArray(ages)
-      ? ages
-          .slice(0, children)
-          .map((age) => Number(age))
-          .filter((age) => age >= 1 && age <= 12)
-      : [];
+      const cleanAges = Array.isArray(rawAges)
+        ? rawAges
+            .slice(0, children)
+            .map((age) => Number(age))
+            .filter((age) => age >= 1 && age <= 12)
+        : [];
 
-    return {
-      RoomIndex: room.RoomIndex ?? room.roomIndex ?? index + 1,
-      roomIndex: room.roomIndex ?? room.RoomIndex ?? index + 1,
+      return {
+        RoomIndex: toNumber(room.RoomIndex ?? room.roomIndex, index + 1),
+        roomIndex: toNumber(room.roomIndex ?? room.RoomIndex, index + 1),
 
-      Adults: Number(room.Adults ?? room.adults ?? 1),
-      adults: Number(room.adults ?? room.Adults ?? 1),
+        Adults: toNumber(room.Adults ?? room.adults, 1),
+        adults: toNumber(room.adults ?? room.Adults, 1),
 
+        Children: children,
+        children,
+
+        ChildAges: cleanAges,
+        ChildrenAges: cleanAges,
+        childAges: cleanAges,
+      };
+    });
+  }
+
+  const children = toNumber(guests?.children ?? search?.guests?.children, 0);
+
+  const rawAges =
+    guests?.childAges ||
+    guests?.ChildrenAges ||
+    guests?.ChildAges ||
+    search?.guests?.childAges ||
+    [];
+
+  const cleanAges = Array.isArray(rawAges)
+    ? rawAges
+        .slice(0, children)
+        .map((age) => Number(age))
+        .filter((age) => age >= 1 && age <= 12)
+    : [];
+
+  return [
+    {
+      RoomIndex: 1,
+      roomIndex: 1,
+      Adults: toNumber(guests?.adults ?? search?.guests?.adults, 1),
+      adults: toNumber(guests?.adults ?? search?.guests?.adults, 1),
       Children: children,
       children,
-
       ChildAges: cleanAges,
       ChildrenAges: cleanAges,
       childAges: cleanAges,
-    };
-  });
+    },
+  ];
 };
 
 const buildPaxRooms = (roomGuests = []) => {
   return roomGuests.map((room) => ({
-    Adults: Number(room.Adults ?? room.adults ?? 1),
-    Children: Number(room.Children ?? room.children ?? 0),
+    Adults: toNumber(room.Adults ?? room.adults, 1),
+    Children: toNumber(room.Children ?? room.children, 0),
     ChildrenAges: room.ChildrenAges || room.ChildAges || room.childAges || [],
   }));
 };
@@ -92,6 +158,7 @@ const extractPrebookRoom = (data, fallbackRoom) => {
   const hotelResult = extractHotelResult(data);
 
   return (
+    data?.room_raw ||
     hotelResult?.Rooms?.[0] ||
     data?.raw?.HotelResult?.[0]?.Rooms?.[0] ||
     data?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0] ||
@@ -126,7 +193,7 @@ const normalizePrebookRoom = (prebookRoom = {}, fallbackRoom = {}) => {
     ),
   );
 
-  const price = Number(
+  const price = toNumber(
     getSafeValue(
       rawRoom?.TotalFare,
       rawRoom?.Price?.PublishedPrice,
@@ -138,9 +205,10 @@ const normalizePrebookRoom = (prebookRoom = {}, fallbackRoom = {}) => {
       fallbackRawRoom?.price,
       0,
     ),
+    0,
   );
 
-  const tax = Number(
+  const tax = toNumber(
     getSafeValue(
       rawRoom?.TotalTax,
       rawRoom?.Price?.Tax,
@@ -152,9 +220,10 @@ const normalizePrebookRoom = (prebookRoom = {}, fallbackRoom = {}) => {
       fallbackRawRoom?.tax,
       0,
     ),
+    0,
   );
 
-  const netAmount = Number(
+  const netAmount = toNumber(
     getSafeValue(
       rawRoom?.NetAmount,
       rawRoom?.net_amount,
@@ -163,6 +232,68 @@ const normalizePrebookRoom = (prebookRoom = {}, fallbackRoom = {}) => {
       price,
       0,
     ),
+    0,
+  );
+
+  const meal = getSafeValue(
+    rawRoom?.MealType,
+    rawRoom?.MealPlan,
+    rawRoom?.meal,
+    fallbackRawRoom?.MealType,
+    fallbackRawRoom?.MealPlan,
+    fallbackRawRoom?.meal,
+    "",
+  );
+
+  const inclusion = getSafeValue(
+    rawRoom?.Inclusion,
+    rawRoom?.inclusion,
+    fallbackRawRoom?.Inclusion,
+    fallbackRawRoom?.inclusion,
+    "",
+  );
+
+  const refundable = getSafeValue(
+    rawRoom?.IsRefundable,
+    rawRoom?.refundable,
+    fallbackRawRoom?.IsRefundable,
+    fallbackRawRoom?.refundable,
+    false,
+  );
+
+  const cancelPolicies = getFirstArray(
+    rawRoom?.CancelPolicies,
+    rawRoom?.cancel_policies,
+    fallbackRawRoom?.CancelPolicies,
+    fallbackRawRoom?.cancel_policies,
+  );
+
+  const rateConditions = getFirstArray(
+    rawRoom?.RateConditions,
+    rawRoom?.rate_conditions,
+    fallbackRawRoom?.RateConditions,
+    fallbackRawRoom?.rate_conditions,
+  );
+
+  const supplements = getFirstArray(
+    rawRoom?.Supplements,
+    rawRoom?.supplements,
+    fallbackRawRoom?.Supplements,
+    fallbackRawRoom?.supplements,
+  );
+
+  const amenities = getFirstArray(
+    rawRoom?.Amenities,
+    rawRoom?.amenities,
+    fallbackRawRoom?.Amenities,
+    fallbackRawRoom?.amenities,
+  );
+
+  const roomPromotion = getFirstArray(
+    rawRoom?.RoomPromotion,
+    rawRoom?.room_promotion,
+    fallbackRawRoom?.RoomPromotion,
+    fallbackRawRoom?.room_promotion,
   );
 
   return {
@@ -184,119 +315,29 @@ const normalizePrebookRoom = (prebookRoom = {}, fallbackRoom = {}) => {
     TotalTax: tax,
     NetAmount: netAmount,
 
-    meal: getSafeValue(
-      rawRoom?.MealType,
-      rawRoom?.MealPlan,
-      rawRoom?.meal,
-      fallbackRawRoom?.MealType,
-      fallbackRawRoom?.MealPlan,
-      fallbackRawRoom?.meal,
-      "",
-    ),
-    MealType: getSafeValue(
-      rawRoom?.MealType,
-      rawRoom?.MealPlan,
-      rawRoom?.meal,
-      fallbackRawRoom?.MealType,
-      fallbackRawRoom?.MealPlan,
-      fallbackRawRoom?.meal,
-      "",
-    ),
+    meal,
+    MealType: meal,
 
-    inclusion: getSafeValue(
-      rawRoom?.Inclusion,
-      rawRoom?.inclusion,
-      fallbackRawRoom?.Inclusion,
-      fallbackRawRoom?.inclusion,
-      "",
-    ),
-    Inclusion: getSafeValue(
-      rawRoom?.Inclusion,
-      rawRoom?.inclusion,
-      fallbackRawRoom?.Inclusion,
-      fallbackRawRoom?.inclusion,
-      "",
-    ),
+    inclusion,
+    Inclusion: inclusion,
 
-    refundable: getSafeValue(
-      rawRoom?.IsRefundable,
-      rawRoom?.refundable,
-      fallbackRawRoom?.IsRefundable,
-      fallbackRawRoom?.refundable,
-      false,
-    ),
-    IsRefundable: getSafeValue(
-      rawRoom?.IsRefundable,
-      rawRoom?.refundable,
-      fallbackRawRoom?.IsRefundable,
-      fallbackRawRoom?.refundable,
-      false,
-    ),
+    refundable,
+    IsRefundable: refundable,
 
-    cancel_policies: getFirstArray(
-      rawRoom?.CancelPolicies,
-      rawRoom?.cancel_policies,
-      fallbackRawRoom?.CancelPolicies,
-      fallbackRawRoom?.cancel_policies,
-    ),
-    CancelPolicies: getFirstArray(
-      rawRoom?.CancelPolicies,
-      rawRoom?.cancel_policies,
-      fallbackRawRoom?.CancelPolicies,
-      fallbackRawRoom?.cancel_policies,
-    ),
+    cancel_policies: cancelPolicies,
+    CancelPolicies: cancelPolicies,
 
-    rate_conditions: getFirstArray(
-      rawRoom?.RateConditions,
-      rawRoom?.rate_conditions,
-      fallbackRawRoom?.RateConditions,
-      fallbackRawRoom?.rate_conditions,
-    ),
-    RateConditions: getFirstArray(
-      rawRoom?.RateConditions,
-      rawRoom?.rate_conditions,
-      fallbackRawRoom?.RateConditions,
-      fallbackRawRoom?.rate_conditions,
-    ),
+    rate_conditions: rateConditions,
+    RateConditions: rateConditions,
 
-    supplements: getFirstArray(
-      rawRoom?.Supplements,
-      rawRoom?.supplements,
-      fallbackRawRoom?.Supplements,
-      fallbackRawRoom?.supplements,
-    ),
-    Supplements: getFirstArray(
-      rawRoom?.Supplements,
-      rawRoom?.supplements,
-      fallbackRawRoom?.Supplements,
-      fallbackRawRoom?.supplements,
-    ),
+    supplements,
+    Supplements: supplements,
 
-    amenities: getFirstArray(
-      rawRoom?.Amenities,
-      rawRoom?.amenities,
-      fallbackRawRoom?.Amenities,
-      fallbackRawRoom?.amenities,
-    ),
-    Amenities: getFirstArray(
-      rawRoom?.Amenities,
-      rawRoom?.amenities,
-      fallbackRawRoom?.Amenities,
-      fallbackRawRoom?.amenities,
-    ),
+    amenities,
+    Amenities: amenities,
 
-    room_promotion: getFirstArray(
-      rawRoom?.RoomPromotion,
-      rawRoom?.room_promotion,
-      fallbackRawRoom?.RoomPromotion,
-      fallbackRawRoom?.room_promotion,
-    ),
-    RoomPromotion: getFirstArray(
-      rawRoom?.RoomPromotion,
-      rawRoom?.room_promotion,
-      fallbackRawRoom?.RoomPromotion,
-      fallbackRawRoom?.room_promotion,
-    ),
+    room_promotion: roomPromotion,
+    RoomPromotion: roomPromotion,
   };
 };
 
@@ -326,51 +367,37 @@ const buildPrebookPayload = ({
   );
 
   const normalizedRoomGuests = normalizeRoomGuests(payload, guests, search);
-  const normalizedChildAges = normalizedRoomGuests.flatMap(
-    (room) => room.ChildrenAges,
-  );
   const paxRooms = buildPaxRooms(normalizedRoomGuests);
 
-  const safeGuests = {
-    ...(guests || {}),
-    adults:
-      Number(guests?.adults) ||
-      paxRooms.reduce((sum, room) => sum + Number(room.Adults || 0), 0) ||
-      1,
-    children:
-      Number(guests?.children) ||
-      paxRooms.reduce((sum, room) => sum + Number(room.Children || 0), 0) ||
-      0,
-    rooms: Number(guests?.rooms) || paxRooms.length || 1,
-    childAges: normalizedChildAges,
-    roomGuests: normalizedRoomGuests,
-    PaxRooms: paxRooms,
-  };
+  const childAges = paxRooms.flatMap((room) => room.ChildrenAges || []);
+
+  const totalAdults =
+    paxRooms.reduce((sum, room) => sum + toNumber(room.Adults, 0), 0) || 1;
+
+  const totalChildren = paxRooms.reduce(
+    (sum, room) => sum + toNumber(room.Children, 0),
+    0,
+  );
 
   return {
     BookingCode: bookingCode,
     HotelCode: hotelCode,
     CheckIn: checkIn,
     CheckOut: checkOut,
-
     GuestNationality:
       payload?.guestNationality ||
       payload?.GuestNationality ||
       guests?.nationality ||
       search?.nationality ||
+      search?.guestNationality ||
       "IN",
 
-    Guests: safeGuests,
-
-    ChildAges: normalizedChildAges,
-    ChildrenAges: normalizedChildAges,
-
-    RoomGuests: normalizedRoomGuests,
     PaxRooms: paxRooms,
 
-    Rooms: safeGuests.rooms,
-    Adults: safeGuests.adults,
-    Children: safeGuests.children,
+    Rooms: paxRooms.length || 1,
+    Adults: totalAdults,
+    Children: totalChildren,
+    ChildAges: childAges,
   };
 };
 
@@ -389,13 +416,13 @@ const PrebookLoader = () => {
   } = useHotelStore();
 
   const state = location.state || {};
-  const payload = state?.payload || state;
+  const payload = state?.payload || state || {};
 
   const hotel = payload.hotel || selectedHotel;
   const room = payload.room || selectedRoom;
   const checkIn = payload.checkIn || search?.checkIn;
   const checkOut = payload.checkOut || search?.checkOut;
-  const guests = payload.guests || search?.guests;
+  const guests = payload.guests || search?.guests || {};
 
   const bookingCode = getSafeValue(
     payload?.bookingCode,
@@ -428,13 +455,11 @@ const PrebookLoader = () => {
 
     setSelectedHotel(hotel);
 
-    const roomWithBookingCode = {
+    setSelectedRoom({
       ...room,
       BookingCode: bookingCode,
       booking_code: bookingCode,
-    };
-
-    setSelectedRoom(roomWithBookingCode);
+    });
   }, [hotel, room, bookingCode, navigate, setSelectedHotel, setSelectedRoom]);
 
   useEffect(() => {
@@ -450,19 +475,32 @@ const PrebookLoader = () => {
         setStatus("loading");
         setError("");
 
+        const missingFields = [];
+
+        if (!prebookPayload.BookingCode) missingFields.push("BookingCode");
+        if (!prebookPayload.HotelCode) missingFields.push("HotelCode");
+        if (!prebookPayload.CheckIn) missingFields.push("CheckIn");
+        if (!prebookPayload.CheckOut) missingFields.push("CheckOut");
+
+        const totalChildren = toNumber(prebookPayload.Children, 0);
+        const childAgeCount = prebookPayload.ChildAges?.length || 0;
+
+        if (totalChildren > 0 && childAgeCount !== totalChildren) {
+          missingFields.push("Correct Child Ages");
+        }
+
+        if (missingFields.length > 0) {
+          throw new Error(
+            `Missing required prebook data: ${missingFields.join(", ")}`,
+          );
+        }
+
         console.log("HOTEL PREBOOK PAYLOAD:", prebookPayload);
-        console.log(
-          "PREBOOK ROOM GUESTS:",
-          JSON.stringify(prebookPayload.RoomGuests, null, 2),
-        );
         console.log(
           "PREBOOK PAX ROOMS:",
           JSON.stringify(prebookPayload.PaxRooms, null, 2),
         );
-        console.log(
-          "PREBOOK CHILD AGES:",
-          JSON.stringify(prebookPayload.ChildAges, null, 2),
-        );
+
         const res = await privateApi.post(
           "/api/hotels/hotels/prebook/",
           prebookPayload,
@@ -475,18 +513,90 @@ const PrebookLoader = () => {
         console.log("HOTEL PREBOOK RESPONSE:", data);
 
         if (!data?.success) {
-          throw new Error(data?.message || "PreBook failed");
+          throw new Error(extractTboErrorMessage(data, "TBO PreBook failed"));
         }
 
         const apiPrebookData = data?.data || data;
-        const normalizedRoomGuests = prebookPayload.RoomGuests || [];
-        const normalizedChildAges = prebookPayload.ChildAges || [];
+
+        const normalizedRoomGuests = normalizeRoomGuests(
+          payload,
+          guests,
+          search,
+        );
+
         const paxRooms = prebookPayload.PaxRooms || [];
-        const safeGuests = prebookPayload.Guests || guests || {};
+        const normalizedChildAges = prebookPayload.ChildAges || [];
+
+        const safeGuests = {
+          ...(guests || {}),
+          adults: prebookPayload.Adults || 1,
+          children: prebookPayload.Children || 0,
+          rooms: prebookPayload.Rooms || paxRooms.length || 1,
+          childAges: normalizedChildAges,
+          roomGuests: normalizedRoomGuests,
+          PaxRooms: paxRooms,
+        };
 
         const hotelResult = extractHotelResult(apiPrebookData);
         const apiRoom = extractPrebookRoom(apiPrebookData, room);
         const normalizedRoom = normalizePrebookRoom(apiRoom, room);
+
+        const apiRateConditions = getFirstArray(
+          apiPrebookData?.rate_conditions,
+          apiPrebookData?.rateConditions,
+          apiPrebookData?.RateConditions,
+          apiPrebookData?.raw?.HotelResult?.[0]?.RateConditions,
+          apiPrebookData?.raw?.Response?.HotelResult?.[0]?.RateConditions,
+          hotelResult?.RateConditions,
+          normalizedRoom?.RateConditions,
+        );
+
+        const apiValidation =
+          apiPrebookData?.validation ||
+          apiPrebookData?.ValidationInfo ||
+          apiPrebookData?.raw?.ValidationInfo ||
+          apiPrebookData?.raw?.Response?.ValidationInfo ||
+          {};
+
+        const finalBookingCode =
+          normalizedRoom?.BookingCode ||
+          apiPrebookData?.booking_code ||
+          apiPrebookData?.BookingCode ||
+          bookingCode;
+
+        const finalRoomPromotions = getFirstArray(
+          apiPrebookData?.room_promotions,
+          apiPrebookData?.roomPromotion,
+          normalizedRoom?.RoomPromotion,
+        );
+
+        const finalSupplements = getFirstArray(
+          apiPrebookData?.supplements,
+          normalizedRoom?.Supplements,
+        );
+
+        const finalCancellationPolicies = getFirstArray(
+          apiPrebookData?.cancellation_policies,
+          normalizedRoom?.CancelPolicies,
+        );
+
+        const finalAmenities = getFirstArray(
+          apiPrebookData?.amenities,
+          normalizedRoom?.Amenities,
+        );
+
+        const finalInclusions = getSafeValue(
+          apiPrebookData?.inclusions,
+          normalizedRoom?.Inclusion,
+          "",
+        );
+
+        const finalMealType = getSafeValue(
+          apiPrebookData?.meal_type,
+          apiPrebookData?.mealType,
+          normalizedRoom?.MealType,
+          "",
+        );
 
         const finalPrebookData = {
           ...apiPrebookData,
@@ -496,10 +606,10 @@ const PrebookLoader = () => {
           hotelResult,
           room: normalizedRoom,
 
-          booking_code: normalizedRoom?.BookingCode || bookingCode,
-          BookingCode: normalizedRoom?.BookingCode || bookingCode,
+          booking_code: finalBookingCode,
+          BookingCode: finalBookingCode,
 
-          net_amount: Number(
+          net_amount: toNumber(
             getSafeValue(
               apiPrebookData?.net_amount,
               apiPrebookData?.NetAmount,
@@ -507,8 +617,10 @@ const PrebookLoader = () => {
               normalizedRoom?.TotalFare,
               0,
             ),
+            0,
           ),
-          NetAmount: Number(
+
+          NetAmount: toNumber(
             getSafeValue(
               apiPrebookData?.NetAmount,
               apiPrebookData?.net_amount,
@@ -516,9 +628,10 @@ const PrebookLoader = () => {
               normalizedRoom?.TotalFare,
               0,
             ),
+            0,
           ),
 
-          total_amount: Number(
+          total_amount: toNumber(
             getSafeValue(
               apiPrebookData?.total_amount,
               apiPrebookData?.TotalAmount,
@@ -526,27 +639,42 @@ const PrebookLoader = () => {
               normalizedRoom?.NetAmount,
               0,
             ),
+            0,
           ),
 
-          convenience_fee: Number(
+          convenience_fee: toNumber(
             getSafeValue(
               apiPrebookData?.convenience_fee,
               apiPrebookData?.convenienceFee,
               apiPrebookData?.ConvenienceFee,
               0,
             ),
+            0,
           ),
 
-          // Sheet required display fields
-          roomPromotion: normalizedRoom?.RoomPromotion || [],
-          supplements: normalizedRoom?.Supplements || [],
-          inclusions: normalizedRoom?.Inclusion || "",
-          mealType: normalizedRoom?.MealType || "",
-          cancellationPolicies: normalizedRoom?.CancelPolicies || [],
-          rateConditions: normalizedRoom?.RateConditions || [],
-          amenities: normalizedRoom?.Amenities || [],
+          roomPromotion: finalRoomPromotions,
+          room_promotions: finalRoomPromotions,
 
-          // Preserve current search/guest data for booking page
+          supplements: finalSupplements,
+
+          inclusions: finalInclusions,
+          Inclusion: finalInclusions,
+
+          mealType: finalMealType,
+          meal_type: finalMealType,
+
+          cancellationPolicies: finalCancellationPolicies,
+          cancellation_policies: finalCancellationPolicies,
+
+          rateConditions: apiRateConditions,
+          RateConditions: apiRateConditions,
+          rate_conditions: apiRateConditions,
+
+          amenities: finalAmenities,
+
+          validation: apiValidation,
+          ValidationInfo: apiValidation,
+
           checkIn,
           checkOut,
           guests: safeGuests,
@@ -572,16 +700,30 @@ const PrebookLoader = () => {
             checkOut,
             guests: safeGuests,
 
-            bookingCode: normalizedRoom?.BookingCode || bookingCode,
+            bookingCode: finalBookingCode,
 
-            // Sheet required fields passed clearly to booking/details UI
-            roomPromotion: normalizedRoom?.RoomPromotion || [],
-            supplements: normalizedRoom?.Supplements || [],
-            inclusions: normalizedRoom?.Inclusion || "",
-            mealType: normalizedRoom?.MealType || "",
-            cancellationPolicies: normalizedRoom?.CancelPolicies || [],
-            rateConditions: normalizedRoom?.RateConditions || [],
-            amenities: normalizedRoom?.Amenities || [],
+            roomPromotion: finalRoomPromotions,
+            room_promotions: finalRoomPromotions,
+
+            supplements: finalSupplements,
+
+            inclusions: finalInclusions,
+            Inclusion: finalInclusions,
+
+            mealType: finalMealType,
+            meal_type: finalMealType,
+
+            cancellationPolicies: finalCancellationPolicies,
+            cancellation_policies: finalCancellationPolicies,
+
+            rateConditions: apiRateConditions,
+            RateConditions: apiRateConditions,
+            rate_conditions: apiRateConditions,
+
+            amenities: finalAmenities,
+
+            validation: apiValidation,
+            ValidationInfo: apiValidation,
 
             childAges: normalizedChildAges,
             roomGuests: normalizedRoomGuests,
@@ -596,16 +738,16 @@ const PrebookLoader = () => {
         const statusCode = err?.response?.status;
         const apiData = err?.response?.data;
 
-        const message =
-          apiData?.message ||
-          apiData?.error ||
-          apiData?.data?.Error?.ErrorMessage ||
-          apiData?.data?.Response?.Error?.ErrorMessage ||
-          err?.message ||
-          "PreBook failed. Please try again.";
-
+        console.log("FULL AXIOS ERROR:", err);
+        console.log("BACKEND ERROR RESPONSE:", err?.response);
+        console.log("BACKEND ERROR DATA:", apiData);
         console.log("PREBOOK ERROR STATUS:", statusCode);
-        console.log("PREBOOK ERROR:", apiData || err);
+
+        const message =
+          extractTboErrorMessage(apiData, "") ||
+          "TBO PreBook failed. Please check selected room availability.";
+
+        console.log("PREBOOK ERROR MESSAGE:", message);
 
         const lowerMessage = String(message).toLowerCase();
 
@@ -614,7 +756,8 @@ const PrebookLoader = () => {
           statusCode === 403 ||
           lowerMessage.includes("auth") ||
           lowerMessage.includes("login") ||
-          lowerMessage.includes("token")
+          lowerMessage.includes("token") ||
+          lowerMessage.includes("session")
         ) {
           navigate("/login", {
             replace: true,
@@ -626,11 +769,19 @@ const PrebookLoader = () => {
                 checkIn,
                 checkOut,
 
-                guests: prebookPayload.Guests || guests || {},
+                guests: {
+                  ...(guests || {}),
+                  adults: prebookPayload.Adults || 1,
+                  children: prebookPayload.Children || 0,
+                  rooms: prebookPayload.Rooms || 1,
+                  childAges: prebookPayload.ChildAges || [],
+                  PaxRooms: prebookPayload.PaxRooms || [],
+                },
+
                 bookingCode,
 
                 childAges: prebookPayload.ChildAges || [],
-                roomGuests: prebookPayload.RoomGuests || [],
+                roomGuests: normalizeRoomGuests(payload, guests, search),
                 PaxRooms: prebookPayload.PaxRooms || [],
 
                 isDomesticHotel: payload?.isDomesticHotel,
@@ -708,12 +859,6 @@ const PrebookLoader = () => {
         Please wait while we verify price, cancellation policy, inclusions, meal
         type, supplements and room availability.
       </p>
-
-      {/* {bookingCode && (
-        <p className="text-gray-600 text-xs mt-4 text-center break-all max-w-md">
-          BookingCode: {bookingCode}
-        </p>
-      )} */}
     </div>
   );
 };

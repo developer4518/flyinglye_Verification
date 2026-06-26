@@ -126,6 +126,12 @@ const findDeepValueByKeys = (obj, keywords = [], maxDepth = 6) => {
   return search(obj);
 };
 
+const formatPrice = (value) => {
+  return Number(value || 0).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
+};
+
 const getBlockValidationFromReviewData = (data = {}) => {
   const sources = [
     data?.validation,
@@ -594,8 +600,7 @@ const HotelReviewBooking = () => {
     return {
       arrivalTransportType:
         payload?.ArrivalTransport?.ArrivalTransportType ?? 0,
-      arrivalTransportInfoId:
-        payload?.ArrivalTransport?.TransportInfoId || "",
+      arrivalTransportInfoId: payload?.ArrivalTransport?.TransportInfoId || "",
       arrivalTime:
         payload?.ArrivalTransport?.Time ||
         getDateTimeLocalDefault(reviewData?.checkIn, "14:00"),
@@ -1368,8 +1373,8 @@ const HotelReviewBooking = () => {
                                 <input
                                   type="tel"
                                   value={
-                                    gstForms[index]
-                                      ?.GSTCompanyContactNumber || ""
+                                    gstForms[index]?.GSTCompanyContactNumber ||
+                                    ""
                                   }
                                   onChange={(e) =>
                                     updateGSTField(
@@ -1390,9 +1395,7 @@ const HotelReviewBooking = () => {
 
                                 <input
                                   type="email"
-                                  value={
-                                    gstForms[index]?.GSTCompanyEmail || ""
-                                  }
+                                  value={gstForms[index]?.GSTCompanyEmail || ""}
                                   onChange={(e) =>
                                     updateGSTField(
                                       index,
@@ -1612,7 +1615,7 @@ const HotelReviewBooking = () => {
                   </p>
                 </span>
 
-                <span>₹ {Math.round(Number(net || 0))}</span>
+                <span>₹ {formatPrice(net)}</span>
               </div>
 
               <hr className="border-gray-700" />
@@ -1620,7 +1623,7 @@ const HotelReviewBooking = () => {
               <div className="flex justify-between text-lg font-bold">
                 <span>Total Payable</span>
                 <span className="text-yellow-400">
-                  ₹ {Math.round(Number(net || 0))}
+                  ₹ {formatPrice(net || 0)}
                 </span>
               </div>
             </div>

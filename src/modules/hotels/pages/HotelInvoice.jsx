@@ -347,7 +347,7 @@ const HotelInvoice = () => {
       booking?.NetReceivable ||
         booking?.ReceivableAmount ||
         booking?.TotalReceivable,
-    ) || Math.round(netAmount || gross || 0);
+    ) || Number(netAmount || gross || 0);
 
   const taxableValue =
     Number(
