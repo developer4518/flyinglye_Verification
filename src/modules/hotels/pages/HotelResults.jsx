@@ -143,8 +143,6 @@ const normalizeRoom = (room = {}, index = 0) => {
   const price = Number(
     room.price ??
       room.TotalFare ??
-      room.Price?.PublishedPrice ??
-      room.Price?.OfferedPrice ??
       room.MinPrice ??
       rawRoom?.TotalFare ??
       0,

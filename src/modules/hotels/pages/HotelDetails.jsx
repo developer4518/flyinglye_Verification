@@ -676,9 +676,7 @@ const HotelDetails = () => {
 
   const tax = Number(room?.tax || room?.TotalTax || room?.Tax || 0);
 
-  const totalAmount = Number(
-    room?.publishedFare || room?.TotalFare || roomPrice + tax || 0,
-  );
+  const totalAmount = Number(room?.TotalFare || roomPrice + tax || 0);
 
   const { isDomesticHotel, isInternationalHotel } = useMemo(() => {
     if (!hotel) {
