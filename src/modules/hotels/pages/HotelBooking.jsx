@@ -1505,10 +1505,10 @@ const HotelBooking = () => {
                   disabled={guest.PaxType === 2}
                   onChange={(e) => updateGuest(index, "Title", e.target.value)}
                 >
-                  {guest.PaxType === 1 && (
+                  {guest.PaxType === 1 ? (
                     <select
                       className="input"
-                      value={guest.Title}
+                      value={guest.Title || "Mr"}
                       onChange={(e) =>
                         updateGuest(index, "Title", e.target.value)
                       }
@@ -1517,7 +1517,7 @@ const HotelBooking = () => {
                       <option value="Mrs">Mrs</option>
                       <option value="Ms">Ms</option>
                     </select>
-                  )}
+                  ) : null}
                 </select>
 
                 <input
