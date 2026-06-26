@@ -1162,11 +1162,6 @@ const HotelBooking = () => {
                         key={groupIndex}
                         className="rounded-2xl border border-orange-400/20 bg-[#0B0B0F]/60 p-4"
                       >
-                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-400/10 px-3 py-1 text-xs font-semibold text-orange-200">
-                          <span>📦</span>
-                          Supplement Group {groupIndex + 1}
-                        </div>
-
                         <div className="space-y-3">
                           {(Array.isArray(supplementGroup)
                             ? supplementGroup
