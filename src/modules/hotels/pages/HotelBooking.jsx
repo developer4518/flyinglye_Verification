@@ -207,17 +207,28 @@ const HotelBooking = () => {
 
   const roomPromotions = normalizeList(roomPromotionsRaw);
 
+  const flattenDeep = (value) => {
+    if (!Array.isArray(value)) return value ? [value] : [];
+
+    return value.flatMap((item) =>
+      Array.isArray(item) ? flattenDeep(item) : item ? [item] : [],
+    );
+  };
+
   const supplementsRaw =
     preBook?.supplements ||
     preBook?.Supplements ||
     preBook?.room?.Supplements ||
+    preBook?.room?.supplements ||
     roomData?.Supplements ||
+    roomData?.supplements ||
     roomData?.Supplement ||
     hotelResult?.Supplements ||
+    hotelResult?.supplements ||
     [];
 
   const supplements = Array.isArray(supplementsRaw)
-    ? supplementsRaw.filter(Boolean)
+    ? flattenDeep(supplementsRaw).filter(Boolean)
     : normalizeList(supplementsRaw);
 
   const formatSupplementText = (supplement) => {
@@ -233,10 +244,10 @@ const HotelBooking = () => {
       "Supplement";
 
     const amount =
-      supplement?.Price ||
-      supplement?.Amount ||
-      supplement?.Charge ||
-      supplement?.SupplementPrice ||
+      supplement?.Price ??
+      supplement?.Amount ??
+      supplement?.Charge ??
+      supplement?.SupplementPrice ??
       supplement?.SupplementCharge;
 
     const currency =
@@ -244,12 +255,13 @@ const HotelBooking = () => {
       supplement?.currency ||
       preBook?.currency ||
       preBook?.Currency ||
-      "INR";
+      "";
 
     if (amount !== undefined && amount !== null && amount !== "") {
       return `${title} - ${currency === "INR" ? "₹" : currency} ${Number(
         amount,
       ).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
     }
