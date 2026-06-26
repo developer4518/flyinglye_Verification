@@ -1155,22 +1155,7 @@ const HotelBooking = () => {
 
             <div className="p-5">
               {supplements.length > 0 ? (
-                <div className="rounded-2xl border border-orange-400/20 bg-gradient-to-br from-orange-400/10 via-yellow-400/5 to-transparent p-5">
-                  <div className="mb-5 flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-400/30 bg-orange-400/10 text-2xl">
-                      🧾
-                    </div>
-
-                    <div>
-                      <h4 className="text-lg font-bold text-orange-100">
-                        Hotel Supplements & Extra Charges
-                      </h4>
-                      <p className="mt-1 text-sm text-gray-400">
-                        These charges may be payable at the hotel/property.
-                      </p>
-                    </div>
-                  </div>
-
+                <div className="rounded-2xl border border-orange-400/20 bg-linear-to-br from-orange-400/10 via-yellow-400/5 to-transparent p-5">
                   <div className="space-y-4">
                     {supplements.map((supplementGroup, groupIndex) => (
                       <div
