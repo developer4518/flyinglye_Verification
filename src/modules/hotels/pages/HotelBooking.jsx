@@ -1155,9 +1155,100 @@ const HotelBooking = () => {
 
             <div className="p-5">
               {supplements.length > 0 ? (
-                <pre className="overflow-x-auto rounded-xl border border-orange-400/20 bg-orange-400/10 p-4 text-sm leading-6 text-orange-100">
-                  {JSON.stringify({ supplements }, null, 2)}
-                </pre>
+                <div className="rounded-2xl border border-orange-400/20 bg-gradient-to-br from-orange-400/10 via-yellow-400/5 to-transparent p-5">
+                  <div className="mb-5 flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-400/30 bg-orange-400/10 text-2xl">
+                      🧾
+                    </div>
+
+                    <div>
+                      <h4 className="text-lg font-bold text-orange-100">
+                        Hotel Supplements & Extra Charges
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-400">
+                        These charges may be payable at the hotel/property.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {supplements.map((supplementGroup, groupIndex) => (
+                      <div
+                        key={groupIndex}
+                        className="rounded-2xl border border-orange-400/20 bg-[#0B0B0F]/60 p-4"
+                      >
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-400/10 px-3 py-1 text-xs font-semibold text-orange-200">
+                          <span>📦</span>
+                          Supplement Group {groupIndex + 1}
+                        </div>
+
+                        <div className="space-y-3">
+                          {(Array.isArray(supplementGroup)
+                            ? supplementGroup
+                            : [supplementGroup]
+                          ).map((supplement, index) => (
+                            <div
+                              key={`${groupIndex}-${index}`}
+                              className="rounded-xl border border-white/10 bg-white/5 p-4"
+                            >
+                              <div className="mb-4 flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-gray-500">
+                                    Description
+                                  </p>
+                                  <h5 className="text-base font-bold text-white">
+                                    {supplement?.Description || "Supplement"}
+                                  </h5>
+                                </div>
+
+                                <div className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-200">
+                                  {supplement?.Type || "AtProperty"}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                  <p className="text-xs text-gray-500">Index</p>
+                                  <p className="mt-1 font-semibold text-gray-100">
+                                    {supplement?.Index ?? index + 1}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                  <p className="text-xs text-gray-500">Type</p>
+                                  <p className="mt-1 font-semibold text-purple-200">
+                                    {supplement?.Type || "-"}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                  <p className="text-xs text-gray-500">Price</p>
+                                  <p className="mt-1 font-semibold text-green-300">
+                                    {Number(
+                                      supplement?.Price || 0,
+                                    ).toLocaleString("en-IN", {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                  <p className="text-xs text-gray-500">
+                                    Currency
+                                  </p>
+                                  <p className="mt-1 font-semibold text-yellow-300">
+                                    {supplement?.Currency || "-"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <p className="text-sm text-gray-400">
                   No supplements or extra charges are available for this room.
