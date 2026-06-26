@@ -1831,6 +1831,18 @@ const HotelBooking = () => {
           opacity: 0.7;
           cursor: not-allowed;
         }
+          
+          .title-select {
+  appearance: auto;
+  -webkit-appearance: auto;
+  color: #ffffff;
+  background-color: #0b0b0f;
+}
+
+.title-select option {
+  background: #111118;
+  color: #ffffff;
+}
       `}</style>
     </div>
   );
