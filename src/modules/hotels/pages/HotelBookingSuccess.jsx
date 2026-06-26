@@ -995,7 +995,7 @@ const HotelBookingSuccess = () => {
 
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <div className="rounded-[2rem] border border-white/10 bg-[#111118] p-5 shadow-xl shadow-black/30 md:p-6">
+            <div className="rounded-4xl border border-white/10 bg-[#111118] p-5 shadow-xl shadow-black/30 md:p-6">
               <div className="flex flex-col gap-5 md:flex-row md:items-start">
                 <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border border-yellow-400/30 bg-yellow-400/10 text-5xl">
                   🏨
@@ -1080,7 +1080,7 @@ const HotelBookingSuccess = () => {
                   return (
                     <div
                       key={index}
-                      className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-yellow-400/30"
+                      className="rounded-3xl border border-white/10 bg-white/3 p-4 transition hover:border-yellow-400/30"
                     >
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0">
@@ -1154,7 +1154,7 @@ const HotelBookingSuccess = () => {
                   guestsByRoom.map((roomGroup, roomIndex) => (
                     <div
                       key={roomIndex}
-                      className="rounded-3xl border border-white/10 bg-white/[0.03] p-4"
+                      className="rounded-3xl border border-white/10 bg-white/3 p-4"
                     >
                       <p className="mb-3 font-bold text-yellow-300">
                         Room {roomGroup.roomIndex + 1}
@@ -1230,8 +1230,8 @@ const HotelBookingSuccess = () => {
 
                 <div className="overflow-hidden rounded-3xl border border-white/10">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[720px] text-sm">
-                      <thead className="bg-white/[0.04] text-yellow-300">
+                    <table className="w-full min-w-180 text-sm">
+                      <thead className="bg-white/4 text-yellow-300">
                         <tr>
                           <th className="p-4 text-left font-bold">
                             Cancelled on or After

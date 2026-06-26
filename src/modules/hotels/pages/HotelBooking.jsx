@@ -1550,28 +1550,21 @@ const HotelBooking = () => {
               )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <select
-                  className="input"
-                  value={guest.Title}
-                  disabled={guest.PaxType === 2}
-                  onChange={(e) => updateGuest(index, "Title", e.target.value)}
-                >
-                  {guest.PaxType === 1 ? (
-                    <select
-                      className="input"
-                      value={guest.Title || "Mr"}
-                      onChange={(e) =>
-                        updateGuest(index, "Title", e.target.value)
-                      }
-                    >
-                      <option value="Mr">Mr</option>
-                      <option value="Mrs">Mrs</option>
-                      <option value="Ms">Ms</option>
-                    </select>
-                  ) : (
-                    <div className="hidden sm:block" />
-                  )}
-                </select>
+                {guest.PaxType === 1 ? (
+                  <select
+                    className="input title-select"
+                    value={guest.Title || "Mr"}
+                    onChange={(e) =>
+                      updateGuest(index, "Title", e.target.value)
+                    }
+                  >
+                    <option value="Mr">Mr</option>
+                    <option value="Mrs">Mrs</option>
+                    <option value="Ms">Ms</option>
+                  </select>
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
 
                 <input
                   placeholder="First Name"

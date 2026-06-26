@@ -810,7 +810,7 @@ Lead Guest: ${leadGuestName || "N/A"}`,
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] px-3 py-10 font-[var(--font-body)] text-[var(--text-main)] md:py-24">
+    <div className="min-h-screen bg-(--bg-main) px-3 py-10 font-(--font-body) text-(--text-main) md:py-24">
       <style>
         {`
           .voucher-wrapper {
@@ -1685,7 +1685,7 @@ Lead Guest: ${leadGuestName || "N/A"}`,
         )}
       </div>
 
-      <div className="no-print mx-auto mt-5 flex max-w-[1050px] justify-end">
+      <div className="no-print mx-auto mt-5 flex max-w-262.5 justify-end">
         <button onClick={() => navigate(-1)} className="back-btn">
           Back
         </button>
