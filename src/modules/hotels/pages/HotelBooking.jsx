@@ -227,9 +227,7 @@ const HotelBooking = () => {
     hotelResult?.supplements ||
     [];
 
-  const supplements = Array.isArray(supplementsRaw)
-    ? flattenDeep(supplementsRaw).filter(Boolean)
-    : normalizeList(supplementsRaw);
+  const supplements = Array.isArray(supplementsRaw) ? supplementsRaw : [];
 
   const formatSupplementText = (supplement) => {
     if (!supplement) return "";
@@ -1158,23 +1156,36 @@ const HotelBooking = () => {
             <div className="p-5">
               {supplements.length > 0 ? (
                 <div className="space-y-3">
-                  {supplements.map((supplement, index) => (
-                    <div
-                      key={index}
-                      className="rounded-xl border border-orange-400/20 bg-orange-400/10 p-4 text-sm text-orange-100"
-                    >
-                      <div className="font-semibold">
-                        {formatSupplementText(supplement)}
-                      </div>
+                  {supplements.map((supplementGroup, groupIndex) => (
+                    <div key={groupIndex} className="space-y-3">
+                      {(Array.isArray(supplementGroup)
+                        ? supplementGroup
+                        : [supplementGroup]
+                      ).map((supplement, index) => (
+                        <div
+                          key={`${groupIndex}-${index}`}
+                          className="rounded-xl border border-orange-400/20 bg-orange-400/10 p-4 text-sm text-orange-100"
+                        >
+                          <div className="font-semibold">
+                            {supplement?.Description || "Supplement"}
+                          </div>
 
-                      {typeof supplement === "object" &&
-                        supplement?.IsMandatory !== undefined && (
-                          <p className="mt-1 text-xs text-orange-200/80">
-                            {supplement.IsMandatory
-                              ? "Mandatory supplement"
-                              : "Optional supplement"}
-                          </p>
-                        )}
+                          <div className="mt-2 text-xs text-orange-200/90">
+                            Type: {supplement?.Type || "-"}
+                          </div>
+
+                          <div className="mt-1 text-xs text-orange-200/90">
+                            Price: {supplement?.Currency || ""}{" "}
+                            {Number(supplement?.Price || 0).toLocaleString(
+                              "en-IN",
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              },
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -1517,7 +1528,9 @@ const HotelBooking = () => {
                       <option value="Mrs">Mrs</option>
                       <option value="Ms">Ms</option>
                     </select>
-                  ) : null}
+                  ) : (
+                    <div className="hidden sm:block" />
+                  )}
                 </select>
 
                 <input
