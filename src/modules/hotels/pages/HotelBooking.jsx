@@ -1155,40 +1155,9 @@ const HotelBooking = () => {
 
             <div className="p-5">
               {supplements.length > 0 ? (
-                <div className="space-y-3">
-                  {supplements.map((supplementGroup, groupIndex) => (
-                    <div key={groupIndex} className="space-y-3">
-                      {(Array.isArray(supplementGroup)
-                        ? supplementGroup
-                        : [supplementGroup]
-                      ).map((supplement, index) => (
-                        <div
-                          key={`${groupIndex}-${index}`}
-                          className="rounded-xl border border-orange-400/20 bg-orange-400/10 p-4 text-sm text-orange-100"
-                        >
-                          <div className="font-semibold">
-                            {supplement?.Description || "Supplement"}
-                          </div>
-
-                          <div className="mt-2 text-xs text-orange-200/90">
-                            Type: {supplement?.Type || "-"}
-                          </div>
-
-                          <div className="mt-1 text-xs text-orange-200/90">
-                            Price: {supplement?.Currency || ""}{" "}
-                            {Number(supplement?.Price || 0).toLocaleString(
-                              "en-IN",
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              },
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                <pre className="overflow-x-auto rounded-xl border border-orange-400/20 bg-orange-400/10 p-4 text-sm leading-6 text-orange-100">
+                  {JSON.stringify({ supplements }, null, 2)}
+                </pre>
               ) : (
                 <p className="text-sm text-gray-400">
                   No supplements or extra charges are available for this room.
