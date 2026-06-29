@@ -1745,7 +1745,7 @@ const HotelBooking = () => {
               <span>
                 Total Amount{" "}
                 <p className="text-xs text-gray-200">
-                  (Inclusive of all taxes)
+                  (Inclusive of all taxes )
                 </p>
               </span>
 

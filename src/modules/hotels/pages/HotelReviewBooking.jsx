@@ -1611,7 +1611,7 @@ const HotelReviewBooking = () => {
                 <span>
                   Total Amount{" "}
                   <p className="text-xs text-gray-200">
-                    (Inclusive of all taxes)
+                    (Inclusive of all taxes and TDS)
                   </p>
                 </span>
 
@@ -1647,7 +1647,7 @@ const HotelReviewBooking = () => {
               disabled={loading}
               className="mt-6 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 py-3 font-semibold text-black disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Confirming Booking..." : "Confirm Booking"}
+              {loading ? "Generating.... " : "Generate Voucher"}
             </button>
 
             <p className="mt-3 text-center text-xs text-gray-500">
