@@ -541,6 +541,45 @@ const PrebookLoader = () => {
         const apiRoom = extractPrebookRoom(apiPrebookData, room);
         const normalizedRoom = normalizePrebookRoom(apiRoom, room);
 
+        const finalTotalFare = toNumber(
+          getSafeValue(
+            normalizedRoom?.TotalFare,
+            normalizedRoom?.room_raw?.TotalFare,
+            apiPrebookData?.room_raw?.TotalFare,
+            apiPrebookData?.raw?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare,
+            apiPrebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]
+              ?.TotalFare,
+            room?.TotalFare,
+            room?.room_raw?.TotalFare,
+            0,
+          ),
+          0,
+        );
+
+        const finalNetAmount = toNumber(
+          getSafeValue(
+            apiPrebookData?.net_amount,
+            apiPrebookData?.NetAmount,
+            normalizedRoom?.NetAmount,
+            normalizedRoom?.room_raw?.NetAmount,
+            apiPrebookData?.room_raw?.NetAmount,
+            apiPrebookData?.raw?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
+            apiPrebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]
+              ?.NetAmount,
+            0,
+          ),
+          0,
+        );
+
+        const normalizedRoomWithFare = {
+          ...normalizedRoom,
+          TotalFare: finalTotalFare,
+          totalFare: finalTotalFare,
+          displayFare: finalTotalFare,
+          NetAmount: finalNetAmount,
+          net_amount: finalNetAmount,
+        };
+
         const apiRateConditions = getFirstArray(
           apiPrebookData?.rate_conditions,
           apiPrebookData?.rateConditions,
@@ -604,43 +643,20 @@ const PrebookLoader = () => {
           responseTimeMs,
 
           hotelResult,
-          room: normalizedRoom,
+          room: normalizedRoomWithFare,
 
           booking_code: finalBookingCode,
           BookingCode: finalBookingCode,
 
-          net_amount: toNumber(
-            getSafeValue(
-              apiPrebookData?.net_amount,
-              apiPrebookData?.NetAmount,
-              normalizedRoom?.NetAmount,
-              normalizedRoom?.TotalFare,
-              0,
-            ),
-            0,
-          ),
+          TotalFare: finalTotalFare,
+          totalFare: finalTotalFare,
+          displayFare: finalTotalFare,
 
-          NetAmount: toNumber(
-            getSafeValue(
-              apiPrebookData?.NetAmount,
-              apiPrebookData?.net_amount,
-              normalizedRoom?.NetAmount,
-              normalizedRoom?.TotalFare,
-              0,
-            ),
-            0,
-          ),
+          net_amount: finalNetAmount,
+          NetAmount: finalNetAmount,
 
-          total_amount: toNumber(
-            getSafeValue(
-              apiPrebookData?.total_amount,
-              apiPrebookData?.TotalAmount,
-              normalizedRoom?.TotalFare,
-              normalizedRoom?.NetAmount,
-              0,
-            ),
-            0,
-          ),
+          // Important: do not pass backend total_amount for customer display
+          total_amount: finalTotalFare,
 
           convenience_fee: toNumber(
             getSafeValue(
@@ -688,19 +704,25 @@ const PrebookLoader = () => {
         };
 
         setPrebookData(finalPrebookData);
-        setSelectedRoom(normalizedRoom);
+        setSelectedRoom(normalizedRoomWithFare);
 
         navigate("/hotel-booking", {
           replace: true,
           state: {
             hotel,
-            room: normalizedRoom,
+            room: normalizedRoomWithFare,
             preBook: finalPrebookData,
             checkIn,
             checkOut,
             guests: safeGuests,
 
             bookingCode: finalBookingCode,
+
+            TotalFare: finalTotalFare,
+            totalFare: finalTotalFare,
+            displayFare: finalTotalFare,
+            net_amount: finalNetAmount,
+            NetAmount: finalNetAmount,
 
             roomPromotion: finalRoomPromotions,
             room_promotions: finalRoomPromotions,

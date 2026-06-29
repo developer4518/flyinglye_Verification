@@ -544,17 +544,26 @@ const HotelBookingSuccess = () => {
     "INR";
 
   const totalFare = Number(
-    savedData?.totalFare ??
-      savedData?.reviewBookingData?.totalFare ??
+    savedData?.TotalFare ??
+      savedData?.totalFare ??
       savedData?.displayFare ??
+      savedData?.reviewBookingData?.TotalFare ??
+      savedData?.reviewBookingData?.totalFare ??
       savedData?.reviewBookingData?.displayFare ??
-      roomData?.TotalFare ??
       savedData?.roomData?.TotalFare ??
       savedData?.reviewBookingData?.roomData?.TotalFare ??
+      savedData?.selectedRoom?.TotalFare ??
+      savedData?.room?.TotalFare ??
+      savedData?.prebookData?.TotalFare ??
+      savedData?.prebookData?.totalFare ??
+      savedData?.prebookData?.displayFare ??
       savedData?.prebookData?.room?.TotalFare ??
+      savedData?.prebookData?.room?.totalFare ??
+      savedData?.prebookData?.room?.displayFare ??
       savedData?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare ??
       savedData?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]
         ?.TotalFare ??
+      roomData?.TotalFare ??
       booking?.TotalFare ??
       0,
   );

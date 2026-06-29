@@ -51,11 +51,20 @@ const HotelBooking = () => {
       roomData?.NetAmount ??
       0,
   );
-
   const totalFare = Number(
-    preBook?.TotalFare ??
+    payload?.TotalFare ??
+      payload?.totalFare ??
+      payload?.displayFare ??
+      preBook?.TotalFare ??
+      preBook?.totalFare ??
+      preBook?.displayFare ??
       preBook?.room?.TotalFare ??
+      preBook?.room?.totalFare ??
+      preBook?.room?.displayFare ??
       roomData?.TotalFare ??
+      roomData?.totalFare ??
+      roomData?.displayFare ??
+      preBook?.room_raw?.TotalFare ??
       preBook?.raw?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare ??
       preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare ??
       0,
@@ -977,8 +986,9 @@ const HotelBooking = () => {
         checkIn,
         checkOut,
         net,
-        totalFare: displayFare,
-        displayFare,
+        TotalFare: totalFare,
+        totalFare,
+        displayFare: totalFare,
         validation,
         validationInfo,
         isCorporate,
