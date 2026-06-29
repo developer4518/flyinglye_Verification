@@ -47,8 +47,7 @@ const HotelBooking = () => {
   const net = Number(preBook?.net_amount || preBook?.NetAmount || 0);
 
   const displayFare = Number(
-    preBook?.total_amount ||
-      preBook?.TotalFare ||
+    preBook?.TotalFare ||
       preBook?.room?.TotalFare ||
       roomData?.TotalFare ||
       net,
