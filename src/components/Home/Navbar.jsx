@@ -71,12 +71,12 @@ const Navbar = () => {
           <Link to="/flights" className={linkClass("/flights")}>
             Flights
           </Link>
+          <Link to="/blogs" className={linkClass("/blogs")}>
+            Blogs
+          </Link>
 
           <Link to="/contact" className={linkClass("/contact")}>
             Contact
-          </Link>
-          <Link to="/blogs" className={linkClass("/blogs")}>
-            Blogs
           </Link>
         </ul>
 
