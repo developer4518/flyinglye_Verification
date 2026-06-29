@@ -84,11 +84,16 @@ const formatDate = (dateValue) => {
 const formatMoney = (value, currency = "INR") => {
   const amount = Number(value || 0);
 
+  const formattedAmount = amount.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   if (currency === "INR") {
-    return `₹ ${Math.round(amount).toLocaleString("en-IN")}`;
+    return `₹ ${formattedAmount}`;
   }
 
-  return `${currency} ${Math.round(amount).toLocaleString("en-IN")}`;
+  return `${currency} ${formattedAmount}`;
 };
 
 const getNights = (checkIn, checkOut) => {
@@ -538,22 +543,27 @@ const HotelBookingSuccess = () => {
     savedData?.finalPayload?.Currency ||
     "INR";
 
-  const netAmount =
-    savedData?.net ||
-    savedData?.finalPayload?.NetAmount ||
-    savedData?.reviewBookingData?.finalPayload?.NetAmount ||
-    booking?.NetAmount ||
-    booking?.TotalAmount ||
-    booking?.InvoiceAmount ||
-    roomData?.TotalFare ||
-    0;
+  const totalFare = Number(
+    savedData?.totalFare ??
+      savedData?.reviewBookingData?.totalFare ??
+      savedData?.displayFare ??
+      savedData?.reviewBookingData?.displayFare ??
+      roomData?.TotalFare ??
+      savedData?.roomData?.TotalFare ??
+      savedData?.reviewBookingData?.roomData?.TotalFare ??
+      savedData?.prebookData?.room?.TotalFare ??
+      savedData?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare ??
+      savedData?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]
+        ?.TotalFare ??
+      booking?.TotalFare ??
+      0,
+  );
 
   const offeredRate =
     roomData?.TotalFare ||
     booking?.TotalFare ||
     booking?.OfferedFare ||
-    savedData?.finalPayload?.NetAmount ||
-    netAmount;
+    totalFare;
 
   const publishedRate =
     roomData?.PublishedPrice ||
@@ -1468,7 +1478,7 @@ const HotelBookingSuccess = () => {
                   </span>
 
                   <span className="text-2xl font-black text-yellow-400">
-                    {formatMoney(netAmount, currency)}
+                    {formatMoney(totalFare, currency)}
                   </span>
                 </div>
               </div>

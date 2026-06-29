@@ -44,14 +44,24 @@ const HotelBooking = () => {
     preBook?.raw?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode ||
     preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.BookingCode;
 
-  const net = Number(preBook?.net_amount || preBook?.NetAmount || 0);
-
-  const displayFare = Number(
-    preBook?.TotalFare ||
-      preBook?.room?.TotalFare ||
-      roomData?.TotalFare ||
-      net,
+  const net = Number(
+    preBook?.net_amount ??
+      preBook?.NetAmount ??
+      preBook?.room?.NetAmount ??
+      roomData?.NetAmount ??
+      0,
   );
+
+  const totalFare = Number(
+    preBook?.TotalFare ??
+      preBook?.room?.TotalFare ??
+      roomData?.TotalFare ??
+      preBook?.raw?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare ??
+      preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare ??
+      0,
+  );
+
+  const displayFare = totalFare;
 
   const toBool = (value) =>
     value === true || String(value).toLowerCase() === "true";
@@ -967,6 +977,8 @@ const HotelBooking = () => {
         checkIn,
         checkOut,
         net,
+        totalFare: displayFare,
+        displayFare,
         validation,
         validationInfo,
         isCorporate,
@@ -1729,9 +1741,10 @@ const HotelBooking = () => {
 
               <span>
                 ₹{" "}
-                {displayFare.toLocaleString("en-IN", {
+                {totalFare.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
-                })}
+                })}{" "}
               </span>
             </div>
 
@@ -1741,7 +1754,8 @@ const HotelBooking = () => {
               <span>Total</span>
               <span className="text-yellow-400">
                 ₹{" "}
-                {displayFare.toLocaleString("en-IN", {
+                {totalFare.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </span>
