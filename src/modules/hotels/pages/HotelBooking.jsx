@@ -46,6 +46,14 @@ const HotelBooking = () => {
 
   const net = Number(preBook?.net_amount || preBook?.NetAmount || 0);
 
+  const displayFare = Number(
+    preBook?.total_amount ||
+      preBook?.TotalFare ||
+      preBook?.room?.TotalFare ||
+      roomData?.TotalFare ||
+      net,
+  );
+
   const toBool = (value) =>
     value === true || String(value).toLowerCase() === "true";
 
@@ -1722,7 +1730,7 @@ const HotelBooking = () => {
 
               <span>
                 ₹{" "}
-                {net.toLocaleString("en-IN", {
+                {displayFare.toLocaleString("en-IN", {
                   maximumFractionDigits: 2,
                 })}
               </span>
@@ -1734,7 +1742,7 @@ const HotelBooking = () => {
               <span>Total</span>
               <span className="text-yellow-400">
                 ₹{" "}
-                {net.toLocaleString("en-IN", {
+                {displayFare.toLocaleString("en-IN", {
                   maximumFractionDigits: 2,
                 })}
               </span>
