@@ -543,6 +543,49 @@ const HotelBooking = () => {
     return value.replace(/[^A-Za-z]/g, "");
   };
 
+  const FIRST_NAME_MIN_LENGTH = 1;
+  const FIRST_NAME_MAX_LENGTH = 50;
+
+  const handleFirstNameChange = (index, value) => {
+    const cleanedValue = cleanNameInput(value);
+
+    if (cleanedValue.length > FIRST_NAME_MAX_LENGTH) {
+      alert("First Name cannot be more than 50 characters.");
+
+      updateGuest(
+        index,
+        "FirstName",
+        cleanedValue.slice(0, FIRST_NAME_MAX_LENGTH),
+      );
+      return;
+    }
+
+    updateGuest(index, "FirstName", cleanedValue);
+  };
+
+  const handleFirstNameBlur = (index) => {
+    const firstName = String(guestList[index]?.FirstName || "").trim();
+
+    if (firstName.length < FIRST_NAME_MIN_LENGTH) {
+      alert("First Name must be at least 1 character.");
+    }
+  };
+
+  const isValidFirstNameByRules = (name) => {
+    const value = String(name || "").trim();
+
+    if (value.length < FIRST_NAME_MIN_LENGTH) return false;
+    if (value.length > FIRST_NAME_MAX_LENGTH) return false;
+
+    if (!validation.SpaceAllowed && /\s/.test(value)) return false;
+
+    if (!validation.SpecialCharAllowed && /[^A-Za-z ]/.test(value)) {
+      return false;
+    }
+
+    return true;
+  };
+
   const normalizeName = (name) =>
     String(name || "")
       .trim()
@@ -709,11 +752,21 @@ const HotelBooking = () => {
     for (let i = 0; i < guestList.length; i++) {
       const g = guestList[i];
 
-      if (!g.FirstName.trim() || !g.LastName.trim()) {
-        return `Guest ${i + 1}: First name and last name are required`;
+      const firstName = String(g.FirstName || "").trim();
+
+      if (firstName.length < FIRST_NAME_MIN_LENGTH) {
+        return `Guest ${i + 1}: First Name must be at least 1 character`;
       }
 
-      if (!isValidNameByRules(g.FirstName)) {
+      if (firstName.length > FIRST_NAME_MAX_LENGTH) {
+        return `Guest ${i + 1}: First Name cannot be more than 50 characters`;
+      }
+
+      if (!g.LastName.trim()) {
+        return `Guest ${i + 1}: Last name is required`;
+      }
+
+      if (!isValidFirstNameByRules(g.FirstName)) {
         return `Guest ${i + 1}: First name does not match hotel validation rules`;
       }
 
@@ -1601,18 +1654,9 @@ const HotelBooking = () => {
                   placeholder="First Name"
                   className="input"
                   value={guest.FirstName}
-                  maxLength={
-                    validation.CharLimit && validation.PaxNameMaxLength
-                      ? validation.PaxNameMaxLength
-                      : 50
-                  }
-                  onChange={(e) =>
-                    updateGuest(
-                      index,
-                      "FirstName",
-                      cleanNameInput(e.target.value),
-                    )
-                  }
+                  minLength={FIRST_NAME_MIN_LENGTH}
+                  onBlur={() => handleFirstNameBlur(index)}
+                  onChange={(e) => handleFirstNameChange(index, e.target.value)}
                 />
 
                 <input
