@@ -507,6 +507,61 @@ const getHotelNormsFromReviewData = (data = {}) => {
   );
 };
 
+const normalizeSupplementGroups = (value) => {
+  if (!value) return [];
+
+  const groups = Array.isArray(value) ? value : [value];
+
+  return groups
+    .map((group) => {
+      if (Array.isArray(group)) {
+        return group.flat(Infinity).filter(Boolean);
+      }
+
+      return group ? [group] : [];
+    })
+    .filter((group) => group.length > 0);
+};
+
+const getSupplementsFromReviewData = (data = {}) => {
+  const sources = [
+    data?.supplements,
+    data?.Supplements,
+
+    data?.roomData?.Supplements,
+    data?.roomData?.supplements,
+    data?.roomData?.Supplement,
+
+    data?.hotelResult?.Supplements,
+    data?.hotelResult?.supplements,
+
+    data?.prebookData?.supplements,
+    data?.prebookData?.Supplements,
+    data?.prebookData?.room?.Supplements,
+    data?.prebookData?.room?.supplements,
+
+    data?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0]?.Supplements,
+    data?.prebookData?.raw?.HotelResult?.[0]?.Rooms?.[0]?.supplements,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.Supplements,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.supplements,
+
+    data?.prebookData?.raw?.HotelResult?.[0]?.Supplements,
+    data?.prebookData?.raw?.HotelResult?.[0]?.supplements,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.Supplements,
+    data?.prebookData?.raw?.Response?.HotelResult?.[0]?.supplements,
+  ];
+
+  for (const source of sources) {
+    const normalized = normalizeSupplementGroups(source);
+
+    if (normalized.length > 0) {
+      return normalized;
+    }
+  }
+
+  return [];
+};
+
 const HotelReviewBooking = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -549,43 +604,33 @@ const HotelReviewBooking = () => {
     prebookData?.raw?.Response?.HotelResult?.[0] ||
     {};
 
-  const reviewData = baseReviewData
+  const reviewDataSource = baseReviewData
     ? {
         ...baseReviewData,
         hotel: mergedHotel,
         roomData: mergedRoomData,
         prebookData: mergedPrebookData,
         hotelResult: mergedHotelResult,
+      }
+    : null;
+
+  const reviewData = reviewDataSource
+    ? {
+        ...reviewDataSource,
 
         hotelAddress:
-          baseReviewData?.hotelAddress ||
-          getHotelAddressFromReviewData({
-            ...baseReviewData,
-            hotel: mergedHotel,
-            roomData: mergedRoomData,
-            prebookData: mergedPrebookData,
-            hotelResult: mergedHotelResult,
-          }),
+          reviewDataSource?.hotelAddress ||
+          getHotelAddressFromReviewData(reviewDataSource),
 
         hotelFacilities:
-          baseReviewData?.hotelFacilities ||
-          getHotelFacilitiesFromReviewData({
-            ...baseReviewData,
-            hotel: mergedHotel,
-            roomData: mergedRoomData,
-            prebookData: mergedPrebookData,
-            hotelResult: mergedHotelResult,
-          }),
+          reviewDataSource?.hotelFacilities ||
+          getHotelFacilitiesFromReviewData(reviewDataSource),
 
         hotelNorms:
-          baseReviewData?.hotelNorms ||
-          getHotelNormsFromReviewData({
-            ...baseReviewData,
-            hotel: mergedHotel,
-            roomData: mergedRoomData,
-            prebookData: mergedPrebookData,
-            hotelResult: mergedHotelResult,
-          }),
+          reviewDataSource?.hotelNorms ||
+          getHotelNormsFromReviewData(reviewDataSource),
+
+        supplements: getSupplementsFromReviewData(reviewDataSource),
       }
     : null;
 
@@ -888,6 +933,7 @@ const HotelReviewBooking = () => {
 
       const finalHotelFacilities = getHotelFacilitiesFromReviewData(reviewData);
       const finalHotelNorms = getHotelNormsFromReviewData(reviewData);
+      const finalSupplements = getSupplementsFromReviewData(reviewData);
       const bookingPayload = buildFinalBookingPayload();
 
       console.log("FINAL BOOK PAYLOAD:", bookingPayload);
@@ -937,7 +983,7 @@ const HotelReviewBooking = () => {
 
         cancellationPolicies: reviewData.cancellationPolicies || [],
         roomPromotions: reviewData.roomPromotions || [],
-        supplements: reviewData.supplements || [],
+        supplements: finalSupplements,
         roomAmenities: reviewData.roomAmenities || [],
         rateConditions: reviewData.rateConditions || [],
 
@@ -1000,11 +1046,12 @@ const HotelReviewBooking = () => {
     corporatePAN,
     cancellationPolicies = [],
     roomPromotions = [],
-    supplements = [],
     roomAmenities = [],
     rateConditions = [],
     finalPayload,
   } = reviewData;
+
+  const supplements = getSupplementsFromReviewData(reviewData);
 
   const hotelFacilities = getHotelFacilitiesFromReviewData(reviewData);
 

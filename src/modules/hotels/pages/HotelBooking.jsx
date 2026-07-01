@@ -983,6 +983,7 @@ const HotelBooking = () => {
         hotel,
         roomData,
         hotelResult,
+        prebookData: preBook,
         checkIn,
         checkOut,
         net,
