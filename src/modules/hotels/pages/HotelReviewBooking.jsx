@@ -1533,22 +1533,113 @@ const HotelReviewBooking = () => {
             )}
 
             {supplements.length > 0 && (
-              <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
-                <h3 className="mb-4 font-semibold text-yellow-300">
-                  Supplements
-                </h3>
+              <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+                <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
+                  <span className="text-yellow-300">➕</span>
+                  <h3 className="font-semibold text-yellow-300">Supplements</h3>
+                </div>
 
-                <div className="space-y-3">
-                  {supplements.map((supplement, index) => (
-                    <div
-                      key={index}
-                      className="rounded-xl border border-orange-400/20 bg-orange-400/10 p-4 text-sm text-orange-100"
-                    >
-                      <div className="font-semibold">
-                        {formatSupplementText(supplement)}
-                      </div>
+                <div className="p-5">
+                  <div className="rounded-2xl border border-orange-400/20 bg-linear-to-br from-orange-400/10 via-yellow-400/5 to-transparent p-5">
+                    <div className="space-y-4">
+                      {supplements.map((supplementGroup, groupIndex) => (
+                        <div
+                          key={groupIndex}
+                          className="rounded-2xl border border-orange-400/20 bg-[#0B0B0F]/60 p-4"
+                        >
+                          <div className="space-y-3">
+                            {(Array.isArray(supplementGroup)
+                              ? supplementGroup
+                              : [supplementGroup]
+                            ).map((supplement, index) => {
+                              const price =
+                                supplement?.Price ??
+                                supplement?.Amount ??
+                                supplement?.Charge ??
+                                supplement?.SupplementPrice ??
+                                supplement?.SupplementCharge ??
+                                0;
+
+                              const currency =
+                                supplement?.Currency ||
+                                supplement?.currency ||
+                                reviewData?.prebookData?.currency ||
+                                reviewData?.prebookData?.Currency ||
+                                reviewData?.currency ||
+                                "INR";
+
+                              return (
+                                <div
+                                  key={`${groupIndex}-${index}`}
+                                  className="rounded-xl border border-white/10 bg-white/5 p-4"
+                                >
+                                  <div className="mb-4 flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-xs uppercase tracking-wide text-gray-500">
+                                        Description
+                                      </p>
+
+                                      <h5 className="text-base font-bold text-white">
+                                        {supplement?.Description ||
+                                          supplement?.Name ||
+                                          supplement?.SupplementName ||
+                                          "Supplement"}
+                                      </h5>
+                                    </div>
+
+                                    <div className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-200">
+                                      {supplement?.Type || "AtProperty"}
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                      <p className="text-xs text-gray-500">
+                                        Index
+                                      </p>
+                                      <p className="mt-1 font-semibold text-gray-100">
+                                        {supplement?.Index ?? index + 1}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                      <p className="text-xs text-gray-500">
+                                        Type
+                                      </p>
+                                      <p className="mt-1 font-semibold text-purple-200">
+                                        {supplement?.Type || "-"}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                      <p className="text-xs text-gray-500">
+                                        Price
+                                      </p>
+                                      <p className="mt-1 font-semibold text-green-300">
+                                        {Number(price).toLocaleString("en-IN", {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        })}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                                      <p className="text-xs text-gray-500">
+                                        Currency
+                                      </p>
+                                      <p className="mt-1 font-semibold text-yellow-300">
+                                        {currency || "-"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
             )}
