@@ -55,7 +55,15 @@ const App = () => {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/blogs" element={<Blogs />} />
         <Route path="/blogs/:slug" element={<BlogDetails />} />
-        <Route path="/flights" element={<FlightsResults />} />
+        <Route path="/terms" element={<TermsConditions />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route
+          path="*"
+          element={<h1 className="text-center mt-20">404 - Page Not Found</h1>}
+        />
+
+        {/* Hotels Routes */}
         <Route path="/hotels" element={<HotelResults />} />
         <Route path="/hotels/:id" element={<HotelDetails />} />
         <Route path="/prebook" element={<PrebookLoader />} />
@@ -71,6 +79,9 @@ const App = () => {
           path="/booking-details/:bookingId"
           element={<HotelBookingDetails />}
         />
+
+        {/* Flights Routes*/}
+        <Route path="/flights" element={<FlightsResults />} />
         <Route path="/fare-rule" element={<FareRule />} />
         <Route path="/fare-quote" element={<FareQuote />} />
         <Route path="/ssr" element={<SSRPage />} />
@@ -80,16 +91,6 @@ const App = () => {
         <Route
           path="/flight-booking-details/:id"
           element={<FlightBookingDetails />}
-        />
-        <Route path="/terms" element={<TermsConditions />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/refund-policy" element={<RefundPolicy />} />
-        {/* <Route path="/hotels" element={<HotelPage />} /> */}
-        {/* <Route path="/railways" element={<RailwayPage />} /> */}
-        {/* Optional: 404 Page */}
-        <Route
-          path="*"
-          element={<h1 className="text-center mt-20">404 - Page Not Found</h1>}
         />
       </Routes>
 

@@ -141,11 +141,7 @@ const normalizeRoom = (room = {}, index = 0) => {
     room.booking_code || room.BookingCode || rawRoom?.BookingCode || null;
 
   const price = Number(
-    room.price ??
-      room.TotalFare ??
-      room.MinPrice ??
-      rawRoom?.TotalFare ??
-      0,
+    room.price ?? room.TotalFare ?? room.MinPrice ?? rawRoom?.TotalFare ?? 0,
   );
 
   const tax = Number(

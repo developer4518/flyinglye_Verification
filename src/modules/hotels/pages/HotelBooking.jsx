@@ -895,7 +895,7 @@ const HotelBooking = () => {
       const cleanedGuests = guestList.map((g) => {
         const passenger = {
           RoomIndex: g.RoomIndex,
-          Title: g.PaxType === 2 ? "" : g.Title,
+          Title: g.Title || "Mr",
           FirstName: formatName(g.FirstName),
           MiddleName: "",
           LastName: formatName(g.LastName),
@@ -1633,22 +1633,16 @@ const HotelBooking = () => {
               )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {guest.PaxType === 1 ? (
-                  <select
-                    className="input title-select"
-                    value={guest.Title || "Mr"}
-                    onChange={(e) =>
-                      updateGuest(index, "Title", e.target.value)
-                    }
-                  >
-                    <option value="Mr">Mr</option>
-                    <option value="Mrs">Mrs</option>
-                    <option value="Ms">Ms</option>
-                    <option value="Miss">Miss</option>
-                  </select>
-                ) : (
-                  <div className="hidden sm:block" />
-                )}
+                <select
+                  className="input title-select"
+                  value={guest.Title || "Mr"}
+                  onChange={(e) => updateGuest(index, "Title", e.target.value)}
+                >
+                  <option value="Mr">Mr</option>
+                  <option value="Mrs">Mrs</option>
+                  <option value="Ms">Ms</option>
+                  <option value="Miss">Miss</option>
+                </select>
 
                 <input
                   placeholder="First Name"
