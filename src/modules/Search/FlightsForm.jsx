@@ -7,8 +7,9 @@ import { useFlightStore } from "../../store/flightStore";
 const FlightsForm = () => {
   const navigate = useNavigate();
 
-  // updated store usage
-  const { setFlights, setPassengerCount } = useFlightStore();
+  const { setFlights, setPassengerCount, setSearchTravellers } =
+    useFlightStore();
+
   const [tripType, setTripType] = useState("oneway");
   const [travellersOpen, setTravellersOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,25 +48,27 @@ const FlightsForm = () => {
     "First Class": "6",
   };
 
-  /* CLICK OUTSIDE */
-
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (originRef.current && !originRef.current.contains(e.target))
+      if (originRef.current && !originRef.current.contains(e.target)) {
         setOriginSuggestions([]);
+      }
 
-      if (destinationRef.current && !destinationRef.current.contains(e.target))
+      if (
+        destinationRef.current &&
+        !destinationRef.current.contains(e.target)
+      ) {
         setDestinationSuggestions([]);
+      }
 
-      if (travellerRef.current && !travellerRef.current.contains(e.target))
+      if (travellerRef.current && !travellerRef.current.contains(e.target)) {
         setTravellersOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  /* SEARCH AIRPORT */
 
   const searchAirports = (query) => {
     if (!query) return [];
@@ -83,8 +86,6 @@ const FlightsForm = () => {
       .slice(0, 8);
   };
 
-  /* SWAP */
-
   const swapAirports = () => {
     setFormData((prev) => ({
       ...prev,
@@ -96,34 +97,67 @@ const FlightsForm = () => {
     setDestinationInput(originInput);
   };
 
-  /* SEARCH */
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const validateSearch = () => {
+    const totalTravellers =
+      travellers.adults + travellers.children + travellers.infants;
 
     if (!formData.origin || !formData.destination) {
-      setError("Please select airports");
-      return;
+      return "Please select airports";
     }
 
     if (formData.origin === formData.destination) {
-      setError("Origin and destination cannot be same");
-      return;
+      return "Origin and destination cannot be same";
     }
 
     if (!formData.departure_date) {
-      setError("Please select departure date");
-      return;
+      return "Please select departure date";
+    }
+
+    if (formData.departure_date < today) {
+      return "Departure date cannot be less than today's date";
     }
 
     if (tripType === "roundtrip" && !formData.return_date) {
-      setError("Please select return date");
+      return "Please select return date";
+    }
+
+    if (
+      tripType === "roundtrip" &&
+      formData.return_date &&
+      formData.return_date < formData.departure_date
+    ) {
+      return "Return date cannot be before departure date";
+    }
+
+    if (travellers.adults < 1) {
+      return "At least 1 adult passenger is required";
+    }
+
+    if (travellers.infants > travellers.adults) {
+      return "Infants cannot be more than adults";
+    }
+
+    if (totalTravellers > 9) {
+      return "Total passengers cannot be more than 9";
+    }
+
+    return "";
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+
+    const validationError = validateSearch();
+
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setError("");
     setLoading(true);
 
-    console.log("PAYLOAD:", {
+    const payload = {
       origin: formData.origin,
       destination: formData.destination,
       departure_date: formData.departure_date,
@@ -132,33 +166,53 @@ const FlightsForm = () => {
       children: travellers.children,
       infants: travellers.infants,
       flight_cabin_class: cabinClassMap[travellers.cabin],
-    });
+    };
+
+    console.log("PAYLOAD:", payload);
     try {
-      const response = await publicApi.post("/api/airlines/search/", {
-        origin: formData.origin,
-        destination: formData.destination,
-        departure_date: formData.departure_date,
-        return_date: tripType === "roundtrip" ? formData.return_date : null,
-        adults: travellers.adults,
-        children: travellers.children,
-        infants: travellers.infants,
-        flight_cabin_class: cabinClassMap[travellers.cabin],
-      });
+      const response = await publicApi.post("/api/airlines/search/", payload);
 
       const data = response?.data;
 
-      // ✅ SAFE PARSING (handles any API shape)
-      const results =
-        data?.Response?.Results?.flat?.() || data?.Response?.Results || [];
+      console.log("SEARCH RAW RESPONSE:", data);
 
-      if (!Array.isArray(results) || results.length === 0) {
-        setError("No flights found");
+      const apiResponse =
+        data?.data?.Response || data?.Response || data?.data || data;
+
+      const errorCode = Number(apiResponse?.Error?.ErrorCode || 0);
+      const errorMessage = apiResponse?.Error?.ErrorMessage || "";
+
+      if (errorCode && errorCode !== 0) {
+        setError(errorMessage || "Unable to search flights");
         return;
       }
 
+      const rawResults =
+        apiResponse?.Results ||
+        data?.data?.Response?.Results ||
+        data?.Response?.Results ||
+        [];
+
+      const results = Array.isArray(rawResults)
+        ? rawResults.flat(Infinity).filter(Boolean)
+        : [];
+
+      console.log("PARSED FLIGHT RESULTS:", results);
+
+      if (!results.length) {
+        setError(errorMessage || "No flights found");
+        return;
+      }
+
+      const traceId =
+        apiResponse?.TraceId ||
+        data?.data?.Response?.TraceId ||
+        data?.Response?.TraceId ||
+        null;
+
       setFlights({
         flights: results,
-        traceId: data?.Response?.TraceId || null,
+        traceId,
       });
 
       const totalTravellers =
@@ -166,18 +220,25 @@ const FlightsForm = () => {
 
       setPassengerCount(totalTravellers);
 
+      if (typeof setSearchTravellers === "function") {
+        setSearchTravellers(travellers);
+      }
+
       navigate("/flights");
     } catch (err) {
-      console.error("ERROR:", err);
+      console.error("SEARCH ERROR:", err?.response?.data || err);
+
+      const apiError =
+        err?.response?.data?.data?.Response?.Error?.ErrorMessage ||
+        err?.response?.data?.Response?.Error?.ErrorMessage ||
+        err?.response?.data?.Error?.ErrorMessage ||
+        err?.response?.data?.error ||
+        err?.response?.data?.message;
 
       if (err.message === "Network Error") {
         setError("CORS error: Backend is blocking request");
       } else {
-        setError(
-          err?.response?.data?.error ||
-            err?.response?.data?.message ||
-            "Server error",
-        );
+        setError(apiError || "Server error");
       }
     } finally {
       setLoading(false);
@@ -190,18 +251,20 @@ const FlightsForm = () => {
 
       updated[type] = Math.max(0, prev[type] + value);
 
-      // Minimum 1 adult
       if (updated.adults < 1) updated.adults = 1;
 
-      // Infants cannot exceed adults
       if (updated.infants > updated.adults) {
         updated.infants = updated.adults;
       }
 
       const total = updated.adults + updated.children + updated.infants;
 
-      if (total > 9) return prev;
+      if (total > 9) {
+        setError("Total passengers cannot be more than 9");
+        return prev;
+      }
 
+      setError("");
       return updated;
     });
   };
@@ -211,8 +274,6 @@ const FlightsForm = () => {
 
   return (
     <div className="bg-(--bg-card) border border-(--border-soft) rounded-2xl shadow-2xl p-4 md:p-8 space-y-6 backdrop-blur-md">
-      {/* TRIP TYPE */}
-
       <div className="flex gap-2 text-xs md:text-sm font-semibold">
         {["oneway", "roundtrip"].map((type) => (
           <button
@@ -221,7 +282,6 @@ const FlightsForm = () => {
             onClick={() => {
               setTripType(type);
 
-              // ✅ FIX: clear return date when switching to one-way
               if (type === "oneway") {
                 setFormData((prev) => ({
                   ...prev,
@@ -250,8 +310,6 @@ const FlightsForm = () => {
         onSubmit={handleSearch}
         className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4"
       >
-        {/* FROM */}
-
         <div className="relative md:col-span-5" ref={originRef}>
           <label className="text-xs text-(--text-muted)">From</label>
 
@@ -263,6 +321,10 @@ const FlightsForm = () => {
               const value = e.target.value;
               setOriginInput(value);
               setOriginSuggestions(searchAirports(value));
+
+              if (!value.trim()) {
+                setFormData((prev) => ({ ...prev, origin: "" }));
+              }
             }}
             className="rounded-xl p-3 text-sm w-full transition-all outline-none"
             style={{
@@ -312,8 +374,6 @@ const FlightsForm = () => {
           )}
         </div>
 
-        {/* SWAP */}
-
         <div className="flex justify-center items-end md:col-span-1">
           <button
             type="button"
@@ -324,10 +384,9 @@ const FlightsForm = () => {
           </button>
         </div>
 
-        {/* TO */}
-
         <div className="relative md:col-span-5" ref={destinationRef}>
           <label className="text-xs text-(--text-muted)">To</label>
+
           <input
             type="text"
             placeholder="City or Airport"
@@ -336,6 +395,10 @@ const FlightsForm = () => {
               const value = e.target.value;
               setDestinationInput(value);
               setDestinationSuggestions(searchAirports(value));
+
+              if (!value.trim()) {
+                setFormData((prev) => ({ ...prev, destination: "" }));
+              }
             }}
             className="bg-(--bg-secondary) border border-(--border-soft) rounded-lg p-2.5 text-sm w-full"
           />
@@ -372,20 +435,17 @@ const FlightsForm = () => {
           )}
         </div>
 
-        {/* DATES */}
-
         <div className="grid grid-cols-2 gap-3 md:col-span-6">
           <div>
             <label className="text-xs text-(--text-muted)">Departure</label>
             <input
               type="date"
-              min={formData.departure_date || today}
+              min={today}
               value={formData.departure_date}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
                   departure_date: e.target.value,
-                  // ✅ auto reset invalid return date
                   return_date:
                     prev.return_date && prev.return_date < e.target.value
                       ? ""
@@ -401,16 +461,19 @@ const FlightsForm = () => {
             <input
               type="date"
               disabled={tripType === "oneway"}
+              min={formData.departure_date || today}
               value={formData.return_date}
               onChange={(e) =>
-                setFormData({ ...formData, return_date: e.target.value })
+                setFormData((prev) => ({
+                  ...prev,
+                  return_date: e.target.value,
+                }))
               }
               className="bg-(--bg-secondary) border border-(--border-soft) rounded-lg p-2.5 text-sm w-full"
             />
           </div>
         </div>
 
-        {/* TRAVELLERS */}
         <div className="relative md:col-span-3" ref={travellerRef}>
           <label className="text-xs text-(--text-muted)">
             Travellers & Class
@@ -432,7 +495,7 @@ const FlightsForm = () => {
                 md:top-full md:bottom-auto md:mt-2 md:mb-0
                 left-0
                 w-full md:w-95
-               bg-(--bg-card)
+                bg-(--bg-card)
                 border border-(--border-soft)
                 rounded-2xl
                 shadow-2xl
@@ -443,102 +506,60 @@ const FlightsForm = () => {
               "
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* TRAVELLERS */}
                 <div className="space-y-3">
-                  {/* Adults */}
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-sm">Adults</p>
-                      <p className="text-xs text-(--text-muted)">12+ years</p>
+                  {[
+                    {
+                      key: "adults",
+                      label: "Adults",
+                      subLabel: "12+ years",
+                    },
+                    {
+                      key: "children",
+                      label: "Children",
+                      subLabel: "2-11 years",
+                    },
+                    {
+                      key: "infants",
+                      label: "Infants",
+                      subLabel: "Under 2 years",
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{item.label}</p>
+                        <p className="text-xs text-(--text-muted)">
+                          {item.subLabel}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => updateCount(item.key, -1)}
+                          className="w-8 h-8 border border-(--border-soft) rounded-lg"
+                        >
+                          -
+                        </button>
+
+                        <span className="w-6 text-center">
+                          {travellers[item.key]}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => updateCount(item.key, 1)}
+                          className="w-8 h-8 border border-(--border-soft) rounded-lg"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => updateCount("adults", -1)}
-                        className="w-8 h-8 border border-(--border-soft) rounded-lg"
-                      >
-                        -
-                      </button>
-
-                      <span className="w-6 text-center">
-                        {travellers.adults}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => updateCount("adults", 1)}
-                        className="w-8 h-8 border border-(--border-soft) rounded-lg"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Children */}
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-sm">Children</p>
-                      <p className="text-xs text-(--text-muted)">2-11 years</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => updateCount("children", -1)}
-                        className="w-8 h-8 border border-(--border-soft) rounded-lg"
-                      >
-                        -
-                      </button>
-
-                      <span className="w-6 text-center">
-                        {travellers.children}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => updateCount("children", 1)}
-                        className="w-8 h-8 border border-(--border-soft) rounded-lg"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Infants */}
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-sm">Infants</p>
-                      <p className="text-xs text-(--text-muted)">
-                        Under 2 years
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => updateCount("infants", -1)}
-                        className="w-8 h-8 border border-(--border-soft) rounded-lg"
-                      >
-                        -
-                      </button>
-
-                      <span className="w-6 text-center">
-                        {travellers.infants}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => updateCount("infants", 1)}
-                        className="w-8 h-8 border border-(--border-soft) rounded-lg"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
-                {/* CABIN CLASS */}
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-(--text-muted)">
                     Cabin Class
@@ -555,19 +576,19 @@ const FlightsForm = () => {
                         key={cabin}
                         type="button"
                         onClick={() =>
-                          setTravellers({
-                            ...travellers,
+                          setTravellers((prev) => ({
+                            ...prev,
                             cabin,
-                          })
+                          }))
                         }
                         className={`
-                text-sm px-3 py-2 rounded-lg border transition text-center
-                ${
-                  travellers.cabin === cabin
-                    ? "bg-linear-to-r from-start to-end text-black border-transparent"
-                    : "border-(--border-soft) hover:bg-(--bg-secondary)"
-                }
-              `}
+                          text-sm px-3 py-2 rounded-lg border transition text-center
+                          ${
+                            travellers.cabin === cabin
+                              ? "bg-linear-to-r from-start to-end text-black border-transparent"
+                              : "border-(--border-soft) hover:bg-(--bg-secondary)"
+                          }
+                        `}
                       >
                         {cabin}
                       </button>
@@ -576,7 +597,6 @@ const FlightsForm = () => {
                 </div>
               </div>
 
-              {/* DONE BUTTON */}
               <button
                 type="button"
                 onClick={() => setTravellersOpen(false)}
@@ -587,12 +607,11 @@ const FlightsForm = () => {
             </div>
           )}
         </div>
-        {/* SEARCH */}
 
         <button
           type="submit"
           disabled={loading}
-          className="md:col-span-12 bg-linear-to-r from-start to-end text-black rounded-xl p-3 font-semibold text-base"
+          className="md:col-span-12 bg-linear-to-r from-start to-end text-black rounded-xl p-3 font-semibold text-base disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? "Searching Flights..." : "Search Flights"}
         </button>

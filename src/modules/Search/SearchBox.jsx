@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Tabs from "./Tabs";
 import FlightsForm from "./FlightsForm";
 import { useNavigate } from "react-router-dom";
@@ -8,15 +8,20 @@ const SearchBox = () => {
   const [activeTab, setActiveTab] = useState("flights");
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (activeTab === "packages") {
+      navigate("/packages");
+    }
+  }, [activeTab, navigate]);
+
   const renderForm = () => {
     switch (activeTab) {
       case "flights":
         return <FlightsForm />;
+
       case "hotels":
         return <HotelsForm />;
-      case "packages":
-        navigate("/packages");
-        return null;
+
       default:
         return null;
     }
