@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useCallback } from "react";
 import { useHotelStore } from "../../../store/hotelStore";
+import { privateApi } from "../../../services/api";
 
 const FALLBACK_IMAGE = "https://api.flyinglyte.com/media/hotels/default.jpg";
 
@@ -376,31 +377,264 @@ const getRoomBadges = (room) => {
   return badges;
 };
 
+
+const getVisiblePageNumbers = (currentPage, totalPages) => {
+  const maxVisiblePages = 5;
+
+  let startPage = Math.max(
+    1,
+    Number(currentPage) - Math.floor(maxVisiblePages / 2),
+  );
+
+  let endPage = Math.min(
+    Number(totalPages),
+    startPage + maxVisiblePages - 1,
+  );
+
+  startPage = Math.max(1, endPage - maxVisiblePages + 1);
+
+  return Array.from(
+    { length: Math.max(0, endPage - startPage + 1) },
+    (_, index) => startPage + index,
+  );
+};
+
+const getHotelResponse = (hotels) => {
+  if (
+    hotels?.data &&
+    typeof hotels.data === "object" &&
+    !Array.isArray(hotels.data)
+  ) {
+    return hotels.data;
+  }
+
+  return hotels || {};
+};
+
+const getSearchPayload = ({
+  search,
+  hotelResponse,
+  page,
+  pageSize,
+}) => {
+  const savedPayload =
+    search?.requestPayload ||
+    search?.searchPayload ||
+    search?.apiPayload ||
+    search?.payload ||
+    hotelResponse?.request_payload ||
+    hotelResponse?.search_payload ||
+    {};
+
+  const cityCode =
+    savedPayload?.CityCode ||
+    savedPayload?.city_code ||
+    savedPayload?.cityCode ||
+    search?.cityCode ||
+    search?.city?.code ||
+    search?.city?.Code ||
+    search?.city?.value ||
+    search?.city;
+
+  const roomGuests = Array.isArray(search?.guests?.roomGuests)
+    ? search.guests.roomGuests
+    : [];
+
+  const paxRoomsFromGuests = roomGuests.map((room) => {
+    const children = Number(room?.Children ?? room?.children ?? 0);
+
+    const childrenAges = (
+      room?.ChildrenAges ||
+      room?.ChildAges ||
+      room?.childAges ||
+      []
+    )
+      .slice(0, children)
+      .map((age) => Number(age))
+      .filter((age) => Number.isFinite(age) && age >= 1 && age <= 12);
+
+    return {
+      Adults: Number(room?.Adults ?? room?.adults ?? 1),
+      Children: children,
+      ChildrenAges: childrenAges,
+    };
+  });
+
+  const fallbackPaxRooms =
+    paxRoomsFromGuests.length > 0
+      ? paxRoomsFromGuests
+      : Array.isArray(hotelResponse?.pax_rooms) &&
+          hotelResponse.pax_rooms.length > 0
+        ? hotelResponse.pax_rooms
+        : [
+            {
+              Adults: Number(search?.guests?.adults || 1),
+              Children: Number(search?.guests?.children || 0),
+              ChildrenAges: Array.isArray(search?.guests?.childAges)
+                ? search.guests.childAges.map(Number)
+                : [],
+            },
+          ];
+
+  const checkIn =
+    savedPayload?.CheckIn ||
+    savedPayload?.check_in ||
+    savedPayload?.checkIn ||
+    search?.checkIn;
+
+  const checkOut =
+    savedPayload?.CheckOut ||
+    savedPayload?.check_out ||
+    savedPayload?.checkOut ||
+    search?.checkOut;
+
+  const nationality =
+    savedPayload?.GuestNationality ||
+    savedPayload?.guest_nationality ||
+    savedPayload?.nationality ||
+    search?.nationality ||
+    hotelResponse?.nationality ||
+    "IN";
+
+  const currency =
+    savedPayload?.Currency ||
+    savedPayload?.currency ||
+    search?.currency ||
+    hotelResponse?.currency ||
+    "INR";
+
+  return {
+    ...savedPayload,
+
+    // Common backend/TBO field names
+    CityCode: savedPayload?.CityCode ?? cityCode,
+    CheckIn: savedPayload?.CheckIn ?? checkIn,
+    CheckOut: savedPayload?.CheckOut ?? checkOut,
+    GuestNationality: savedPayload?.GuestNationality ?? nationality,
+    PaxRooms: savedPayload?.PaxRooms ?? fallbackPaxRooms,
+    Currency: savedPayload?.Currency ?? currency,
+
+    // Also preserve snake/camel-case variants used by custom backends
+    city_code: savedPayload?.city_code ?? cityCode,
+    check_in: savedPayload?.check_in ?? checkIn,
+    check_out: savedPayload?.check_out ?? checkOut,
+    guest_nationality:
+      savedPayload?.guest_nationality ?? nationality,
+    pax_rooms: savedPayload?.pax_rooms ?? fallbackPaxRooms,
+    currency: savedPayload?.currency ?? currency,
+
+    page: Number(page),
+    page_size: Number(pageSize),
+  };
+};
+
 const HotelResults = () => {
   const navigate = useNavigate();
 
-  const { hotels, search, setSelectedHotel, setSelectedRoom, selectHotelRoom } =
-    useHotelStore();
+  const {
+    hotels,
+    search,
+    setHotels,
+    setSelectedHotel,
+    setSelectedRoom,
+    selectHotelRoom,
+  } = useHotelStore();
 
   const { city, cityName, checkIn, checkOut, guests } = search || {};
 
-  const displayCity = cityName || city || "Destination";
+  const displayCity =
+    cityName ||
+    city?.name ||
+    city?.Name ||
+    city?.label ||
+    city?.Label ||
+    (typeof city === "string" ? city : "") ||
+    "Destination";
 
   const totalGuests =
     Number(guests?.adults || 0) + Number(guests?.children || 0);
 
   const childAges = Array.isArray(guests?.childAges) ? guests.childAges : [];
 
+  const hotelResponse = useMemo(
+    () => getHotelResponse(hotels),
+    [hotels],
+  );
+
   const hotelList = useMemo(() => {
     let list = [];
 
-    if (Array.isArray(hotels)) list = hotels;
-    else if (Array.isArray(hotels?.HotelResult)) list = hotels.HotelResult;
-    else if (Array.isArray(hotels?.results)) list = hotels.results;
-    else if (Array.isArray(hotels?.data)) list = hotels.data;
+    if (Array.isArray(hotelResponse)) {
+      list = hotelResponse;
+    } else if (Array.isArray(hotelResponse?.HotelResult)) {
+      list = hotelResponse.HotelResult;
+    } else if (Array.isArray(hotelResponse?.results)) {
+      list = hotelResponse.results;
+    } else if (Array.isArray(hotelResponse?.data)) {
+      list = hotelResponse.data;
+    }
 
     return list.map(normalizeHotel);
-  }, [hotels]);
+  }, [hotelResponse]);
+
+  const currentPage = Math.max(
+    1,
+    Number(hotelResponse?.page || hotelResponse?.current_page || 1),
+  );
+
+  const pageSize = Math.max(
+    1,
+    Number(hotelResponse?.page_size || hotelResponse?.limit || 20),
+  );
+
+  const totalPages = Math.max(
+    1,
+    Number(
+      hotelResponse?.total_pages ||
+        hotelResponse?.totalPages ||
+        Math.ceil(
+          Number(
+            hotelResponse?.count ||
+              hotelResponse?.total_tbo_hotels_found ||
+              hotelList.length,
+          ) / pageSize,
+        ) ||
+        1,
+    ),
+  );
+
+  const totalHotels = Math.max(
+    0,
+    Number(
+      hotelResponse?.count ||
+        hotelResponse?.total_tbo_hotels_found ||
+        hotelResponse?.total ||
+        hotelList.length,
+    ),
+  );
+
+  const hasNext =
+    hotelResponse?.has_next ??
+    hotelResponse?.hasNext ??
+    currentPage < totalPages;
+
+  const hasPrevious =
+    hotelResponse?.has_previous ??
+    hotelResponse?.hasPrevious ??
+    currentPage > 1;
+
+  const visiblePageNumbers = useMemo(
+    () => getVisiblePageNumbers(currentPage, totalPages),
+    [currentPage, totalPages],
+  );
+
+  const firstVisibleHotel =
+    totalHotels === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+
+  const lastVisibleHotel = Math.min(
+    currentPage * pageSize,
+    totalHotels,
+  );
 
   const [sort, setSort] = useState("price");
   const [priceRange, setPriceRange] = useState([0, 200000]);
@@ -408,6 +642,8 @@ const HotelResults = () => {
   const [onlyRefundable, setOnlyRefundable] = useState(false);
   const [mealType, setMealType] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [paginationError, setPaginationError] = useState("");
 
   const filteredHotels = useMemo(() => {
     const filtered = hotelList.filter((hotel) => {
@@ -434,6 +670,109 @@ const HotelResults = () => {
       return 0;
     });
   }, [hotelList, sort, priceRange, minRating, onlyRefundable, mealType]);
+
+  const updateHotelResponse = useCallback(
+    (responseData) => {
+      if (typeof setHotels === "function") {
+        setHotels(responseData);
+        return;
+      }
+
+      // Zustand fallback when the store does not expose setHotels.
+      if (typeof useHotelStore.setState === "function") {
+        useHotelStore.setState({ hotels: responseData });
+      }
+    },
+    [setHotels],
+  );
+
+  const handlePageChange = useCallback(
+    async (requestedPage) => {
+      const nextPage = Number(requestedPage);
+
+      if (
+        pageLoading ||
+        nextPage < 1 ||
+        nextPage > totalPages ||
+        nextPage === currentPage
+      ) {
+        return;
+      }
+
+      setPageLoading(true);
+      setPaginationError("");
+
+      const endpoint =
+        search?.requestEndpoint ||
+        search?.endpoint ||
+        "/api/hotels/search-hotels/";
+
+      const requestMethod = String(
+        search?.requestMethod || search?.method || "post",
+      ).toLowerCase();
+
+      const requestPayload = getSearchPayload({
+        search,
+        hotelResponse,
+        page: nextPage,
+        pageSize,
+      });
+
+      try {
+        let response;
+
+        if (requestMethod === "get") {
+          response = await privateApi.get(endpoint, {
+            params: requestPayload,
+          });
+        } else {
+          response = await privateApi.post(endpoint, requestPayload);
+        }
+
+        const responseData = response?.data?.data || response?.data || {};
+
+        if (
+          !Array.isArray(responseData?.results) &&
+          !Array.isArray(responseData?.HotelResult) &&
+          !Array.isArray(responseData?.data)
+        ) {
+          throw new Error(
+            "Pagination response does not contain a hotel results array.",
+          );
+        }
+
+        updateHotelResponse(responseData);
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      } catch (error) {
+        console.error(
+          "HOTEL PAGINATION ERROR:",
+          error?.response?.data || error,
+        );
+
+        setPaginationError(
+          error?.response?.data?.message ||
+            error?.response?.data?.error ||
+            error?.message ||
+            "Unable to load this hotel page.",
+        );
+      } finally {
+        setPageLoading(false);
+      }
+    },
+    [
+      pageLoading,
+      totalPages,
+      currentPage,
+      search,
+      hotelResponse,
+      pageSize,
+      updateHotelResponse,
+    ],
+  );
 
   const handleView = useCallback(
     (hotel, room) => {
@@ -579,8 +918,10 @@ const HotelResults = () => {
             <p className="text-xs md:text-sm text-gray-400 mt-1">
               {checkIn || "Check-in"} → {checkOut || "Check-out"} •{" "}
               {totalGuests || 1} Guest{totalGuests > 1 ? "s" : ""} •{" "}
-              {guests?.rooms || 1} Room
-              {Number(guests?.rooms || 1) > 1 ? "s" : ""}
+              {guests?.rooms || guests?.roomGuests?.length || 1} Room
+              {Number(guests?.rooms || guests?.roomGuests?.length || 1) > 1
+                ? "s"
+                : ""}
             </p>
 
             {childAges.length > 0 && (
@@ -593,11 +934,11 @@ const HotelResults = () => {
 
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-300 border border-green-500/20">
-              All Hotel Feed
+              {totalHotels || hotelList.length} Hotels Found
             </span>
 
             <span className="px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
-              INR Exact Price
+              Page {currentPage} of {totalPages}
             </span>
           </div>
         </div>
@@ -620,6 +961,18 @@ const HotelResults = () => {
         </div>
 
         <div className="md:col-span-3 space-y-5">
+          {paginationError && (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              {paginationError}
+            </div>
+          )}
+
+          {pageLoading && (
+            <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-200">
+              Loading page {currentPage < totalPages ? currentPage + 1 : currentPage}…
+            </div>
+          )}
+
           {filteredHotels.length === 0 ? (
             <div className="bg-[#15151C] p-10 rounded-2xl text-center border border-gray-800">
               <p className="text-lg text-gray-300">No hotels found</p>
@@ -630,6 +983,7 @@ const HotelResults = () => {
           ) : (
             filteredHotels.map((hotel, index) => {
               const defaultRoom = hotel.selected_room || hotel.rooms?.[0];
+
               const hotelImage =
                 hotel.image ||
                 hotel.images?.[0] ||
@@ -640,7 +994,9 @@ const HotelResults = () => {
               return (
                 <div
                   key={`${hotel.hotel_code || hotel.HotelCode || index}-${index}`}
-                  className="group bg-[#15151C] rounded-2xl border border-gray-800 hover:border-yellow-400/40 transition overflow-hidden shadow-lg shadow-black/20"
+                  className={`group bg-[#15151C] rounded-2xl border border-gray-800 hover:border-yellow-400/40 transition overflow-hidden shadow-lg shadow-black/20 ${
+                    pageLoading ? "opacity-60 pointer-events-none" : ""
+                  }`}
                 >
                   <div className="flex flex-col lg:flex-row">
                     <div className="relative w-full lg:w-60 h-44 sm:h-48 lg:h-52 shrink-0 bg-[#0B0B0F]">
@@ -689,9 +1045,7 @@ const HotelResults = () => {
                                 .map((item, i) => (
                                   <span
                                     key={i}
-                                    className="px-2 py-1 rounded-full text-[11px]
-          bg-emerald-500/10 border border-emerald-500/20
-          text-emerald-300"
+                                    className="px-2 py-1 rounded-full text-[11px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
                                   >
                                     ✓ {item.trim()}
                                   </span>
@@ -727,6 +1081,7 @@ const HotelResults = () => {
                           <button
                             onClick={() => handleView(hotel, defaultRoom)}
                             disabled={
+                              pageLoading ||
                               !(
                                 defaultRoom?.booking_code ||
                                 defaultRoom?.BookingCode ||
@@ -746,6 +1101,113 @@ const HotelResults = () => {
                 </div>
               );
             })
+          )}
+
+          {totalPages > 1 && (
+            <div className="mt-8 bg-[#15151C] border border-gray-800 rounded-2xl p-4 md:p-5">
+              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                <div>
+                  <p className="text-sm text-gray-300">
+                    Showing{" "}
+                    <span className="font-semibold text-yellow-300">
+                      {firstVisibleHotel}
+                    </span>{" "}
+                    –{" "}
+                    <span className="font-semibold text-yellow-300">
+                      {lastVisibleHotel}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold text-yellow-300">
+                      {totalHotels}
+                    </span>{" "}
+                    hotels
+                  </p>
+
+                  <p className="text-xs text-gray-500 mt-1">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={
+                      pageLoading || !hasPrevious || currentPage <= 1
+                    }
+                    className="px-3 py-2 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm text-gray-300 hover:border-yellow-400 hover:text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    ← Previous
+                  </button>
+
+                  {visiblePageNumbers[0] > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handlePageChange(1)}
+                        disabled={pageLoading}
+                        className="w-10 h-10 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm hover:border-yellow-400 transition disabled:opacity-40"
+                      >
+                        1
+                      </button>
+
+                      {visiblePageNumbers[0] > 2 && (
+                        <span className="px-1 text-gray-500">…</span>
+                      )}
+                    </>
+                  )}
+
+                  {visiblePageNumbers.map((pageNumber) => (
+                    <button
+                      type="button"
+                      key={pageNumber}
+                      onClick={() => handlePageChange(pageNumber)}
+                      disabled={pageLoading || pageNumber === currentPage}
+                      aria-current={
+                        pageNumber === currentPage ? "page" : undefined
+                      }
+                      className={`w-10 h-10 rounded-lg border text-sm font-semibold transition ${
+                        pageNumber === currentPage
+                          ? "bg-yellow-400 border-yellow-400 text-black"
+                          : "bg-[#0B0B0F] border-gray-700 text-gray-300 hover:border-yellow-400 hover:text-yellow-300"
+                      } disabled:cursor-not-allowed`}
+                    >
+                      {pageNumber}
+                    </button>
+                  ))}
+
+                  {visiblePageNumbers[visiblePageNumbers.length - 1] <
+                    totalPages && (
+                    <>
+                      {visiblePageNumbers[visiblePageNumbers.length - 1] <
+                        totalPages - 1 && (
+                        <span className="px-1 text-gray-500">…</span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handlePageChange(totalPages)}
+                        disabled={pageLoading}
+                        className="w-10 h-10 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm hover:border-yellow-400 transition disabled:opacity-40"
+                      >
+                        {totalPages}
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={
+                      pageLoading || !hasNext || currentPage >= totalPages
+                    }
+                    className="px-3 py-2 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm text-gray-300 hover:border-yellow-400 hover:text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    {pageLoading ? "Loading..." : "Next →"}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
