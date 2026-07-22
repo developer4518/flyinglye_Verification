@@ -14,6 +14,8 @@ const MIN_CHILD_AGE = 1;
 const MAX_CHILD_AGE = 12;
 const HOTEL_CODES_PER_REQUEST = 100;
 const RESPONSE_TIME_SECONDS = 23;
+const HOTEL_PAGE_SIZE = 20;
+const HOTEL_SEARCH_ENDPOINT = "/api/hotels/search-hotels/";
 
 const INDIA_NATIONALITY = {
   Code: "IN",
@@ -538,6 +540,10 @@ const HotelsForm = () => {
       GuestNationality: finalNationality,
       currency: "INR",
       pax_rooms: JSON.stringify(paxRooms),
+
+      // Backend pagination
+      page: 1,
+      page_size: HOTEL_PAGE_SIZE,
     };
 
     const domesticApiParams = {
@@ -579,30 +585,58 @@ const HotelsForm = () => {
       ? baseApiParams
       : domesticApiParams;
 
+    /*
+     * Store the exact request used for page 1.
+     * HotelResults will reuse these params and only change page/page_size.
+     */
+    const paginatedSearchPayload = {
+      ...searchPayload,
+      requestParams: apiParams,
+      requestEndpoint: HOTEL_SEARCH_ENDPOINT,
+      requestMethod: "get",
+      page: 1,
+      pageSize: HOTEL_PAGE_SIZE,
+    };
+
     try {
       resetFlow();
       setLocalLoading(true);
       setLoading(true);
       setError("");
 
-      setSearch(searchPayload);
-      localStorage.setItem("hotelSearchPayload", JSON.stringify(searchPayload));
+      setSearch(paginatedSearchPayload);
+      localStorage.setItem(
+        "hotelSearchPayload",
+        JSON.stringify(paginatedSearchPayload),
+      );
 
       console.log("FINAL HOTEL SEARCH PARAMS:", apiParams);
 
-      const res = await publicApi.get("/api/hotels/search-hotels/", {
+      const res = await publicApi.get(HOTEL_SEARCH_ENDPOINT, {
         params: apiParams,
       });
 
       console.log("HOTEL SEARCH RESPONSE:", res.data);
 
+      /*
+       * Support both response shapes:
+       * 1. { count, page, total_pages, results }
+       * 2. { data: { count, page, total_pages, results } }
+       */
+      const hotelResponse =
+        res.data?.data &&
+        typeof res.data.data === "object" &&
+        !Array.isArray(res.data.data) &&
+        (Array.isArray(res.data.data.results) ||
+          Array.isArray(res.data.data.HotelResult) ||
+          Array.isArray(res.data.data.hotels))
+          ? res.data.data
+          : res.data;
+
       const hotelsData =
-        res.data?.data?.HotelResult ||
-        res.data?.HotelResult ||
-        res.data?.results ||
-        res.data?.data?.results ||
-        res.data?.hotels ||
-        res.data?.data?.hotels ||
+        hotelResponse?.HotelResult ||
+        hotelResponse?.results ||
+        hotelResponse?.hotels ||
         [];
 
       if (!Array.isArray(hotelsData) || hotelsData.length === 0) {
@@ -617,8 +651,12 @@ const HotelsForm = () => {
         return;
       }
 
-      setSearch(searchPayload);
-      setHotels(res.data);
+      /*
+       * Keep the complete response object. Do not store only hotelsData,
+       * otherwise total_pages/count/has_next will be lost.
+       */
+      setSearch(paginatedSearchPayload);
+      setHotels(hotelResponse);
 
       navigate("/hotels");
     } catch (err) {

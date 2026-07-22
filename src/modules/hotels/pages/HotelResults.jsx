@@ -545,6 +545,120 @@ const getSearchPayload = ({ search, hotelResponse, page, pageSize }) => {
   };
 };
 
+const PaginationControls = ({
+  currentPage,
+  totalPages,
+  totalHotels,
+  firstVisibleHotel,
+  lastVisibleHotel,
+  visiblePageNumbers,
+  hasPrevious,
+  hasNext,
+  pageLoading,
+  handlePageChange,
+  className = "",
+}) => {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div
+      className={`${className} bg-[#15151C] border border-gray-800 rounded-2xl p-4 md:p-5`}
+    >
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <div>
+          <p className="text-sm text-gray-300">
+            Showing{" "}
+            <span className="font-semibold text-yellow-300">
+              {firstVisibleHotel}
+            </span>{" "}
+            –{" "}
+            <span className="font-semibold text-yellow-300">
+              {lastVisibleHotel}
+            </span>{" "}
+            of{" "}
+            <span className="font-semibold text-yellow-300">{totalHotels}</span>{" "}
+            hotels
+          </p>
+
+          <p className="text-xs text-gray-500 mt-1">
+            Page {currentPage} of {totalPages}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={pageLoading || !hasPrevious || currentPage <= 1}
+            className="px-3 py-2 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm text-gray-300 hover:border-yellow-400 hover:text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            ← Previous
+          </button>
+
+          {visiblePageNumbers[0] > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => handlePageChange(1)}
+                disabled={pageLoading}
+                className="w-10 h-10 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm hover:border-yellow-400 transition disabled:opacity-40"
+              >
+                1
+              </button>
+
+              {visiblePageNumbers[0] > 2 && (
+                <span className="px-1 text-gray-500">…</span>
+              )}
+            </>
+          )}
+
+          {visiblePageNumbers.map((pageNumber) => (
+            <button
+              type="button"
+              key={pageNumber}
+              onClick={() => handlePageChange(pageNumber)}
+              disabled={pageLoading || pageNumber === currentPage}
+              aria-current={pageNumber === currentPage ? "page" : undefined}
+              className={`w-10 h-10 rounded-lg border text-sm font-semibold transition ${
+                pageNumber === currentPage
+                  ? "bg-yellow-400 border-yellow-400 text-black"
+                  : "bg-[#0B0B0F] border-gray-700 text-gray-300 hover:border-yellow-400 hover:text-yellow-300"
+              } disabled:cursor-not-allowed`}
+            >
+              {pageNumber}
+            </button>
+          ))}
+
+          {visiblePageNumbers[visiblePageNumbers.length - 1] < totalPages && (
+            <>
+              {visiblePageNumbers[visiblePageNumbers.length - 1] <
+                totalPages - 1 && <span className="px-1 text-gray-500">…</span>}
+
+              <button
+                type="button"
+                onClick={() => handlePageChange(totalPages)}
+                disabled={pageLoading}
+                className="w-10 h-10 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm hover:border-yellow-400 transition disabled:opacity-40"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={pageLoading || !hasNext || currentPage >= totalPages}
+            className="px-3 py-2 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm text-gray-300 hover:border-yellow-400 hover:text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            {pageLoading ? "Loading..." : "Next →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HotelResults = () => {
   const navigate = useNavigate();
 
@@ -1072,6 +1186,20 @@ const HotelResults = () => {
             </div>
           )}
 
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalHotels={totalHotels}
+            firstVisibleHotel={firstVisibleHotel}
+            lastVisibleHotel={lastVisibleHotel}
+            visiblePageNumbers={visiblePageNumbers}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+            pageLoading={pageLoading}
+            handlePageChange={handlePageChange}
+            className="mb-2"
+          />
+
           {filteredHotels.length === 0 ? (
             <div className="bg-[#15151C] p-10 rounded-2xl text-center border border-gray-800">
               <p className="text-lg text-gray-300">No hotels found</p>
@@ -1202,110 +1330,19 @@ const HotelResults = () => {
             })
           )}
 
-          {totalPages > 1 && (
-            <div className="mt-8 bg-[#15151C] border border-gray-800 rounded-2xl p-4 md:p-5">
-              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-                <div>
-                  <p className="text-sm text-gray-300">
-                    Showing{" "}
-                    <span className="font-semibold text-yellow-300">
-                      {firstVisibleHotel}
-                    </span>{" "}
-                    –{" "}
-                    <span className="font-semibold text-yellow-300">
-                      {lastVisibleHotel}
-                    </span>{" "}
-                    of{" "}
-                    <span className="font-semibold text-yellow-300">
-                      {totalHotels}
-                    </span>{" "}
-                    hotels
-                  </p>
-
-                  <p className="text-xs text-gray-500 mt-1">
-                    Page {currentPage} of {totalPages}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={pageLoading || !hasPrevious || currentPage <= 1}
-                    className="px-3 py-2 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm text-gray-300 hover:border-yellow-400 hover:text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                  >
-                    ← Previous
-                  </button>
-
-                  {visiblePageNumbers[0] > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handlePageChange(1)}
-                        disabled={pageLoading}
-                        className="w-10 h-10 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm hover:border-yellow-400 transition disabled:opacity-40"
-                      >
-                        1
-                      </button>
-
-                      {visiblePageNumbers[0] > 2 && (
-                        <span className="px-1 text-gray-500">…</span>
-                      )}
-                    </>
-                  )}
-
-                  {visiblePageNumbers.map((pageNumber) => (
-                    <button
-                      type="button"
-                      key={pageNumber}
-                      onClick={() => handlePageChange(pageNumber)}
-                      disabled={pageLoading || pageNumber === currentPage}
-                      aria-current={
-                        pageNumber === currentPage ? "page" : undefined
-                      }
-                      className={`w-10 h-10 rounded-lg border text-sm font-semibold transition ${
-                        pageNumber === currentPage
-                          ? "bg-yellow-400 border-yellow-400 text-black"
-                          : "bg-[#0B0B0F] border-gray-700 text-gray-300 hover:border-yellow-400 hover:text-yellow-300"
-                      } disabled:cursor-not-allowed`}
-                    >
-                      {pageNumber}
-                    </button>
-                  ))}
-
-                  {visiblePageNumbers[visiblePageNumbers.length - 1] <
-                    totalPages && (
-                    <>
-                      {visiblePageNumbers[visiblePageNumbers.length - 1] <
-                        totalPages - 1 && (
-                        <span className="px-1 text-gray-500">…</span>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handlePageChange(totalPages)}
-                        disabled={pageLoading}
-                        className="w-10 h-10 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm hover:border-yellow-400 transition disabled:opacity-40"
-                      >
-                        {totalPages}
-                      </button>
-                    </>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={
-                      pageLoading || !hasNext || currentPage >= totalPages
-                    }
-                    className="px-3 py-2 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm text-gray-300 hover:border-yellow-400 hover:text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                  >
-                    {pageLoading ? "Loading..." : "Next →"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalHotels={totalHotels}
+            firstVisibleHotel={firstVisibleHotel}
+            lastVisibleHotel={lastVisibleHotel}
+            visiblePageNumbers={visiblePageNumbers}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+            pageLoading={pageLoading}
+            handlePageChange={handlePageChange}
+            className="mt-8"
+          />
         </div>
       </div>
 
