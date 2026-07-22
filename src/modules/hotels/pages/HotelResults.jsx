@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useHotelStore } from "../../../store/hotelStore";
 import { publicApi } from "../../../services/api";
 
@@ -377,7 +377,6 @@ const getRoomBadges = (room) => {
   return badges;
 };
 
-
 const getVisiblePageNumbers = (currentPage, totalPages) => {
   const maxVisiblePages = 5;
 
@@ -386,10 +385,7 @@ const getVisiblePageNumbers = (currentPage, totalPages) => {
     Number(currentPage) - Math.floor(maxVisiblePages / 2),
   );
 
-  let endPage = Math.min(
-    Number(totalPages),
-    startPage + maxVisiblePages - 1,
-  );
+  let endPage = Math.min(Number(totalPages), startPage + maxVisiblePages - 1);
 
   startPage = Math.max(1, endPage - maxVisiblePages + 1);
 
@@ -411,25 +407,13 @@ const getHotelResponse = (hotels) => {
   return hotels || {};
 };
 
-const toJsonQueryValue = (value, fallback = []) => {
-  const finalValue = value ?? fallback;
-
-  if (typeof finalValue === "string") {
-    return finalValue;
-  }
-
-  try {
-    return JSON.stringify(finalValue);
-  } catch {
-    return JSON.stringify(fallback);
-  }
-};
-
-const getSearchParams = ({ search, hotelResponse, page, pageSize }) => {
-  // Reuse the exact parameters saved by the original hotel search first.
+const getSearchPayload = ({ search, hotelResponse, page, pageSize }) => {
+  /*
+   * Reuse the exact parameters from the original search whenever available.
+   * This is important for city code, nationality, multi-room data and child ages.
+   */
   const savedParams =
     search?.requestParams ||
-    search?.params ||
     search?.requestPayload ||
     search?.searchPayload ||
     search?.apiPayload ||
@@ -439,43 +423,44 @@ const getSearchParams = ({ search, hotelResponse, page, pageSize }) => {
     hotelResponse?.search_payload ||
     {};
 
-  const city =
-    savedParams?.city ??
-    savedParams?.city_code ??
-    savedParams?.CityCode ??
-    search?.cityCode ??
-    search?.city?.code ??
-    search?.city?.Code ??
-    search?.city?.value ??
+  const cityCode =
+    savedParams?.city ||
+    savedParams?.city_code ||
+    savedParams?.cityCode ||
+    savedParams?.CityCode ||
+    search?.cityCode ||
+    search?.city?.code ||
+    search?.city?.Code ||
+    search?.city?.value ||
     search?.city;
 
   const roomGuests = Array.isArray(search?.guests?.roomGuests)
     ? search.guests.roomGuests
     : [];
 
-  const normalizedPaxRooms =
-    roomGuests.length > 0
-      ? roomGuests.map((room) => {
-          const children = Number(room?.Children ?? room?.children ?? 0);
+  const paxRoomsFromGuests = roomGuests.map((room) => {
+    const children = Number(room?.Children ?? room?.children ?? 0);
 
-          const childrenAges = (
-            room?.ChildrenAges ||
-            room?.ChildAges ||
-            room?.childAges ||
-            []
-          )
-            .slice(0, children)
-            .map(Number)
-            .filter(
-              (age) => Number.isFinite(age) && age >= 1 && age <= 12,
-            );
+    const childrenAges = (
+      room?.ChildrenAges ||
+      room?.ChildAges ||
+      room?.childAges ||
+      []
+    )
+      .slice(0, children)
+      .map(Number)
+      .filter((age) => Number.isFinite(age) && age >= 1 && age <= 12);
 
-          return {
-            Adults: Number(room?.Adults ?? room?.adults ?? 1),
-            Children: children,
-            ChildrenAges: childrenAges,
-          };
-        })
+    return {
+      Adults: Number(room?.Adults ?? room?.adults ?? 1),
+      Children: children,
+      ChildrenAges: childrenAges,
+    };
+  });
+
+  const fallbackPaxRooms =
+    paxRoomsFromGuests.length > 0
+      ? paxRoomsFromGuests
       : Array.isArray(hotelResponse?.pax_rooms) &&
           hotelResponse.pax_rooms.length > 0
         ? hotelResponse.pax_rooms
@@ -489,77 +474,71 @@ const getSearchParams = ({ search, hotelResponse, page, pageSize }) => {
             },
           ];
 
-  const adults = normalizedPaxRooms.reduce(
+  const checkIn =
+    savedParams?.checkin ||
+    savedParams?.check_in ||
+    savedParams?.checkIn ||
+    savedParams?.CheckIn ||
+    search?.checkIn;
+
+  const checkOut =
+    savedParams?.checkout ||
+    savedParams?.check_out ||
+    savedParams?.checkOut ||
+    savedParams?.CheckOut ||
+    search?.checkOut;
+
+  const adults = fallbackPaxRooms.reduce(
     (total, room) => total + Number(room?.Adults || 0),
     0,
   );
 
-  const children = normalizedPaxRooms.reduce(
+  const children = fallbackPaxRooms.reduce(
     (total, room) => total + Number(room?.Children || 0),
     0,
   );
 
-  const childAges = normalizedPaxRooms.flatMap((room) =>
-    Array.isArray(room?.ChildrenAges) ? room.ChildrenAges : [],
+  const childAges = fallbackPaxRooms.flatMap((room) =>
+    Array.isArray(room?.ChildrenAges) ? room.ChildrenAges.map(Number) : [],
   );
 
-  const checkin =
-    savedParams?.checkin ??
-    savedParams?.check_in ??
-    savedParams?.checkIn ??
-    savedParams?.CheckIn ??
-    search?.checkIn;
-
-  const checkout =
-    savedParams?.checkout ??
-    savedParams?.check_out ??
-    savedParams?.checkOut ??
-    savedParams?.CheckOut ??
-    search?.checkOut;
-
   const nationality =
-    savedParams?.nationality ??
-    savedParams?.guest_nationality ??
-    savedParams?.GuestNationality ??
-    search?.nationality ??
-    hotelResponse?.nationality ??
+    savedParams?.nationality ||
+    savedParams?.guest_nationality ||
+    savedParams?.GuestNationality ||
+    search?.nationality ||
+    hotelResponse?.nationality ||
     "IN";
 
   const currency =
-    savedParams?.currency ??
-    savedParams?.Currency ??
-    search?.currency ??
-    hotelResponse?.currency ??
+    savedParams?.currency ||
+    savedParams?.Currency ||
+    search?.currency ||
+    hotelResponse?.currency ||
     "INR";
 
   return {
     ...savedParams,
 
-    // Exact query names used by the hotel search endpoint.
-    city,
-    checkin,
-    checkout,
-    adults: Number(savedParams?.adults ?? adults || 1),
-    children: Number(savedParams?.children ?? children || 0),
-    rooms: Number(
-      savedParams?.rooms ??
-        search?.guests?.rooms ??
-        search?.guests?.roomGuests?.length ??
-        normalizedPaxRooms.length ??
-        1,
-    ),
+    // Exact query names used by /api/hotels/search-hotels/
+    city: savedParams?.city ?? cityCode,
+    checkin: savedParams?.checkin ?? checkIn,
+    checkout: savedParams?.checkout ?? checkOut,
+    adults: Number(savedParams?.adults ?? (adults || 1)),
+    children: Number(savedParams?.children ?? (children || 0)),
+    rooms: Number(savedParams?.rooms ?? (fallbackPaxRooms.length || 1)),
     nationality,
     currency,
 
-    // Keep multi-room and child-age information on every page request.
-    pax_rooms: toJsonQueryValue(
-      savedParams?.pax_rooms ?? savedParams?.PaxRooms,
-      normalizedPaxRooms,
-    ),
-    child_ages: toJsonQueryValue(
-      savedParams?.child_ages ?? savedParams?.childAges,
-      childAges,
-    ),
+    // Preserve child and multi-room data. Existing saved values win.
+    child_ages:
+      savedParams?.child_ages ??
+      savedParams?.childAges ??
+      JSON.stringify(childAges),
+    pax_rooms:
+      savedParams?.pax_rooms ??
+      savedParams?.PaxRooms ??
+      JSON.stringify(fallbackPaxRooms),
 
     page: Number(page),
     page_size: Number(pageSize),
@@ -594,10 +573,7 @@ const HotelResults = () => {
 
   const childAges = Array.isArray(guests?.childAges) ? guests.childAges : [];
 
-  const hotelResponse = useMemo(
-    () => getHotelResponse(hotels),
-    [hotels],
-  );
+  const hotelResponse = useMemo(() => getHotelResponse(hotels), [hotels]);
 
   const hotelList = useMemo(() => {
     let list = [];
@@ -669,9 +645,18 @@ const HotelResults = () => {
   const firstVisibleHotel =
     totalHotels === 0 ? 0 : (currentPage - 1) * pageSize + 1;
 
-  const lastVisibleHotel = Math.min(
-    currentPage * pageSize,
-    totalHotels,
+  const lastVisibleHotel = Math.min(currentPage * pageSize, totalHotels);
+
+  const hasPaginationMetadata = Boolean(
+    hotelResponse &&
+    !Array.isArray(hotelResponse) &&
+    (Object.prototype.hasOwnProperty.call(hotelResponse, "total_pages") ||
+      Object.prototype.hasOwnProperty.call(hotelResponse, "totalPages") ||
+      Object.prototype.hasOwnProperty.call(hotelResponse, "count") ||
+      Object.prototype.hasOwnProperty.call(
+        hotelResponse,
+        "total_tbo_hotels_found",
+      )),
   );
 
   const [sort, setSort] = useState("price");
@@ -681,8 +666,8 @@ const HotelResults = () => {
   const [mealType, setMealType] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
-  const [loadingPage, setLoadingPage] = useState(null);
   const [paginationError, setPaginationError] = useState("");
+  const paginationBootstrapStarted = useRef(false);
 
   const filteredHotels = useMemo(() => {
     const filtered = hotelList.filter((hotel) => {
@@ -725,6 +710,90 @@ const HotelResults = () => {
     [setHotels],
   );
 
+  /*
+   * Self-healing pagination:
+   * If the search page stored only the first 20 results instead of the complete
+   * API response, request page 1 once to recover count and total_pages.
+   */
+  useEffect(() => {
+    if (
+      paginationBootstrapStarted.current ||
+      hasPaginationMetadata ||
+      hotelList.length === 0 ||
+      !search
+    ) {
+      return;
+    }
+
+    paginationBootstrapStarted.current = true;
+    let isActive = true;
+
+    const loadPaginationMetadata = async () => {
+      try {
+        setPageLoading(true);
+        setPaginationError("");
+
+        const endpoint =
+          search?.requestEndpoint ||
+          search?.endpoint ||
+          "/api/hotels/search-hotels/";
+
+        const params = getSearchPayload({
+          search,
+          hotelResponse,
+          page: 1,
+          pageSize,
+        });
+
+        const response = await publicApi.get(endpoint, { params });
+        const responseData = response?.data?.data || response?.data || {};
+
+        if (
+          !Array.isArray(responseData?.results) &&
+          !Array.isArray(responseData?.HotelResult) &&
+          !Array.isArray(responseData?.data)
+        ) {
+          throw new Error("Hotel response does not contain a results array.");
+        }
+
+        if (isActive) {
+          updateHotelResponse(responseData);
+        }
+      } catch (error) {
+        console.error(
+          "HOTEL PAGINATION METADATA ERROR:",
+          error?.response?.data || error,
+        );
+
+        if (isActive) {
+          setPaginationError(
+            error?.response?.data?.message ||
+              error?.response?.data?.error ||
+              error?.message ||
+              "Unable to load hotel pagination.",
+          );
+        }
+      } finally {
+        if (isActive) {
+          setPageLoading(false);
+        }
+      }
+    };
+
+    loadPaginationMetadata();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    hasPaginationMetadata,
+    hotelList.length,
+    search,
+    hotelResponse,
+    pageSize,
+    updateHotelResponse,
+  ]);
+
   const handlePageChange = useCallback(
     async (requestedPage) => {
       const nextPage = Number(requestedPage);
@@ -739,7 +808,6 @@ const HotelResults = () => {
       }
 
       setPageLoading(true);
-      setLoadingPage(nextPage);
       setPaginationError("");
 
       const endpoint =
@@ -747,7 +815,7 @@ const HotelResults = () => {
         search?.endpoint ||
         "/api/hotels/search-hotels/";
 
-      const requestParams = getSearchParams({
+      const requestPayload = getSearchPayload({
         search,
         hotelResponse,
         page: nextPage,
@@ -756,7 +824,7 @@ const HotelResults = () => {
 
       try {
         const response = await publicApi.get(endpoint, {
-          params: requestParams,
+          params: requestPayload,
         });
 
         const responseData = response?.data?.data || response?.data || {};
@@ -791,7 +859,6 @@ const HotelResults = () => {
         );
       } finally {
         setPageLoading(false);
-        setLoadingPage(null);
       }
     },
     [
@@ -1000,7 +1067,8 @@ const HotelResults = () => {
 
           {pageLoading && (
             <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-200">
-              Loading page {loadingPage || currentPage}…
+              Loading page{" "}
+              {currentPage < totalPages ? currentPage + 1 : currentPage}…
             </div>
           )}
 
@@ -1163,9 +1231,7 @@ const HotelResults = () => {
                   <button
                     type="button"
                     onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={
-                      pageLoading || !hasPrevious || currentPage <= 1
-                    }
+                    disabled={pageLoading || !hasPrevious || currentPage <= 1}
                     className="px-3 py-2 rounded-lg border border-gray-700 bg-[#0B0B0F] text-sm text-gray-300 hover:border-yellow-400 hover:text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
                     ← Previous
