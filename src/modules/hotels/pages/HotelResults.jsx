@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useCallback } from "react";
 import { useHotelStore } from "../../../store/hotelStore";
-import { privateApi } from "../../../services/api";
+import { publicApi } from "../../../services/api";
 
 const FALLBACK_IMAGE = "https://api.flyinglyte.com/media/hotels/default.jpg";
 
@@ -411,58 +411,71 @@ const getHotelResponse = (hotels) => {
   return hotels || {};
 };
 
-const getSearchPayload = ({
-  search,
-  hotelResponse,
-  page,
-  pageSize,
-}) => {
-  const savedPayload =
+const toJsonQueryValue = (value, fallback = []) => {
+  const finalValue = value ?? fallback;
+
+  if (typeof finalValue === "string") {
+    return finalValue;
+  }
+
+  try {
+    return JSON.stringify(finalValue);
+  } catch {
+    return JSON.stringify(fallback);
+  }
+};
+
+const getSearchParams = ({ search, hotelResponse, page, pageSize }) => {
+  // Reuse the exact parameters saved by the original hotel search first.
+  const savedParams =
+    search?.requestParams ||
+    search?.params ||
     search?.requestPayload ||
     search?.searchPayload ||
     search?.apiPayload ||
     search?.payload ||
+    hotelResponse?.request_params ||
     hotelResponse?.request_payload ||
     hotelResponse?.search_payload ||
     {};
 
-  const cityCode =
-    savedPayload?.CityCode ||
-    savedPayload?.city_code ||
-    savedPayload?.cityCode ||
-    search?.cityCode ||
-    search?.city?.code ||
-    search?.city?.Code ||
-    search?.city?.value ||
+  const city =
+    savedParams?.city ??
+    savedParams?.city_code ??
+    savedParams?.CityCode ??
+    search?.cityCode ??
+    search?.city?.code ??
+    search?.city?.Code ??
+    search?.city?.value ??
     search?.city;
 
   const roomGuests = Array.isArray(search?.guests?.roomGuests)
     ? search.guests.roomGuests
     : [];
 
-  const paxRoomsFromGuests = roomGuests.map((room) => {
-    const children = Number(room?.Children ?? room?.children ?? 0);
+  const normalizedPaxRooms =
+    roomGuests.length > 0
+      ? roomGuests.map((room) => {
+          const children = Number(room?.Children ?? room?.children ?? 0);
 
-    const childrenAges = (
-      room?.ChildrenAges ||
-      room?.ChildAges ||
-      room?.childAges ||
-      []
-    )
-      .slice(0, children)
-      .map((age) => Number(age))
-      .filter((age) => Number.isFinite(age) && age >= 1 && age <= 12);
+          const childrenAges = (
+            room?.ChildrenAges ||
+            room?.ChildAges ||
+            room?.childAges ||
+            []
+          )
+            .slice(0, children)
+            .map(Number)
+            .filter(
+              (age) => Number.isFinite(age) && age >= 1 && age <= 12,
+            );
 
-    return {
-      Adults: Number(room?.Adults ?? room?.adults ?? 1),
-      Children: children,
-      ChildrenAges: childrenAges,
-    };
-  });
-
-  const fallbackPaxRooms =
-    paxRoomsFromGuests.length > 0
-      ? paxRoomsFromGuests
+          return {
+            Adults: Number(room?.Adults ?? room?.adults ?? 1),
+            Children: children,
+            ChildrenAges: childrenAges,
+          };
+        })
       : Array.isArray(hotelResponse?.pax_rooms) &&
           hotelResponse.pax_rooms.length > 0
         ? hotelResponse.pax_rooms
@@ -476,52 +489,77 @@ const getSearchPayload = ({
             },
           ];
 
-  const checkIn =
-    savedPayload?.CheckIn ||
-    savedPayload?.check_in ||
-    savedPayload?.checkIn ||
+  const adults = normalizedPaxRooms.reduce(
+    (total, room) => total + Number(room?.Adults || 0),
+    0,
+  );
+
+  const children = normalizedPaxRooms.reduce(
+    (total, room) => total + Number(room?.Children || 0),
+    0,
+  );
+
+  const childAges = normalizedPaxRooms.flatMap((room) =>
+    Array.isArray(room?.ChildrenAges) ? room.ChildrenAges : [],
+  );
+
+  const checkin =
+    savedParams?.checkin ??
+    savedParams?.check_in ??
+    savedParams?.checkIn ??
+    savedParams?.CheckIn ??
     search?.checkIn;
 
-  const checkOut =
-    savedPayload?.CheckOut ||
-    savedPayload?.check_out ||
-    savedPayload?.checkOut ||
+  const checkout =
+    savedParams?.checkout ??
+    savedParams?.check_out ??
+    savedParams?.checkOut ??
+    savedParams?.CheckOut ??
     search?.checkOut;
 
   const nationality =
-    savedPayload?.GuestNationality ||
-    savedPayload?.guest_nationality ||
-    savedPayload?.nationality ||
-    search?.nationality ||
-    hotelResponse?.nationality ||
+    savedParams?.nationality ??
+    savedParams?.guest_nationality ??
+    savedParams?.GuestNationality ??
+    search?.nationality ??
+    hotelResponse?.nationality ??
     "IN";
 
   const currency =
-    savedPayload?.Currency ||
-    savedPayload?.currency ||
-    search?.currency ||
-    hotelResponse?.currency ||
+    savedParams?.currency ??
+    savedParams?.Currency ??
+    search?.currency ??
+    hotelResponse?.currency ??
     "INR";
 
   return {
-    ...savedPayload,
+    ...savedParams,
 
-    // Common backend/TBO field names
-    CityCode: savedPayload?.CityCode ?? cityCode,
-    CheckIn: savedPayload?.CheckIn ?? checkIn,
-    CheckOut: savedPayload?.CheckOut ?? checkOut,
-    GuestNationality: savedPayload?.GuestNationality ?? nationality,
-    PaxRooms: savedPayload?.PaxRooms ?? fallbackPaxRooms,
-    Currency: savedPayload?.Currency ?? currency,
+    // Exact query names used by the hotel search endpoint.
+    city,
+    checkin,
+    checkout,
+    adults: Number(savedParams?.adults ?? adults || 1),
+    children: Number(savedParams?.children ?? children || 0),
+    rooms: Number(
+      savedParams?.rooms ??
+        search?.guests?.rooms ??
+        search?.guests?.roomGuests?.length ??
+        normalizedPaxRooms.length ??
+        1,
+    ),
+    nationality,
+    currency,
 
-    // Also preserve snake/camel-case variants used by custom backends
-    city_code: savedPayload?.city_code ?? cityCode,
-    check_in: savedPayload?.check_in ?? checkIn,
-    check_out: savedPayload?.check_out ?? checkOut,
-    guest_nationality:
-      savedPayload?.guest_nationality ?? nationality,
-    pax_rooms: savedPayload?.pax_rooms ?? fallbackPaxRooms,
-    currency: savedPayload?.currency ?? currency,
+    // Keep multi-room and child-age information on every page request.
+    pax_rooms: toJsonQueryValue(
+      savedParams?.pax_rooms ?? savedParams?.PaxRooms,
+      normalizedPaxRooms,
+    ),
+    child_ages: toJsonQueryValue(
+      savedParams?.child_ages ?? savedParams?.childAges,
+      childAges,
+    ),
 
     page: Number(page),
     page_size: Number(pageSize),
@@ -643,6 +681,7 @@ const HotelResults = () => {
   const [mealType, setMealType] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(null);
   const [paginationError, setPaginationError] = useState("");
 
   const filteredHotels = useMemo(() => {
@@ -700,6 +739,7 @@ const HotelResults = () => {
       }
 
       setPageLoading(true);
+      setLoadingPage(nextPage);
       setPaginationError("");
 
       const endpoint =
@@ -707,11 +747,7 @@ const HotelResults = () => {
         search?.endpoint ||
         "/api/hotels/search-hotels/";
 
-      const requestMethod = String(
-        search?.requestMethod || search?.method || "post",
-      ).toLowerCase();
-
-      const requestPayload = getSearchPayload({
+      const requestParams = getSearchParams({
         search,
         hotelResponse,
         page: nextPage,
@@ -719,15 +755,9 @@ const HotelResults = () => {
       });
 
       try {
-        let response;
-
-        if (requestMethod === "get") {
-          response = await privateApi.get(endpoint, {
-            params: requestPayload,
-          });
-        } else {
-          response = await privateApi.post(endpoint, requestPayload);
-        }
+        const response = await publicApi.get(endpoint, {
+          params: requestParams,
+        });
 
         const responseData = response?.data?.data || response?.data || {};
 
@@ -761,6 +791,7 @@ const HotelResults = () => {
         );
       } finally {
         setPageLoading(false);
+        setLoadingPage(null);
       }
     },
     [
@@ -969,7 +1000,7 @@ const HotelResults = () => {
 
           {pageLoading && (
             <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-200">
-              Loading page {currentPage < totalPages ? currentPage + 1 : currentPage}…
+              Loading page {loadingPage || currentPage}…
             </div>
           )}
 
