@@ -148,6 +148,33 @@ const getInitialRooms = (search) => {
   });
 };
 
+const normalizeHotelSearchResponse = (payload) => {
+  if (!payload) return {};
+  if (Array.isArray(payload)) return { results: payload };
+
+  const nestedData =
+    payload?.data &&
+    typeof payload.data === "object" &&
+    !Array.isArray(payload.data)
+      ? payload.data
+      : null;
+
+  if (!nestedData) return payload;
+
+  return {
+    ...payload,
+    ...nestedData,
+    results:
+      nestedData.results ||
+      nestedData.HotelResult ||
+      nestedData.hotels ||
+      payload.results ||
+      payload.HotelResult ||
+      payload.hotels ||
+      [],
+  };
+};
+
 const HotelsForm = () => {
   const navigate = useNavigate();
 
@@ -623,15 +650,7 @@ const HotelsForm = () => {
        * 1. { count, page, total_pages, results }
        * 2. { data: { count, page, total_pages, results } }
        */
-      const hotelResponse =
-        res.data?.data &&
-        typeof res.data.data === "object" &&
-        !Array.isArray(res.data.data) &&
-        (Array.isArray(res.data.data.results) ||
-          Array.isArray(res.data.data.HotelResult) ||
-          Array.isArray(res.data.data.hotels))
-          ? res.data.data
-          : res.data;
+      const hotelResponse = normalizeHotelSearchResponse(res.data);
 
       const hotelsData =
         hotelResponse?.HotelResult ||
@@ -655,8 +674,22 @@ const HotelsForm = () => {
        * Keep the complete response object. Do not store only hotelsData,
        * otherwise total_pages/count/has_next will be lost.
        */
-      setSearch(paginatedSearchPayload);
-      setHotels(hotelResponse);
+      /*
+       * Store the complete response directly so pagination metadata cannot
+       * be stripped by custom Zustand setter logic.
+       */
+      useHotelStore.setState({
+        search: paginatedSearchPayload,
+        hotels: hotelResponse,
+      });
+
+      console.log("PAGINATION STORED:", {
+        count: hotelResponse?.count,
+        page: hotelResponse?.page,
+        pageSize: hotelResponse?.page_size,
+        totalPages: hotelResponse?.total_pages,
+        hasNext: hotelResponse?.has_next,
+      });
 
       navigate("/hotels");
     } catch (err) {

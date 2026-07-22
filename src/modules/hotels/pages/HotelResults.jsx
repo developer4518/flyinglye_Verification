@@ -396,15 +396,35 @@ const getVisiblePageNumbers = (currentPage, totalPages) => {
 };
 
 const getHotelResponse = (hotels) => {
-  if (
+  if (!hotels) return {};
+  if (Array.isArray(hotels)) return hotels;
+
+  const nestedData =
     hotels?.data &&
     typeof hotels.data === "object" &&
     !Array.isArray(hotels.data)
-  ) {
-    return hotels.data;
-  }
+      ? hotels.data
+      : null;
 
-  return hotels || {};
+  if (!nestedData) return hotels;
+
+  /*
+   * Merge the outer and nested response instead of returning only data.
+   * Some API responses keep count/total_pages on the outer object and
+   * results inside data. Returning only data removes pagination metadata.
+   */
+  return {
+    ...hotels,
+    ...nestedData,
+    results:
+      nestedData.results ||
+      nestedData.HotelResult ||
+      nestedData.hotels ||
+      hotels.results ||
+      hotels.HotelResult ||
+      hotels.hotels ||
+      [],
+  };
 };
 
 const getSearchPayload = ({ search, hotelResponse, page, pageSize }) => {
@@ -662,14 +682,8 @@ const PaginationControls = ({
 const HotelResults = () => {
   const navigate = useNavigate();
 
-  const {
-    hotels,
-    search,
-    setHotels,
-    setSelectedHotel,
-    setSelectedRoom,
-    selectHotelRoom,
-  } = useHotelStore();
+  const { hotels, search, setSelectedHotel, setSelectedRoom, selectHotelRoom } =
+    useHotelStore();
 
   const { city, cityName, checkIn, checkOut, guests } = search || {};
 
@@ -809,20 +823,16 @@ const HotelResults = () => {
     });
   }, [hotelList, sort, priceRange, minRating, onlyRefundable, mealType]);
 
-  const updateHotelResponse = useCallback(
-    (responseData) => {
-      if (typeof setHotels === "function") {
-        setHotels(responseData);
-        return;
-      }
+  const updateHotelResponse = useCallback((responseData) => {
+    const completeResponse = getHotelResponse(responseData);
 
-      // Zustand fallback when the store does not expose setHotels.
-      if (typeof useHotelStore.setState === "function") {
-        useHotelStore.setState({ hotels: responseData });
-      }
-    },
-    [setHotels],
-  );
+    /*
+     * Write directly to Zustand. This prevents a custom setHotels action
+     * from converting the response to response.results and dropping
+     * count, total_pages, has_next and has_previous.
+     */
+    useHotelStore.setState({ hotels: completeResponse });
+  }, []);
 
   /*
    * Self-healing pagination:
@@ -860,7 +870,7 @@ const HotelResults = () => {
         });
 
         const response = await publicApi.get(endpoint, { params });
-        const responseData = response?.data?.data || response?.data || {};
+        const responseData = getHotelResponse(response?.data || {});
 
         if (
           !Array.isArray(responseData?.results) &&
@@ -941,7 +951,7 @@ const HotelResults = () => {
           params: requestPayload,
         });
 
-        const responseData = response?.data?.data || response?.data || {};
+        const responseData = getHotelResponse(response?.data || {});
 
         if (
           !Array.isArray(responseData?.results) &&
