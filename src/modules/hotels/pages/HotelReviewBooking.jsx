@@ -1952,14 +1952,14 @@ const HotelReviewBooking = () => {
                 <p className="text-sm leading-7 text-slate-700 sm:text-base sm:leading-8">
                   By proceeding to make this booking for
                   <strong className="font-bold text-slate-950">
-                    [{corporateCompanyName}]
+                    {corporateCompanyName}
                   </strong>
                   (the “Company”) , I,
                   <strong className="font-bold text-slate-950">
                     FLYINGLYTE
                   </strong>
                   (the “Travel Agency”), hereby declare, represent, and
-                  undertake as follows:
+                  undertake as follows:  
                 </p>
 
                 <ul className="mt-5 space-y-4 pl-5 text-sm leading-7 text-slate-700 marker:text-[#276A9D] sm:text-base sm:leading-8">
