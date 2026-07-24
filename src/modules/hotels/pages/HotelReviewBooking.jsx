@@ -636,6 +636,11 @@ const HotelReviewBooking = () => {
 
   const [loading, setLoading] = useState(false);
 
+  const [showCorporateConsent, setShowCorporateConsent] = useState(false);
+
+  const [corporateConsentAccepted, setCorporateConsentAccepted] =
+    useState(false);
+
   const packageFareFlags = getPackageFareFlags(reviewData || {});
   const gstAllowed = getGSTAllowed(reviewData || {});
 
@@ -671,6 +676,49 @@ const HotelReviewBooking = () => {
       GSTCompanyEmail: guest?.GSTCompanyEmail || "",
     }));
   });
+
+  const isCorporateBooking =
+    toBoolean(
+      pickFirstValue(
+        reviewData?.IsCorporate,
+        reviewData?.isCorporate,
+
+        reviewData?.CorporateBooking,
+        reviewData?.corporateBooking,
+
+        reviewData?.finalPayload?.IsCorporate,
+        reviewData?.finalPayload?.isCorporate,
+
+        reviewData?.finalPayload?.CorporateBooking,
+        reviewData?.finalPayload?.corporateBooking,
+
+        Number(reviewData?.finalPayload?.RequestedBookingMode) === 5
+          ? true
+          : undefined,
+      ),
+    ) ||
+    Boolean(
+      String(
+        reviewData?.corporatePAN ||
+          reviewData?.finalPayload?.CorporatePAN ||
+          "",
+      ).trim(),
+    );
+
+  const corporateCompanyName =
+    pickFirst(
+      reviewData?.companyName,
+      reviewData?.CompanyName,
+
+      reviewData?.corporateCompanyName,
+      reviewData?.CorporateCompanyName,
+
+      reviewData?.finalPayload?.CompanyName,
+      reviewData?.finalPayload?.CorporateCompanyName,
+
+      gstForms.find((gst) => String(gst?.GSTCompanyName || "").trim())
+        ?.GSTCompanyName,
+    ) || "Company";
 
   const updateTransportField = (field, value) => {
     setTransportForm((prev) => ({
@@ -920,20 +968,16 @@ const HotelReviewBooking = () => {
     return payload;
   };
 
-  const handleConfirmBooking = async () => {
-    if (!reviewData?.finalPayload) {
-      return alert("Booking payload missing");
-    }
-
-    if (!validatePackageTransportDetails()) return;
-    if (!validateGSTDetails()) return;
-
+  const performBooking = async () => {
     try {
       setLoading(true);
 
       const finalHotelFacilities = getHotelFacilitiesFromReviewData(reviewData);
+
       const finalHotelNorms = getHotelNormsFromReviewData(reviewData);
+
       const finalSupplements = getSupplementsFromReviewData(reviewData);
+
       const bookingPayload = buildFinalBookingPayload();
 
       console.log("FINAL BOOK PAYLOAD:", bookingPayload);
@@ -975,20 +1019,31 @@ const HotelReviewBooking = () => {
         finalPayload: bookingPayload,
 
         isPackageFare: packageFareFlags.isPackageFare,
+
         isPackageDetailsMandatory: packageFareFlags.isPackageDetailsMandatory,
+
         departureDetailsMandatory: packageFareFlags.isDepartureDetailsMandatory,
 
         gstAllowed,
         gstDetails: gstForms,
 
         cancellationPolicies: reviewData.cancellationPolicies || [],
+
         roomPromotions: reviewData.roomPromotions || [],
+
         supplements: finalSupplements,
+
         roomAmenities: reviewData.roomAmenities || [],
+
         rateConditions: reviewData.rateConditions || [],
 
         hotelFacilities: finalHotelFacilities,
         hotelNorms: finalHotelNorms,
+
+        corporateConsentAccepted: isCorporateBooking,
+        corporateConsentAcceptedAt: isCorporateBooking
+          ? new Date().toISOString()
+          : null,
       };
 
       localStorage.setItem(
@@ -1018,6 +1073,42 @@ const HotelReviewBooking = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConfirmBooking = () => {
+    if (!reviewData?.finalPayload) {
+      alert("Booking payload missing");
+      return;
+    }
+
+    if (!validatePackageTransportDetails()) return;
+
+    if (!validateGSTDetails()) return;
+
+    /*
+     * Corporate booking:
+     * First open the declaration popup.
+     * The booking API will run only after consent.
+     */
+    if (isCorporateBooking) {
+      setCorporateConsentAccepted(false);
+      setShowCorporateConsent(true);
+      return;
+    }
+
+    /*
+     * Normal booking:
+     * Continue directly without the corporate popup.
+     */
+    performBooking();
+  };
+
+  const handleAcceptCorporateConsent = () => {
+    if (!corporateConsentAccepted || loading) return;
+
+    setShowCorporateConsent(false);
+
+    performBooking();
   };
 
   if (!reviewData) {
@@ -1794,6 +1885,198 @@ const HotelReviewBooking = () => {
           </div>
         </div>
       </div>
+
+      {showCorporateConsent && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-3 py-4 backdrop-blur-sm sm:px-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="corporate-consent-title"
+          onMouseDown={() => {
+            if (!loading) {
+              setShowCorporateConsent(false);
+            }
+          }}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-sky-300/30 bg-[#F8FBFF] text-slate-800 shadow-[0_30px_100px_rgba(0,0,0,0.55)]"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between gap-4 border-b border-sky-200 bg-linear-to-r from-sky-100 via-blue-50 to-indigo-100 px-5 py-4 sm:px-7">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#276A9D] text-white shadow-lg shadow-sky-900/20">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="h-6 w-6"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 10v6" />
+                    <path d="M12 7h.01" />
+                  </svg>
+                </div>
+
+                <div className="min-w-0">
+                  <h2
+                    id="corporate-consent-title"
+                    className="text-lg font-bold text-[#245F8F] sm:text-2xl"
+                  >
+                    Corporate Consent Declaration
+                  </h2>
+
+                  <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
+                    Review and accept the declaration before generating the
+                    voucher.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setShowCorporateConsent(false)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-2xl text-slate-600 transition hover:bg-white/80 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Close corporate consent declaration"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Scrollable declaration */}
+            <div className="overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
+              <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
+                <p className="text-sm leading-7 text-slate-700 sm:text-base sm:leading-8">
+                  By proceeding to make this booking for{" "}
+                  <strong className="font-bold text-slate-950">
+                    [{corporateCompanyName}]
+                  </strong>{" "}
+                  (the “Company”), I,{" "}
+                  <strong className="font-bold text-slate-950">
+                    [FLYINGLYTE1]
+                  </strong>{" "}
+                  (the “Travel Agency”), hereby declare, represent, and
+                  undertake as follows:
+                </p>
+
+                <ul className="mt-5 space-y-4 pl-5 text-sm leading-7 text-slate-700 marker:text-[#276A9D] sm:text-base sm:leading-8">
+                  <li className="list-disc pl-1">
+                    I confirm that I have been authorised by the Company to make
+                    this booking on its behalf for the Company’s Members for its
+                    business purposes only.
+                  </li>
+
+                  <li className="list-disc pl-1">
+                    I am competent to make this declaration and undertaking, and
+                    I am duly authorised to bind the Travel Agency and the
+                    Company, including its employees, agents, consultants, and
+                    other representatives (collectively, the “Company’s
+                    Members”), by the terms set out below.
+                  </li>
+
+                  <li className="list-disc pl-1">
+                    I confirm that I have been authorised by the Company to make
+                    this booking on its behalf for the Company’s Members for its
+                    business purposes only.
+                  </li>
+
+                  <li className="list-disc pl-1">
+                    I have complied and shall continue to comply with all
+                    applicable laws, rules, regulations, and directions,
+                    including (but not limited to) the Foreign Exchange
+                    Management Act, 1999 (FEMA), the Liberalised Remittance
+                    Scheme (LRS), Current Account Rules, and directions issued
+                    by authorised dealer (AD) banks and/or the Reserve Bank of
+                    India (RBI).
+                  </li>
+
+                  <li className="list-disc pl-1">
+                    I have obtained, and where required, will submit to the
+                    relevant authorities, all necessary KYC and supporting
+                    documents pertaining to the Company and the Company’s
+                    Members in connection with the proposed travel.
+                  </li>
+
+                  <li className="list-disc pl-1">
+                    These documents include, without limitation and subject to
+                    the requirements of the relevant AD bank: authorisation from
+                    the Company for the travel of the Company’s Members;
+                    applicable purpose code; Company’s PAN, address proof, and
+                    certificate of incorporation; copies of the Company Members’
+                    documents, such as passports, visas, air tickets, employment
+                    details, and travel itinerary; and relevant communications
+                    evidencing the purpose of travel.
+                  </li>
+
+                  <li className="list-disc pl-1">
+                    I shall indemnify, defend, and hold harmless TBO, its
+                    directors, officers, employees, agents, and representatives,
+                    from and against any and all claims, liabilities, penalties,
+                    losses, or expenses, including legal fees, arising directly
+                    or indirectly from any breach of applicable laws, or any
+                    inaccuracy or breach of the representations, warranties, or
+                    undertakings provided herein.
+                  </li>
+                </ul>
+
+                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 text-lg">⚠️</span>
+
+                    <p className="text-xs leading-6 text-amber-900 sm:text-sm">
+                      The booking will not be submitted until this declaration
+                      has been accepted.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-slate-200 bg-white px-5 py-4 sm:px-7">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition hover:border-sky-300 hover:bg-sky-50/60">
+                <input
+                  type="checkbox"
+                  checked={corporateConsentAccepted}
+                  disabled={loading}
+                  onChange={(event) =>
+                    setCorporateConsentAccepted(event.target.checked)
+                  }
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#276A9D]"
+                />
+
+                <span className="text-sm leading-6 text-slate-700">
+                  I have read, understood, and agree to the declaration provided
+                  above.
+                </span>
+              </label>
+
+              <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setShowCorporateConsent(false)}
+                  className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAcceptCorporateConsent}
+                  disabled={!corporateConsentAccepted || loading}
+                  className="rounded-xl bg-[#276A9D] px-7 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition hover:bg-[#1F5A88] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? "Generating..." : "I accept and agree"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
