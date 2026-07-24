@@ -1950,14 +1950,14 @@ const HotelReviewBooking = () => {
             <div className="overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
               <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
                 <p className="text-sm leading-7 text-slate-700 sm:text-base sm:leading-8">
-                  By proceeding to make this booking for{" "}
+                  By proceeding to make this booking for
                   <strong className="font-bold text-slate-950">
                     [{corporateCompanyName}]
-                  </strong>{" "}
-                  (the “Company”), I,{" "}
+                  </strong>
+                  (the “Company”) , I,
                   <strong className="font-bold text-slate-950">
-                    [FLYINGLYTE1]
-                  </strong>{" "}
+                    FLYINGLYTE
+                  </strong>
                   (the “Travel Agency”), hereby declare, represent, and
                   undertake as follows:
                 </p>
