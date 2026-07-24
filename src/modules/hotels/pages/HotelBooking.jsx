@@ -51,6 +51,7 @@ const HotelBooking = () => {
       roomData?.NetAmount ??
       0,
   );
+
   const totalFare = Number(
     payload?.TotalFare ??
       payload?.totalFare ??
@@ -69,8 +70,6 @@ const HotelBooking = () => {
       preBook?.raw?.Response?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare ??
       0,
   );
-
-  const displayFare = totalFare;
 
   const toBool = (value) =>
     value === true || String(value).toLowerCase() === "true";
@@ -100,9 +99,7 @@ const HotelBooking = () => {
     PaxNameMaxLength: Number(validationInfo?.PaxNameMaxLength || 0),
 
     IsPackageFare: toBool(
-      validationInfo?.IsPackageFare ||
-        validationInfo?.PackageFare ||
-        validationInfo?.PackageFare,
+      validationInfo?.IsPackageFare || validationInfo?.PackageFare,
     ),
 
     PackageDetailsMandatory: toBool(
@@ -146,6 +143,7 @@ const HotelBooking = () => {
 
   const formatDate = (value) => {
     const date = parseDateValue(value);
+
     if (!date) return value || "-";
 
     return date.toLocaleDateString("en-GB", {
@@ -157,14 +155,18 @@ const HotelBooking = () => {
 
   const toApiDateTime = (value) => {
     const date = new Date(value);
+
     if (Number.isNaN(date.getTime())) return "";
+
     return date.toISOString();
   };
 
   const addDays = (date, days) => {
     if (!date) return null;
+
     const updatedDate = new Date(date);
     updatedDate.setDate(updatedDate.getDate() + days);
+
     return updatedDate;
   };
 
@@ -173,7 +175,11 @@ const HotelBooking = () => {
       return value
         .flatMap((item) => {
           if (item === null || item === undefined) return [];
-          if (typeof item === "string") return item.split(separator);
+
+          if (typeof item === "string") {
+            return item.split(separator);
+          }
+
           return [item];
         })
         .map((item) => (typeof item === "string" ? item.trim() : item))
@@ -216,6 +222,7 @@ const HotelBooking = () => {
     if (nextPolicy?.FromDate) {
       const nextFromDate = parseDateValue(nextPolicy.FromDate);
       const previousDate = addDays(nextFromDate, -1);
+
       if (previousDate) return previousDate;
     }
 
@@ -233,14 +240,6 @@ const HotelBooking = () => {
 
   const roomPromotions = normalizeList(roomPromotionsRaw);
 
-  const flattenDeep = (value) => {
-    if (!Array.isArray(value)) return value ? [value] : [];
-
-    return value.flatMap((item) =>
-      Array.isArray(item) ? flattenDeep(item) : item ? [item] : [],
-    );
-  };
-
   const supplementsRaw =
     preBook?.supplements ||
     preBook?.Supplements ||
@@ -254,44 +253,6 @@ const HotelBooking = () => {
     [];
 
   const supplements = Array.isArray(supplementsRaw) ? supplementsRaw : [];
-
-  const formatSupplementText = (supplement) => {
-    if (!supplement) return "";
-    if (typeof supplement === "string") return supplement;
-
-    const title =
-      supplement?.Description ||
-      supplement?.Name ||
-      supplement?.SupplementName ||
-      supplement?.Type ||
-      supplement?.ChargeType ||
-      "Supplement";
-
-    const amount =
-      supplement?.Price ??
-      supplement?.Amount ??
-      supplement?.Charge ??
-      supplement?.SupplementPrice ??
-      supplement?.SupplementCharge;
-
-    const currency =
-      supplement?.Currency ||
-      supplement?.currency ||
-      preBook?.currency ||
-      preBook?.Currency ||
-      "";
-
-    if (amount !== undefined && amount !== null && amount !== "") {
-      return `${title} - ${currency === "INR" ? "₹" : currency} ${Number(
-        amount,
-      ).toLocaleString("en-IN", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
-    }
-
-    return title;
-  };
 
   const roomAmenitiesRaw =
     roomData?.Amenities ||
@@ -314,10 +275,13 @@ const HotelBooking = () => {
     const charge = Number(policy?.CancellationCharge ?? 0);
     const type = String(policy?.ChargeType || "").toLowerCase();
 
-    if (type === "percentage") return `${charge}%`;
+    if (type === "percentage") {
+      return `${charge}%`;
+    }
 
     if (type === "fixed") {
       if (charge === 0) return "Free Cancellation";
+
       return `₹ ${Number(charge).toLocaleString("en-IN", {
         maximumFractionDigits: 2,
       })}`;
@@ -331,6 +295,7 @@ const HotelBooking = () => {
 
     return Array.from({ length: Number(children) || 0 }, (_, index) => {
       const age = Number(list[index]);
+
       return age >= 1 && age <= 12 ? age : "";
     });
   };
@@ -433,7 +398,7 @@ const HotelBooking = () => {
       for (let i = 0; i < room.Children; i++) {
         list.push({
           RoomIndex: roomIndex,
-          Title: "Mstr",
+          Title: "Mr",
           FirstName: "",
           MiddleName: "",
           LastName: "",
@@ -452,6 +417,7 @@ const HotelBooking = () => {
   }, [normalizedRooms]);
 
   const [guestList, setGuestList] = useState(initialGuests);
+
   const [isCorporate, setIsCorporate] = useState(false);
   const [corporatePAN, setCorporatePAN] = useState("");
 
@@ -508,7 +474,9 @@ const HotelBooking = () => {
 
     setGuestList((prev) =>
       prev.map((guest, index) => {
-        if (guest.RoomIndex !== selectedGuest.RoomIndex) return guest;
+        if (guest.RoomIndex !== selectedGuest.RoomIndex) {
+          return guest;
+        }
 
         return {
           ...guest,
@@ -530,7 +498,9 @@ const HotelBooking = () => {
   };
 
   const cleanNameInput = (value) => {
-    if (validation.SpecialCharAllowed && validation.SpaceAllowed) return value;
+    if (validation.SpecialCharAllowed && validation.SpaceAllowed) {
+      return value;
+    }
 
     if (validation.SpecialCharAllowed && !validation.SpaceAllowed) {
       return value.replace(/\s/g, "");
@@ -557,6 +527,7 @@ const HotelBooking = () => {
         "FirstName",
         cleanedValue.slice(0, FIRST_NAME_MAX_LENGTH),
       );
+
       return;
     }
 
@@ -577,7 +548,9 @@ const HotelBooking = () => {
     if (value.length < FIRST_NAME_MIN_LENGTH) return false;
     if (value.length > FIRST_NAME_MAX_LENGTH) return false;
 
-    if (!validation.SpaceAllowed && /\s/.test(value)) return false;
+    if (!validation.SpaceAllowed && /\s/.test(value)) {
+      return false;
+    }
 
     if (!validation.SpecialCharAllowed && /[^A-Za-z ]/.test(value)) {
       return false;
@@ -609,7 +582,9 @@ const HotelBooking = () => {
 
     if (!value) return false;
 
-    if (!validation.SpaceAllowed && /\s/.test(value)) return false;
+    if (!validation.SpaceAllowed && /\s/.test(value)) {
+      return false;
+    }
 
     if (!validation.SpecialCharAllowed && /[^A-Za-z ]/.test(value)) {
       return false;
@@ -631,7 +606,9 @@ const HotelBooking = () => {
       }
     }
 
-    if (!validation.CharLimit && value.length < 2) return false;
+    if (!validation.CharLimit && value.length < 2) {
+      return false;
+    }
 
     return true;
   };
@@ -641,16 +618,10 @@ const HotelBooking = () => {
       .flatMap((guest) => {
         const passengerPAN = guest.PAN;
 
-        if (isCorporate) {
-          return [passengerPAN];
-        }
-
-        // Parent / Guardian PAN is valid only for child passenger
         if (guest.PaxType === 2) {
           return [passengerPAN, guest.ParentPAN];
         }
 
-        // Adult should only use own passenger PAN
         return [passengerPAN];
       })
       .map((pan) =>
@@ -660,28 +631,29 @@ const HotelBooking = () => {
       )
       .filter((pan) => isValidPAN(pan));
 
-    if (isCorporate && isValidPAN(corporatePAN.trim().toUpperCase())) {
-      pans.push(corporatePAN.trim().toUpperCase());
-    }
-
     return new Set(pans).size;
   };
 
   const validateGuests = () => {
     if (!bookingCode) return "Booking code missing";
-    if (!net || net <= 0) return "Net amount missing";
+
+    if (!net || net <= 0) {
+      return "Net amount missing";
+    }
 
     if (isCorporate) {
       if (!validation.CorporateBokingAllowed) {
         return "Corporate booking is not allowed for this hotel";
       }
 
-      if (!isValidPAN(corporatePAN.trim().toUpperCase())) {
+      const finalCorporatePAN = corporatePAN.trim().toUpperCase();
+
+      if (!isValidPAN(finalCorporatePAN)) {
         return "Valid Corporate PAN is required for corporate booking";
       }
     }
 
-    if (validation.PanCountRequired > 0) {
+    if (!isCorporate && validation.PanCountRequired > 0) {
       const uniquePANCount = getUniquePANCount();
 
       if (uniquePANCount < validation.PanCountRequired) {
@@ -739,7 +711,9 @@ const HotelBooking = () => {
       const roomLeads = roomPassengers.filter((guest) => guest.LeadPassenger);
 
       if (roomLeads.length !== 1) {
-        return `Room ${roomIndex + 1}: Please select exactly one lead passenger`;
+        return `Room ${
+          roomIndex + 1
+        }: Please select exactly one lead passenger`;
       }
 
       if (roomLeads[0]?.PaxType !== 1) {
@@ -762,21 +736,25 @@ const HotelBooking = () => {
         return `Guest ${i + 1}: First Name cannot be more than 50 characters`;
       }
 
-      if (!g.LastName.trim()) {
+      if (!String(g.LastName || "").trim()) {
         return `Guest ${i + 1}: Last name is required`;
       }
 
       if (!isValidFirstNameByRules(g.FirstName)) {
-        return `Guest ${i + 1}: First name does not match hotel validation rules`;
+        return `Guest ${
+          i + 1
+        }: First name does not match hotel validation rules`;
       }
 
       if (!isValidNameByRules(g.LastName)) {
-        return `Guest ${i + 1}: Last name does not match hotel validation rules`;
+        return `Guest ${
+          i + 1
+        }: Last name does not match hotel validation rules`;
       }
 
-      const fullName = `${normalizeName(g.FirstName)} ${normalizeName(
-        g.LastName,
-      )}`;
+      const fullName = `${normalizeName(
+        g.FirstName,
+      )} ${normalizeName(g.LastName)}`;
 
       if (!validation.SamePaxNameAllowed) {
         if (fullNameMap.has(fullName)) {
@@ -805,16 +783,19 @@ const HotelBooking = () => {
       }
 
       if (g.LeadPassenger) {
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g.Email.trim())) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(g.Email || "").trim())) {
           return `Room ${g.RoomIndex + 1}: Valid lead passenger email required`;
         }
 
-        if (!/^[0-9]{10}$/.test(g.Phoneno)) {
-          return `Room ${g.RoomIndex + 1}: Valid 10-digit lead passenger phone required`;
+        if (!/^[0-9]{10}$/.test(String(g.Phoneno || ""))) {
+          return `Room ${
+            g.RoomIndex + 1
+          }: Valid 10-digit lead passenger phone required`;
         }
       }
 
-      if (validation.PanMandatory) {
+      // Passenger PAN is checked only for non-corporate bookings.
+      if (validation.PanMandatory && !isCorporate) {
         const passengerPAN = String(g.PAN || "")
           .trim()
           .toUpperCase();
@@ -831,24 +812,20 @@ const HotelBooking = () => {
           return `Guest ${i + 1}: Enter valid parent/guardian PAN`;
         }
 
-        if (isCorporate && !passengerPAN) {
-          return `Guest ${i + 1}: Passenger PAN is required for corporate booking`;
-        }
-
-        if (isCorporate && parentPAN) {
-          return `Guest ${i + 1}: Parent/Guardian PAN is not allowed for corporate booking`;
-        }
-
-        if (!isCorporate && g.PaxType === 1 && !passengerPAN) {
+        if (g.PaxType === 1 && !passengerPAN) {
           return `Guest ${i + 1}: Adult passenger PAN is required`;
         }
 
-        if (!isCorporate && g.PaxType === 1 && parentPAN) {
-          return `Guest ${i + 1}: Parent/Guardian PAN is allowed only for child passenger`;
+        if (g.PaxType === 1 && parentPAN) {
+          return `Guest ${
+            i + 1
+          }: Parent/Guardian PAN is allowed only for child passenger`;
         }
 
-        if (!isCorporate && g.PaxType === 2 && !passengerPAN && !parentPAN) {
-          return `Guest ${i + 1}: Child passenger PAN or Parent/Guardian PAN is required`;
+        if (g.PaxType === 2 && !passengerPAN && !parentPAN) {
+          return `Guest ${
+            i + 1
+          }: Child passenger PAN or Parent/Guardian PAN is required`;
         }
       }
     }
@@ -863,6 +840,7 @@ const HotelBooking = () => {
       );
 
       const adults = roomPassengers.filter((guest) => guest.PaxType === 1);
+
       const children = roomPassengers.filter((guest) => guest.PaxType === 2);
 
       return {
@@ -871,6 +849,7 @@ const HotelBooking = () => {
             ({ RoomIndex, ...guest }) => guest,
           ),
         },
+
         PaxRoom: {
           Adults: adults.length,
           Children: children.length,
@@ -881,13 +860,18 @@ const HotelBooking = () => {
 
     return {
       HotelRoomsDetails: rooms.map((room) => room.HotelRoomDetail),
+
       PaxRooms: rooms.map((room) => room.PaxRoom),
     };
   };
 
   const handleReviewBooking = () => {
     const error = validateGuests();
-    if (error) return alert(error);
+
+    if (error) {
+      alert(error);
+      return;
+    }
 
     try {
       const finalCorporatePAN = corporatePAN.trim().toUpperCase();
@@ -905,11 +889,21 @@ const HotelBooking = () => {
         };
 
         if (g.LeadPassenger) {
-          passenger.Email = g.Email.trim();
-          passenger.Phoneno = g.Phoneno.trim();
+          passenger.Email = String(g.Email || "").trim();
+
+          passenger.Phoneno = String(g.Phoneno || "").trim();
         }
 
-        if (validation.PanMandatory) {
+        if (isCorporate) {
+          /*
+           * The user enters Corporate PAN only once.
+           * It is copied automatically into adult passenger
+           * objects when preparing the API payload.
+           */
+          if (g.PaxType === 1) {
+            passenger.PAN = finalCorporatePAN;
+          }
+        } else if (validation.PanMandatory) {
           const passengerPAN = String(g.PAN || "")
             .trim()
             .toUpperCase();
@@ -922,18 +916,21 @@ const HotelBooking = () => {
             passenger.PAN = passengerPAN;
           }
 
-          // Parent / Guardian PAN should be sent only for child and non-corporate booking
-          if (!isCorporate && g.PaxType === 2 && !passengerPAN && parentPAN) {
+          if (g.PaxType === 2 && !passengerPAN && parentPAN) {
             passenger.ParentPAN = parentPAN;
           }
         }
 
         if (validation.GSTAllowed && isCorporate) {
           passenger.GSTCompanyAddress = gstDetails.GSTCompanyAddress.trim();
+
           passenger.GSTCompanyContactNumber =
             gstDetails.GSTCompanyContactNumber.trim();
+
           passenger.GSTCompanyName = gstDetails.GSTCompanyName.trim();
+
           passenger.GSTNumber = gstDetails.GSTNumber.trim().toUpperCase();
+
           passenger.GSTCompanyEmail = gstDetails.GSTCompanyEmail.trim();
         }
 
@@ -944,12 +941,14 @@ const HotelBooking = () => {
 
       const finalPayload = {
         BookingCode: bookingCode,
+
         GuestNationality:
           payload?.GuestNationality ||
           payload?.guestNationality ||
           preBook?.GuestNationality ||
           guests?.nationality ||
           "IN",
+
         IsVoucherBooking: true,
         NetAmount: net,
         PreBookNetAmount: net,
@@ -968,7 +967,9 @@ const HotelBooking = () => {
       if (validation.PackageDetailsMandatory) {
         finalPayload.ArrivalTransport = {
           ArrivalTransportType: Number(arrivalTransport.ArrivalTransportType),
+
           TransportInfoId: arrivalTransport.TransportInfoId.trim(),
+
           Time: toApiDateTime(arrivalTransport.Time),
         };
       }
@@ -978,7 +979,9 @@ const HotelBooking = () => {
           DepartureTransportType: Number(
             departureTransport.DepartureTransportType,
           ),
+
           TransportInfoId: departureTransport.TransportInfoId.trim(),
+
           Time: toApiDateTime(departureTransport.Time),
         };
       }
@@ -986,6 +989,7 @@ const HotelBooking = () => {
       if (isCorporate) {
         finalPayload.IsCorporate = true;
         finalPayload.CorporatePAN = finalCorporatePAN;
+        finalPayload.RequestedBookingMode = 5;
       }
 
       const searchedRooms =
@@ -1122,18 +1126,13 @@ const HotelBooking = () => {
                   GST Allowed
                 </span>
               )}
-
-              {/* {validation.CorporateBokingAllowed && (
-                <span className="rounded-full border border-purple-400/30 bg-purple-400/10 px-3 py-1 text-purple-200">
-                  Corporate Booking Allowed
-                </span>
-              )} */}
             </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">🕒</span>
+
               <h3 className="font-semibold text-yellow-300">
                 Cancellation Charges
               </h3>
@@ -1149,9 +1148,11 @@ const HotelBooking = () => {
                           <th className="px-4 py-3 text-left font-semibold">
                             Cancelled on or After
                           </th>
+
                           <th className="px-4 py-3 text-left font-semibold">
                             Cancelled on or Before
                           </th>
+
                           <th className="px-4 py-3 text-left font-semibold">
                             Cancellation Charges
                           </th>
@@ -1202,6 +1203,7 @@ const HotelBooking = () => {
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">🏷️</span>
+
               <h3 className="font-semibold text-yellow-300">Room Promotions</h3>
             </div>
 
@@ -1233,6 +1235,7 @@ const HotelBooking = () => {
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">➕</span>
+
               <h3 className="font-semibold text-yellow-300">Supplements</h3>
             </div>
 
@@ -1259,6 +1262,7 @@ const HotelBooking = () => {
                                   <p className="text-xs uppercase tracking-wide text-gray-500">
                                     Description
                                   </p>
+
                                   <h5 className="text-base font-bold text-white">
                                     {supplement?.Description || "Supplement"}
                                   </h5>
@@ -1272,6 +1276,7 @@ const HotelBooking = () => {
                               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <div className="rounded-xl border border-white/10 bg-black/20 p-3">
                                   <p className="text-xs text-gray-500">Index</p>
+
                                   <p className="mt-1 font-semibold text-gray-100">
                                     {supplement?.Index ?? index + 1}
                                   </p>
@@ -1279,6 +1284,7 @@ const HotelBooking = () => {
 
                                 <div className="rounded-xl border border-white/10 bg-black/20 p-3">
                                   <p className="text-xs text-gray-500">Type</p>
+
                                   <p className="mt-1 font-semibold text-purple-200">
                                     {supplement?.Type || "-"}
                                   </p>
@@ -1286,6 +1292,7 @@ const HotelBooking = () => {
 
                                 <div className="rounded-xl border border-white/10 bg-black/20 p-3">
                                   <p className="text-xs text-gray-500">Price</p>
+
                                   <p className="mt-1 font-semibold text-green-300">
                                     {Number(
                                       supplement?.Price || 0,
@@ -1300,6 +1307,7 @@ const HotelBooking = () => {
                                   <p className="text-xs text-gray-500">
                                     Currency
                                   </p>
+
                                   <p className="mt-1 font-semibold text-yellow-300">
                                     {supplement?.Currency || "-"}
                                   </p>
@@ -1323,6 +1331,7 @@ const HotelBooking = () => {
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">🛏️</span>
+
               <h3 className="font-semibold text-yellow-300">Room Amenities</h3>
             </div>
 
@@ -1349,6 +1358,7 @@ const HotelBooking = () => {
           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
             <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
               <span className="text-yellow-300">📋</span>
+
               <h3 className="font-semibold text-yellow-300">Rate Condition</h3>
             </div>
 
@@ -1377,49 +1387,10 @@ const HotelBooking = () => {
             </div>
           </div>
 
-          {validation.CorporateBokingAllowed && (
-            <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
-              <h3 className="mb-4 text-yellow-300">Corporate Booking</h3>
-
-              <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full border border-purple-400/30 bg-purple-400/10 px-4 py-2 text-sm text-purple-200">
-                <input
-                  type="checkbox"
-                  checked={isCorporate}
-                  onChange={(e) => setIsCorporate(e.target.checked)}
-                  className="accent-yellow-400"
-                />
-                Book as corporate customer
-              </label>
-
-              {isCorporate && (
-                <div className="mt-4">
-                  <input
-                    placeholder="Corporate PAN"
-                    className="input uppercase"
-                    value={corporatePAN}
-                    maxLength={10}
-                    onChange={(e) =>
-                      setCorporatePAN(
-                        e.target.value
-                          .replace(/[^A-Za-z0-9]/g, "")
-                          .toUpperCase(),
-                      )
-                    }
-                  />
-
-                  <p className="mt-2 text-xs text-gray-500">
-                    Corporate PAN must belong to the actual corporate customer.
-                    Do not use agency PAN, TBO PAN, or parent/guardian PAN for
-                    corporate booking.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
           {validation.IsPackageFare && (
             <div className="rounded-2xl border border-blue-400/20 bg-blue-400/10 p-5">
               <h3 className="font-semibold text-blue-200">Package Fare</h3>
+
               <p className="mt-2 text-sm text-blue-100/80">
                 This room is marked as package fare. The book request will send{" "}
                 <span className="font-semibold">IsPackageFare: true</span>.
@@ -1447,6 +1418,7 @@ const HotelBooking = () => {
                   }
                 >
                   <option value={0}>Flight</option>
+
                   <option value={1}>Surface</option>
                 </select>
 
@@ -1499,6 +1471,7 @@ const HotelBooking = () => {
                   }
                 >
                   <option value={0}>Flight</option>
+
                   <option value={1}>Surface</option>
                 </select>
 
@@ -1533,182 +1506,93 @@ const HotelBooking = () => {
             </div>
           )}
 
-          {validation.GSTAllowed && isCorporate && (
-            <div className="rounded-2xl border border-gray-800 bg-[#15151C] p-6">
-              <h3 className="mb-4 text-yellow-300">GST Details</h3>
+          {/* Guest Details */}
+          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-[#15151C]">
+            <div className="flex items-center gap-2 bg-[#1E2230] px-5 py-3">
+              <span className="text-yellow-300">🪪</span>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <input
-                  placeholder="GST Company Name"
-                  className="input"
-                  value={gstDetails.GSTCompanyName}
-                  onChange={(e) =>
-                    setGstDetails((prev) => ({
-                      ...prev,
-                      GSTCompanyName: e.target.value,
-                    }))
-                  }
-                />
-
-                <input
-                  placeholder="GST Number"
-                  className="input uppercase"
-                  value={gstDetails.GSTNumber}
-                  maxLength={15}
-                  onChange={(e) =>
-                    setGstDetails((prev) => ({
-                      ...prev,
-                      GSTNumber: e.target.value.toUpperCase(),
-                    }))
-                  }
-                />
-
-                <input
-                  placeholder="GST Company Email"
-                  className="input"
-                  value={gstDetails.GSTCompanyEmail}
-                  onChange={(e) =>
-                    setGstDetails((prev) => ({
-                      ...prev,
-                      GSTCompanyEmail: e.target.value.trim(),
-                    }))
-                  }
-                />
-
-                <input
-                  placeholder="GST Company Contact Number"
-                  className="input"
-                  value={gstDetails.GSTCompanyContactNumber}
-                  maxLength={10}
-                  onChange={(e) =>
-                    setGstDetails((prev) => ({
-                      ...prev,
-                      GSTCompanyContactNumber: e.target.value.replace(
-                        /\D/g,
-                        "",
-                      ),
-                    }))
-                  }
-                />
-
-                <input
-                  placeholder="GST Company Address"
-                  className="input sm:col-span-2"
-                  value={gstDetails.GSTCompanyAddress}
-                  onChange={(e) =>
-                    setGstDetails((prev) => ({
-                      ...prev,
-                      GSTCompanyAddress: e.target.value,
-                    }))
-                  }
-                />
-              </div>
+              <h3 className="font-semibold text-yellow-300">Guest Details</h3>
             </div>
-          )}
 
-          {guestList.map((guest, index) => (
-            <div
-              key={index}
-              className="rounded-2xl border border-gray-800 bg-[#15151C] p-6"
-            >
-              <h3 className="mb-4 text-yellow-300">
-                Room {guest.RoomIndex + 1} - Guest {getRoomGuestNumber(index)}{" "}
-                {guest.LeadPassenger && "(Lead)"}{" "}
-                <span className="text-sm text-gray-500">
-                  {guest.PaxType === 1 ? "Adult" : "Child"}
-                </span>
-              </h3>
+            <div className="space-y-6 p-5">
+              {/* Corporate booking checkbox */}
+              {validation.CorporateBokingAllowed && (
+                <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-5">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isCorporate}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
 
-              {guest.PaxType === 1 && (
-                <label className="mb-4 flex w-fit cursor-pointer items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-4 py-2 text-sm text-yellow-200">
-                  <input
-                    type="radio"
-                    name={`room-lead-${guest.RoomIndex}`}
-                    checked={guest.LeadPassenger}
-                    onChange={() => updateLeadPassenger(index)}
-                    className="accent-yellow-400"
-                  />
-                  Lead passenger for Room {guest.RoomIndex + 1}
-                </label>
+                        setIsCorporate(checked);
+
+                        if (checked) {
+                          // Remove retail PAN values when corporate mode is selected.
+                          setGuestList((prev) =>
+                            prev.map((guest) => ({
+                              ...guest,
+                              PAN: "",
+                              ParentPAN: "",
+                            })),
+                          );
+                        } else {
+                          setCorporatePAN("");
+
+                          setGstDetails({
+                            GSTCompanyAddress: "",
+                            GSTCompanyContactNumber: "",
+                            GSTCompanyName: "",
+                            GSTNumber: "",
+                            GSTCompanyEmail: "",
+                          });
+                        }
+                      }}
+                      className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-yellow-400"
+                    />
+
+                    <div>
+                      <p className="font-semibold text-yellow-300">
+                        Corporate Booking
+                      </p>
+
+                      <p className="mt-1 text-sm text-gray-400">
+                        Select this checkbox when booking for a corporate
+                        customer.
+                      </p>
+                    </div>
+                  </label>
+                </div>
               )}
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <select
-                  className="input title-select"
-                  value={guest.Title || "Mr"}
-                  onChange={(e) => updateGuest(index, "Title", e.target.value)}
-                >
-                  <option value="Mr">Mr</option>
-                  <option value="Mrs">Mrs</option>
-                  <option value="Ms">Ms</option>
-                  <option value="Miss">Miss</option>
-                </select>
+              {/* Corporate PAN appears only once */}
+              {isCorporate && (
+                <div className="rounded-xl border border-purple-400/20 bg-purple-400/5 p-5">
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-purple-200">
+                      Corporate PAN
+                    </h3>
 
-                <input
-                  placeholder="First Name"
-                  className="input"
-                  value={guest.FirstName}
-                  minLength={FIRST_NAME_MIN_LENGTH}
-                  onBlur={() => handleFirstNameBlur(index)}
-                  onChange={(e) => handleFirstNameChange(index, e.target.value)}
-                />
+                    <p className="mt-1 text-sm text-gray-400">
+                      Enter the Corporate PAN once for this booking. You do not
+                      need to enter it again for other guests.
+                    </p>
+                  </div>
 
-                <input
-                  placeholder="Last Name"
-                  className="input"
-                  value={guest.LastName}
-                  maxLength={
-                    validation.CharLimit && validation.PaxNameMaxLength
-                      ? validation.PaxNameMaxLength
-                      : 50
-                  }
-                  onChange={(e) =>
-                    updateGuest(
-                      index,
-                      "LastName",
-                      cleanNameInput(e.target.value),
-                    )
-                  }
-                />
+                  <div className="max-w-md">
+                    <label className="mb-2 block text-sm font-medium text-gray-300">
+                      Corporate PAN <span className="text-red-400">*</span>
+                    </label>
 
-                <div>
-                  <label className="mb-1 block text-xs text-gray-400">
-                    {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
-                  </label>
-
-                  <input
-                    type="number"
-                    min={guest.PaxType === 1 ? 12 : 1}
-                    max={guest.PaxType === 1 ? 120 : 12}
-                    placeholder={
-                      guest.PaxType === 1
-                        ? "Enter adult age"
-                        : "Child age from search"
-                    }
-                    className="input"
-                    value={guest.Age}
-                    disabled={guest.PaxType === 2}
-                    onChange={(e) => updateGuest(index, "Age", e.target.value)}
-                  />
-                </div>
-
-                {validation.PanMandatory && (
-                  <>
                     <input
-                      placeholder={
-                        guest.PaxType === 1
-                          ? "Adult Passenger PAN required"
-                          : isCorporate
-                            ? "Child Passenger PAN required"
-                            : "Child Passenger PAN"
-                      }
+                      type="text"
+                      placeholder="Enter Corporate PAN"
                       className="input uppercase"
-                      value={guest.PAN}
+                      value={corporatePAN}
                       maxLength={10}
+                      autoComplete="off"
                       onChange={(e) =>
-                        updateGuest(
-                          index,
-                          "PAN",
+                        setCorporatePAN(
                           e.target.value
                             .replace(/[^A-Za-z0-9]/g, "")
                             .toUpperCase(),
@@ -1716,76 +1600,292 @@ const HotelBooking = () => {
                       }
                     />
 
-                    {!isCorporate && guest.PaxType === 2 && (
-                      <input
-                        placeholder="Parent / Guardian PAN for child"
-                        className="input uppercase"
-                        value={guest.ParentPAN}
-                        maxLength={10}
-                        onChange={(e) =>
-                          updateGuest(
-                            index,
-                            "ParentPAN",
-                            e.target.value
-                              .replace(/[^A-Za-z0-9]/g, "")
-                              .toUpperCase(),
-                          )
-                        }
-                      />
-                    )}
-                  </>
-                )}
+                    <p className="mt-2 text-xs text-gray-500">
+                      Example: ABCDE1234F
+                    </p>
+                  </div>
+                </div>
+              )}
 
-                {guest.LeadPassenger && (
-                  <>
+              {/* Corporate GST details */}
+              {validation.GSTAllowed && isCorporate && (
+                <div className="rounded-xl border border-gray-800 bg-[#0B0B0F]/45 p-5">
+                  <h3 className="mb-4 text-yellow-300">GST Details</h3>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <input
-                      placeholder={`Lead Email - Room ${guest.RoomIndex + 1}`}
+                      placeholder="GST Company Name"
                       className="input"
-                      value={guest.Email}
+                      value={gstDetails.GSTCompanyName}
                       onChange={(e) =>
-                        updateGuest(index, "Email", e.target.value.trim())
+                        setGstDetails((prev) => ({
+                          ...prev,
+                          GSTCompanyName: e.target.value,
+                        }))
                       }
                     />
 
                     <input
-                      placeholder={`Lead Phone - Room ${guest.RoomIndex + 1}`}
+                      placeholder="GST Number"
+                      className="input uppercase"
+                      value={gstDetails.GSTNumber}
+                      maxLength={15}
+                      onChange={(e) =>
+                        setGstDetails((prev) => ({
+                          ...prev,
+                          GSTNumber: e.target.value
+                            .replace(/[^A-Za-z0-9]/g, "")
+                            .toUpperCase(),
+                        }))
+                      }
+                    />
+
+                    <input
+                      type="email"
+                      placeholder="GST Company Email"
                       className="input"
-                      value={guest.Phoneno}
+                      value={gstDetails.GSTCompanyEmail}
+                      onChange={(e) =>
+                        setGstDetails((prev) => ({
+                          ...prev,
+                          GSTCompanyEmail: e.target.value,
+                        }))
+                      }
+                    />
+
+                    <input
+                      type="tel"
+                      placeholder="GST Company Contact Number"
+                      className="input"
+                      value={gstDetails.GSTCompanyContactNumber}
                       maxLength={10}
+                      onChange={(e) =>
+                        setGstDetails((prev) => ({
+                          ...prev,
+                          GSTCompanyContactNumber: e.target.value.replace(
+                            /\D/g,
+                            "",
+                          ),
+                        }))
+                      }
+                    />
+
+                    <input
+                      placeholder="GST Company Address"
+                      className="input sm:col-span-2"
+                      value={gstDetails.GSTCompanyAddress}
+                      onChange={(e) =>
+                        setGstDetails((prev) => ({
+                          ...prev,
+                          GSTCompanyAddress: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Passenger cards */}
+              {guestList.map((guest, index) => (
+                <div
+                  key={`${guest.RoomIndex}-${index}`}
+                  className="rounded-xl border border-gray-800 bg-[#0B0B0F]/45 p-5"
+                >
+                  <h3 className="mb-4 text-yellow-300">
+                    Room {guest.RoomIndex + 1} - Guest{" "}
+                    {getRoomGuestNumber(index)}{" "}
+                    {guest.LeadPassenger && "(Lead)"}{" "}
+                    <span className="text-sm text-gray-500">
+                      {guest.PaxType === 1 ? "Adult" : "Child"}
+                    </span>
+                  </h3>
+
+                  {guest.PaxType === 1 && (
+                    <label className="mb-4 flex w-fit cursor-pointer items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-4 py-2 text-sm text-yellow-200">
+                      <input
+                        type="radio"
+                        name={`room-lead-${guest.RoomIndex}`}
+                        checked={guest.LeadPassenger}
+                        onChange={() => updateLeadPassenger(index)}
+                        className="accent-yellow-400"
+                      />
+                      Lead passenger for Room {guest.RoomIndex + 1}
+                    </label>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <select
+                      className="input title-select"
+                      value={guest.Title || "Mr"}
+                      onChange={(e) =>
+                        updateGuest(index, "Title", e.target.value)
+                      }
+                    >
+                      <option value="Mr">Mr</option>
+
+                      <option value="Mrs">Mrs</option>
+
+                      <option value="Ms">Ms</option>
+
+                      <option value="Miss">Miss</option>
+                    </select>
+
+                    <input
+                      placeholder="First Name"
+                      className="input"
+                      value={guest.FirstName}
+                      minLength={FIRST_NAME_MIN_LENGTH}
+                      maxLength={FIRST_NAME_MAX_LENGTH}
+                      onBlur={() => handleFirstNameBlur(index)}
+                      onChange={(e) =>
+                        handleFirstNameChange(index, e.target.value)
+                      }
+                    />
+
+                    <input
+                      placeholder="Last Name"
+                      className="input"
+                      value={guest.LastName}
+                      maxLength={
+                        validation.CharLimit && validation.PaxNameMaxLength
+                          ? validation.PaxNameMaxLength
+                          : 50
+                      }
                       onChange={(e) =>
                         updateGuest(
                           index,
-                          "Phoneno",
-                          e.target.value.replace(/\D/g, ""),
+                          "LastName",
+                          cleanNameInput(e.target.value),
                         )
                       }
                     />
-                  </>
-                )}
-              </div>
 
-              {validation.PanMandatory && (
-                <p className="mt-3 text-xs text-gray-500">
-                  {isCorporate
-                    ? "For corporate booking, passenger PAN is required for each guest. Parent/Guardian PAN is not allowed."
-                    : guest.PaxType === 2
-                      ? "For child passengers, you can provide either child PAN or Parent/Guardian PAN."
-                      : "For adult passengers, only the passenger's own PAN is allowed."}
-                </p>
-              )}
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-400">
+                        {guest.PaxType === 1 ? "Adult Age" : "Child Age"}
+                      </label>
+
+                      <input
+                        type="number"
+                        min={guest.PaxType === 1 ? 12 : 1}
+                        max={guest.PaxType === 1 ? 120 : 12}
+                        placeholder={
+                          guest.PaxType === 1
+                            ? "Enter adult age"
+                            : "Child age from search"
+                        }
+                        className="input"
+                        value={guest.Age}
+                        disabled={guest.PaxType === 2}
+                        onChange={(e) =>
+                          updateGuest(index, "Age", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    {/* Passenger PAN only for non-corporate bookings */}
+                    {validation.PanMandatory && !isCorporate && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder={
+                            guest.PaxType === 1
+                              ? "Adult Passenger PAN required"
+                              : "Child Passenger PAN"
+                          }
+                          className="input uppercase"
+                          value={guest.PAN}
+                          maxLength={10}
+                          autoComplete="off"
+                          onChange={(e) =>
+                            updateGuest(
+                              index,
+                              "PAN",
+                              e.target.value
+                                .replace(/[^A-Za-z0-9]/g, "")
+                                .toUpperCase(),
+                            )
+                          }
+                        />
+
+                        {guest.PaxType === 2 && (
+                          <input
+                            type="text"
+                            placeholder="Parent / Guardian PAN for child"
+                            className="input uppercase"
+                            value={guest.ParentPAN}
+                            maxLength={10}
+                            autoComplete="off"
+                            onChange={(e) =>
+                              updateGuest(
+                                index,
+                                "ParentPAN",
+                                e.target.value
+                                  .replace(/[^A-Za-z0-9]/g, "")
+                                  .toUpperCase(),
+                              )
+                            }
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {guest.LeadPassenger && (
+                      <>
+                        <input
+                          type="email"
+                          placeholder={`Lead Email - Room ${
+                            guest.RoomIndex + 1
+                          }`}
+                          className="input"
+                          value={guest.Email}
+                          onChange={(e) =>
+                            updateGuest(index, "Email", e.target.value)
+                          }
+                        />
+
+                        <input
+                          type="tel"
+                          placeholder={`Lead Phone - Room ${
+                            guest.RoomIndex + 1
+                          }`}
+                          className="input"
+                          value={guest.Phoneno}
+                          maxLength={10}
+                          onChange={(e) =>
+                            updateGuest(
+                              index,
+                              "Phoneno",
+                              e.target.value.replace(/\D/g, ""),
+                            )
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  {validation.PanMandatory && !isCorporate && (
+                    <p className="mt-3 text-xs text-gray-500">
+                      {guest.PaxType === 2
+                        ? "For child passengers, provide either the child PAN or a Parent/Guardian PAN."
+                        : "For adult passengers, only the passenger's own PAN is allowed."}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
+
+        {/* Price Summary */}
         <div className="sticky top-24 h-fit rounded-2xl border border-gray-800 bg-[#15151C] p-6">
           <h3 className="mb-4 text-lg text-yellow-300">Price Summary</h3>
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>
-                Total Amount{" "}
-                <p className="text-xs text-gray-200">
-                  (Inclusive of all taxes )
-                </p>
+                Total Amount
+                <p className="text-xs text-gray-200">Inclusive of all taxes</p>
               </span>
 
               <span>
@@ -1793,7 +1893,7 @@ const HotelBooking = () => {
                 {totalFare.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
-                })}{" "}
+                })}
               </span>
             </div>
 
@@ -1801,6 +1901,7 @@ const HotelBooking = () => {
 
             <div className="flex justify-between text-lg font-bold">
               <span>Total</span>
+
               <span className="text-yellow-400">
                 ₹{" "}
                 {totalFare.toLocaleString("en-IN", {
@@ -1827,13 +1928,16 @@ const HotelBooking = () => {
                 >
                   •
                 </span>
+
                 <span>
                   {validation.PanMandatory
-                    ? `PAN details are required for this booking${
-                        validation.PanCountRequired > 0
-                          ? ` (${validation.PanCountRequired} )`
-                          : ""
-                      }.`
+                    ? isCorporate
+                      ? "One Corporate PAN is required for this booking."
+                      : `PAN details are required for this booking${
+                          validation.PanCountRequired > 0
+                            ? ` (${validation.PanCountRequired})`
+                            : ""
+                        }.`
                     : "PAN details are not required for this booking."}
                 </span>
               </li>
@@ -1848,6 +1952,7 @@ const HotelBooking = () => {
                 >
                   •
                 </span>
+
                 <span>
                   {validation.CorporateBokingAllowed
                     ? "Corporate booking is allowed for this hotel."
@@ -1865,6 +1970,7 @@ const HotelBooking = () => {
                 >
                   •
                 </span>
+
                 <span>
                   {validation.IsPackageFare
                     ? "This room has package fare pricing."
@@ -1875,6 +1981,7 @@ const HotelBooking = () => {
           </div>
 
           <button
+            type="button"
             onClick={handleReviewBooking}
             className="mt-6 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 py-3 font-semibold text-black"
           >
@@ -1902,18 +2009,18 @@ const HotelBooking = () => {
           opacity: 0.7;
           cursor: not-allowed;
         }
-          
-          .title-select {
-  appearance: auto;
-  -webkit-appearance: auto;
-  color: #ffffff;
-  background-color: #0b0b0f;
-}
 
-.title-select option {
-  background: #111118;
-  color: #ffffff;
-}
+        .title-select {
+          appearance: auto;
+          -webkit-appearance: auto;
+          color: #ffffff;
+          background-color: #0b0b0f;
+        }
+
+        .title-select option {
+          background: #111118;
+          color: #ffffff;
+        }
       `}</style>
     </div>
   );
