@@ -1123,11 +1123,11 @@ const HotelBooking = () => {
                 </span>
               )}
 
-              {validation.CorporateBokingAllowed && (
+              {/* {validation.CorporateBokingAllowed && (
                 <span className="rounded-full border border-purple-400/30 bg-purple-400/10 px-3 py-1 text-purple-200">
                   Corporate Booking Allowed
                 </span>
-              )}
+              )} */}
             </div>
           </div>
 
