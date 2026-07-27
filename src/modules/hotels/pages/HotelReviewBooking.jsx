@@ -1888,7 +1888,7 @@ const HotelReviewBooking = () => {
 
       {showCorporateConsent && (
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-3 py-4 backdrop-blur-sm sm:px-6"
+          className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 px-3 py-4 backdrop-blur-sm sm:px-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="corporate-consent-title"
