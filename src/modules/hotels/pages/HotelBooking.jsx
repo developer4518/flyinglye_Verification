@@ -572,7 +572,20 @@ const HotelBooking = () => {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
 
-  const isValidPAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
+  const normalizePAN = (pan) =>
+    String(pan || "")
+      .trim()
+      .toUpperCase();
+
+  const isValidPAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(normalizePAN(pan));
+
+  /*
+   * PAN structure: AAAAA9999A
+   * The 4th character identifies the PAN holder type.
+   * For a company/corporate PAN, the 4th character must be "C".
+   */
+  const isValidCorporatePAN = (pan) =>
+    /^[A-Z]{3}C[A-Z][0-9]{4}[A-Z]$/.test(normalizePAN(pan));
 
   const isValidGST = (gst) =>
     /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gst);
@@ -646,10 +659,14 @@ const HotelBooking = () => {
         return "Corporate booking is not allowed for this hotel";
       }
 
-      const finalCorporatePAN = corporatePAN.trim().toUpperCase();
+      const finalCorporatePAN = normalizePAN(corporatePAN);
 
       if (!isValidPAN(finalCorporatePAN)) {
-        return "Valid Corporate PAN is required for corporate booking";
+        return "Enter a valid 10-character Corporate PAN in AAAAA9999A format";
+      }
+
+      if (!isValidCorporatePAN(finalCorporatePAN)) {
+        return 'Corporate PAN must have "C" as its 4th character';
       }
     }
 
@@ -874,7 +891,7 @@ const HotelBooking = () => {
     }
 
     try {
-      const finalCorporatePAN = corporatePAN.trim().toUpperCase();
+      const finalCorporatePAN = normalizePAN(corporatePAN);
 
       const cleanedGuests = guestList.map((g) => {
         const passenger = {
@@ -1587,10 +1604,18 @@ const HotelBooking = () => {
                     <input
                       type="text"
                       placeholder="Enter Corporate PAN"
-                      className="input uppercase"
+                      className={`input uppercase ${
+                        corporatePAN && !isValidCorporatePAN(corporatePAN)
+                          ? "border-red-400!"
+                          : ""
+                      }`}
                       value={corporatePAN}
                       maxLength={10}
                       autoComplete="off"
+                      aria-invalid={
+                        Boolean(corporatePAN) &&
+                        !isValidCorporatePAN(corporatePAN)
+                      }
                       onChange={(e) =>
                         setCorporatePAN(
                           e.target.value
@@ -1600,9 +1625,25 @@ const HotelBooking = () => {
                       }
                     />
 
-                    <p className="mt-2 text-xs text-gray-500">
-                      Example: ABCDE1234F
-                    </p>
+                    {corporatePAN && !isValidPAN(corporatePAN) ? (
+                      <p className="mt-2 text-xs text-red-300">
+                        PAN must contain 5 letters, 4 numbers and 1 final
+                        letter.
+                      </p>
+                    ) : corporatePAN && !isValidCorporatePAN(corporatePAN) ? (
+                      <p className="mt-2 text-xs text-red-300">
+                        NOT A Valid CORPORATE PAN
+                      </p>
+                    ) : corporatePAN ? (
+                      <p className="mt-2 text-xs text-green-300">
+                        Valid corporate PAN format.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Format: AAAAA9999A. Example: ABCCD1234E. The 4th
+                        character must be C.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
