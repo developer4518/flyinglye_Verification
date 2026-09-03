@@ -179,12 +179,21 @@ const HotelInvoice = () => {
     "Hotel";
 
   const city =
+    // ✅ First priority: city originally searched by user
+    savedData?.searchCity ||
+    savedData?.reviewBookingData?.searchCity ||
+    // Hotel data fallback
+    hotel?.city_name ||
     hotel?.city ||
     hotel?.CityName ||
     hotel?.City ||
+    // Booking response fallback
     booking?.CityName ||
     booking?.HotelCity ||
     booking?.City ||
+    // PreBook fallback
+    savedData?.prebookData?.cityName ||
+    savedData?.prebookData?.CityName ||
     "N/A";
 
   const checkIn =
@@ -348,6 +357,28 @@ const HotelInvoice = () => {
         booking?.ReceivableAmount ||
         booking?.TotalReceivable,
     ) || Number(netAmount || gross || 0);
+
+  // ✅ Convenience fee received from PreBook backend
+  const convenienceFee = Number(
+    savedData?.convenienceFee ??
+      savedData?.reviewBookingData?.convenienceFee ??
+      savedData?.prebookData?.convenience_fee ??
+      0,
+  );
+
+  // ✅ Actual amount paid through PayU
+  const totalPaid = Number(
+    savedData?.paidAmount ??
+      savedData?.paymentAmount ??
+      savedData?.totalAmount ??
+      savedData?.reviewBookingData?.totalAmount ??
+      savedData?.prebookData?.total_amount ??
+      0,
+  );
+
+  console.log("INVOICE NET AMOUNT:", netAmount);
+  console.log("INVOICE CONVENIENCE FEE:", convenienceFee);
+  console.log("INVOICE TOTAL PAID:", totalPaid);
 
   const taxableValue =
     Number(
@@ -808,6 +839,7 @@ const HotelInvoice = () => {
                 />
 
                 <div className="border-t border-(--border-soft) pt-3">
+                  {/* Existing Net Amount */}
                   <AmountRow
                     label="Net Amount"
                     value={netAmount}
@@ -815,14 +847,24 @@ const HotelInvoice = () => {
                     highlight
                   />
 
-                  <div className="flex justify-between gap-4 text-lg font-bold text-(--gold-main) mt-2">
-                    <span>Net Receivable</span>
-                    <span>{formatMoney(netReceivable, currency)}</span>
+                  <div className="mt-3 flex justify-between gap-4 text-(--text-muted)">
+                    <span>Convenience Fee</span>
+
+                    <span>{formatMoney(convenienceFee, currency)}</span>
                   </div>
 
-                  <p className="text-xs text-(--text-muted) text-right mt-1">
-                    Amount in {currency}
-                  </p>
+                  {/* Final amount customer actually paid */}
+                  <div className="mt-4 border-t border-(--border-soft) pt-4">
+                    <div className="flex justify-between gap-4 text-xl font-bold text-(--gold-main)">
+                      <span>Total Amount</span>
+
+                      <span>{formatMoney(totalPaid, currency)}</span>
+                    </div>
+
+                    <p className="mt-1 text-right text-xs text-(--text-muted)">
+                      Total amount paid through payment gateway
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

@@ -637,6 +637,30 @@ const PrebookLoader = () => {
           "",
         );
 
+        const finalConvenienceFee = toNumber(
+          getSafeValue(
+            apiPrebookData?.convenience_fee,
+            apiPrebookData?.convenienceFee,
+            apiPrebookData?.ConvenienceFee,
+            0,
+          ),
+          0,
+        );
+
+        const finalTotalAmount = toNumber(
+          getSafeValue(
+            apiPrebookData?.total_amount,
+            apiPrebookData?.totalAmount,
+            apiPrebookData?.TotalAmount,
+            0,
+          ),
+          0,
+        );
+
+        console.log("PREBOOK NET AMOUNT:", finalNetAmount);
+        console.log("PREBOOK CONVENIENCE FEE:", finalConvenienceFee);
+        console.log("PREBOOK TOTAL AMOUNT:", finalTotalAmount);
+
         const finalPrebookData = {
           ...apiPrebookData,
 
@@ -655,18 +679,9 @@ const PrebookLoader = () => {
           net_amount: finalNetAmount,
           NetAmount: finalNetAmount,
 
-          // Important: do not pass backend total_amount for customer display
-          total_amount: finalTotalFare,
-
-          convenience_fee: toNumber(
-            getSafeValue(
-              apiPrebookData?.convenience_fee,
-              apiPrebookData?.convenienceFee,
-              apiPrebookData?.ConvenienceFee,
-              0,
-            ),
-            0,
-          ),
+          // ✅ Backend calculated amounts
+          convenience_fee: finalConvenienceFee,
+          total_amount: finalTotalAmount,
 
           roomPromotion: finalRoomPromotions,
           room_promotions: finalRoomPromotions,
@@ -723,6 +738,8 @@ const PrebookLoader = () => {
             displayFare: finalTotalFare,
             net_amount: finalNetAmount,
             NetAmount: finalNetAmount,
+            convenience_fee: finalConvenienceFee,
+            total_amount: finalTotalAmount,
 
             roomPromotion: finalRoomPromotions,
             room_promotions: finalRoomPromotions,

@@ -251,10 +251,23 @@ const FlightsResults = () => {
     <div className="min-h-screen bg-(--bg-main) pt-20 pb-24 text-(--text-main)">
       <div className="max-w-6xl mx-auto px-3 lg:px-4 py-6 grid lg:grid-cols-[260px_1fr] gap-6">
         {/* Desktop Filters */}
-        <aside className="hidden lg:block bg-(--bg-card) p-6 rounded-xl border border-(--border-soft) h-fit sticky top-24">
+        {/* Desktop Filters */}
+        <aside
+          className="
+    hidden lg:block
+    bg-(--bg-card)
+    p-6
+    rounded-xl
+    border border-(--border-soft)
+    sticky top-24
+    max-h-[calc(100vh-7rem)]
+    overflow-y-auto
+  "
+        >
           <h3 className="font-semibold text-lg mb-4 text-(--gold-main)">
             Filters
           </h3>
+
           <FilterContent />
         </aside>
 

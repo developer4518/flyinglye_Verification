@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useHotelStore } from "../../../store/hotelStore";
 
 const HotelBooking = () => {
-  const { setGuestDetails } = useHotelStore();
+  const { setGuestDetails, search } = useHotelStore();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -1054,23 +1054,52 @@ const HotelBooking = () => {
         finalPayload,
         guestList: guestsForStorage,
         bookingCode,
+
         hotel,
         roomData,
         hotelResult,
+
         prebookData: preBook,
+
         checkIn,
         checkOut,
+
+        // ✅ City originally selected by user in hotel search
+        searchCity:
+          search?.cityName ||
+          search?.city?.name ||
+          search?.city?.Name ||
+          search?.city?.label ||
+          search?.city?.Label ||
+          (typeof search?.city === "string" ? search.city : "") ||
+          "",
+
         net,
+
         TotalFare: totalFare,
         totalFare,
         displayFare: totalFare,
+
+        // ✅ Backend payment values
+        convenienceFee: Number(
+          preBook?.convenience_fee ?? payload?.convenience_fee ?? 0,
+        ),
+
+        totalAmount: Number(
+          preBook?.total_amount ?? payload?.total_amount ?? 0,
+        ),
+
         validation,
         validationInfo,
+
         isCorporate,
         corporatePAN: finalCorporatePAN,
+
         gstDetails,
+
         arrivalTransport,
         departureTransport,
+
         cancellationPolicies,
         roomPromotions,
         supplements,
@@ -1089,6 +1118,9 @@ const HotelBooking = () => {
         state: reviewBookingData,
       });
     } catch (err) {
+      console.error("REVIEW BOOKING FULL ERROR:", err);
+      console.error("ERROR STACK:", err?.stack);
+
       alert(err?.message || "Unable to prepare review booking");
     }
   };

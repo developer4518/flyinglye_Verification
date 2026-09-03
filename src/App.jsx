@@ -35,6 +35,7 @@ import HotelBookingSuccess from "./modules/hotels/pages/HotelBookingSuccess";
 import HotelReviewBooking from "./modules/hotels/pages/HotelReviewBooking";
 import HotelVoucher from "./modules/hotels/pages/HotelVoucher";
 import HotelInvoice from "./modules/hotels/pages/HotelInvoice";
+import PaymentSuccess from "./modules/hotels/pages/PaymentSuccess";
 
 const App = () => {
   return (
@@ -68,15 +69,23 @@ const App = () => {
         <Route path="/hotels/:id" element={<HotelDetails />} />
         <Route path="/prebook" element={<PrebookLoader />} />
         <Route path="/hotel-booking" element={<HotelBooking />} />
+
         <Route path="/hotel-review-booking" element={<HotelReviewBooking />} />
+
+        {/* Payment success page */}
+        <Route path="/payment-success" element={<PaymentSuccess />} />
+
         <Route path="/booking-details/:bookingId" element={<HotelVoucher />} />
+
         <Route path="/hotel-invoice/:bookingId" element={<HotelInvoice />} />
+
         <Route
           path="/hotel-booking-success"
           element={<HotelBookingSuccess />}
         />
+
         <Route
-          path="/booking-details/:bookingId"
+          path="/hotel-booking-details/:bookingId"
           element={<HotelBookingDetails />}
         />
 

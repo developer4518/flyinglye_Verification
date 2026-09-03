@@ -583,21 +583,25 @@ const PassengerDetails = () => {
   const handleContinue = () => {
     if (!validatePassengers()) return;
 
-    const normalizedPassengers = passengers.map((passenger) => ({
-      ...passenger,
-      firstName: normalizeText(passenger.firstName),
-      lastName: normalizeText(passenger.lastName),
-      email: passenger.email.trim(),
-      phone: passenger.phone.trim(),
-      address: normalizeText(passenger.address),
-      city: normalizeText(passenger.city),
-      country: normalizeText(passenger.country),
-      nationality: passenger.nationality.trim().toUpperCase(),
-      passport: passenger.passport.trim().toUpperCase(),
-      dob: formatDate(passenger.dob),
-      passportIssueDate: formatDate(passenger.passportIssueDate),
-      passportExpiry: formatDate(passenger.passportExpiry),
-    }));
+   const normalizedPassengers = passengers.map((passenger, index) => ({
+  ...passenger,
+
+  // ✅ Save actual passenger type
+  paxType: passengerTypes[index] || 1,
+
+  firstName: normalizeText(passenger.firstName),
+  lastName: normalizeText(passenger.lastName),
+  email: passenger.email.trim(),
+  phone: passenger.phone.trim(),
+  address: normalizeText(passenger.address),
+  city: normalizeText(passenger.city),
+  country: normalizeText(passenger.country),
+  nationality: passenger.nationality.trim().toUpperCase(),
+  passport: passenger.passport.trim().toUpperCase(),
+  dob: formatDate(passenger.dob),
+  passportIssueDate: formatDate(passenger.passportIssueDate),
+  passportExpiry: formatDate(passenger.passportExpiry),
+}));
 
     localStorage.setItem(
       "bookingData",

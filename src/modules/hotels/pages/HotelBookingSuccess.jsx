@@ -568,6 +568,20 @@ const HotelBookingSuccess = () => {
       0,
   );
 
+  // ✅ Actual amount paid by user through PayU
+// This includes convenience fee
+const totalPaid = Number(
+  savedData?.paidAmount ??
+    savedData?.paymentAmount ??
+    savedData?.totalAmount ??
+    savedData?.prebookData?.total_amount ??
+    totalFare ??
+    0,
+);
+
+console.log("HOTEL TOTAL FARE:", totalFare);
+console.log("ACTUAL PAYU TOTAL PAID:", totalPaid);
+
   const offeredRate =
     roomData?.TotalFare ||
     booking?.TotalFare ||
@@ -1487,8 +1501,8 @@ const HotelBookingSuccess = () => {
                   </span>
 
                   <span className="text-2xl font-black text-yellow-400">
-                    {formatMoney(totalFare, currency)}
-                  </span>
+  {formatMoney(totalPaid, currency)}
+</span>
                 </div>
               </div>
 

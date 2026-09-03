@@ -644,6 +644,30 @@ const HotelReviewBooking = () => {
   const packageFareFlags = getPackageFareFlags(reviewData || {});
   const gstAllowed = getGSTAllowed(reviewData || {});
 
+  // =====================================================
+// PAYMENT AMOUNTS FROM PREBOOK BACKEND
+// No frontend calculation here.
+// =====================================================
+
+const hotelAmount = Number(
+  reviewData?.net ??
+    reviewData?.prebookData?.net_amount ??
+    reviewData?.prebookData?.NetAmount ??
+    0,
+);
+
+const convenienceFee = Number(
+  reviewData?.convenienceFee ??
+    reviewData?.prebookData?.convenience_fee ??
+    0,
+);
+
+const totalPayable = Number(
+  reviewData?.totalAmount ??
+    reviewData?.prebookData?.total_amount ??
+    0,
+);
+
   const [transportForm, setTransportForm] = useState(() => {
     const payload = reviewData?.finalPayload || {};
 
@@ -1075,6 +1099,75 @@ const HotelReviewBooking = () => {
     }
   };
 
+ const initiatePayment = () => {
+  const leadGuest =
+    reviewData?.guestList?.find((guest) => guest.LeadPassenger) ||
+    reviewData?.guestList?.[0];
+
+  if (!leadGuest) {
+    alert("Lead passenger details missing");
+    return;
+  }
+
+  const paymentAmount = Number(totalPayable || 0);
+
+  if (!paymentAmount || paymentAmount <= 0) {
+    alert("Payment amount missing");
+    return;
+  }
+
+  // ✅ Build EXACT hotel booking payload before payment
+  const bookingPayload = buildFinalBookingPayload();
+
+  console.log("PAYMENT AMOUNT:", paymentAmount);
+  console.log("PENDING HOTEL BOOKING PAYLOAD:", bookingPayload);
+
+  // ✅ Save everything required after PayU payment
+  localStorage.setItem(
+    "pendingHotelBooking",
+    JSON.stringify({
+      reviewData,
+
+      bookingPayload,
+
+      transportForm,
+
+      gstForms,
+
+      paymentAmount,
+    }),
+  );
+
+  const form = document.createElement("form");
+
+  form.method = "POST";
+
+  form.action = `${
+    import.meta.env.VITE_API_BASE_URL
+  }/payment/initiate/`;
+
+  const paymentData = {
+    amount: paymentAmount,
+    firstname: leadGuest.FirstName,
+    email: leadGuest.Email,
+    phone: leadGuest.Phoneno,
+  };
+
+  Object.entries(paymentData).forEach(([key, value]) => {
+    const input = document.createElement("input");
+
+    input.type = "hidden";
+    input.name = key;
+    input.value = value || "";
+
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+
+  form.submit();
+};
+
   const handleConfirmBooking = () => {
     if (!reviewData?.finalPayload) {
       alert("Booking payload missing");
@@ -1100,7 +1193,7 @@ const HotelReviewBooking = () => {
      * Normal booking:
      * Continue directly without the corporate popup.
      */
-    performBooking();
+    initiatePayment();
   };
 
   const handleAcceptCorporateConsent = () => {
@@ -1108,7 +1201,7 @@ const HotelReviewBooking = () => {
 
     setShowCorporateConsent(false);
 
-    performBooking();
+    initiatePayment();
   };
 
   if (!reviewData) {
@@ -1836,26 +1929,50 @@ const HotelReviewBooking = () => {
             </h3>
 
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between text-gray-300">
-                <span>
-                  Total Amount{" "}
-                  <p className="text-xs text-gray-200">
-                    (Inclusive of all taxes and TDS)
-                  </p>
-                </span>
 
-                <span>₹ {formatPrice(net)}</span>
-              </div>
+  {/* Hotel Amount */}
+  <div className="flex justify-between text-gray-300">
+    <span>
+      Total Amount
 
-              <hr className="border-gray-700" />
+      <p className="text-xs text-gray-200">
+        Inclusive of all taxes and TDS
+      </p>
+    </span>
 
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total Payable</span>
-                <span className="text-yellow-400">
-                  ₹ {formatPrice(net || 0)}
-                </span>
-              </div>
-            </div>
+    <span>
+      ₹ {formatPrice(hotelAmount)}
+    </span>
+  </div>
+
+
+  {/* Convenience Fee */}
+  <div className="flex justify-between text-gray-300">
+    <span>
+      Convenience Fee
+    </span>
+
+    <span>
+      ₹ {formatPrice(convenienceFee)}
+    </span>
+  </div>
+
+
+  <hr className="border-gray-700" />
+
+
+  {/* Backend Total Amount */}
+  <div className="flex justify-between text-lg font-bold">
+    <span>
+      Total Payable
+    </span>
+
+    <span className="text-yellow-400">
+      ₹ {formatPrice(totalPayable)}
+    </span>
+  </div>
+
+</div>
 
             {packageFareFlags.isPackageFare && (
               <div className="mt-5 rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-xs text-yellow-100">
@@ -1959,7 +2076,7 @@ const HotelReviewBooking = () => {
                     FLYINGLYTE
                   </strong>
                   (the “Travel Agency”), hereby declare, represent, and
-                  undertake as follows:  
+                  undertake as follows:
                 </p>
 
                 <ul className="mt-5 space-y-4 pl-5 text-sm leading-7 text-slate-700 marker:text-[#276A9D] sm:text-base sm:leading-8">

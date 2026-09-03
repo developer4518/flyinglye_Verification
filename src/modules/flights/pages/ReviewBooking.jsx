@@ -141,9 +141,8 @@ const ReviewBooking = () => {
       /* ---------- PASSENGERS ---------- */
 
       const formattedPassengers = passengers.map((p, index) => {
-        let paxType = 1;
-        if (p.type === "child") paxType = 2;
-        if (p.type === "infant") paxType = 3;
+        // ✅ 1 = Adult, 2 = Child, 3 = Infant
+        const paxType = Number(p.paxType || 1);
 
         const paxFare = getFareByPaxType(paxType);
 
@@ -152,7 +151,7 @@ const ReviewBooking = () => {
           FirstName: p.firstName,
           LastName: p.lastName,
           PaxType: paxType,
-          Gender: p.gender === "male" ? 1 : 2,
+          Gender: String(p.gender || "").toLowerCase() === "male" ? 1 : 2,
 
           DateOfBirth: formatDate(p.dob),
 
