@@ -386,7 +386,7 @@ const BookingSuccess = () => {
           <div className="bg-linear-to-r from-green-500 to-emerald-600 text-white p-6 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between">
             <div>
               <h2 className="text-2xl md:text-3xl font-bold">
-                {isOnHold ? "⏸ Booking Held" : "🎉 Booking Confirmed"}
+                {isOnHold ? "⏸ Booking Hold" : "🎉 Booking Confirmed"}
               </h2>
 
               <p className="text-sm mt-1 opacity-90">

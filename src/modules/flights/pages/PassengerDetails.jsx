@@ -830,6 +830,7 @@ const PassengerDetails = () => {
                     name="phone"
                     value={passenger.phone}
                     onChange={(event) => handleChange(index, event)}
+                    maxLength={10}
                     className={inputStyle}
                   />
                 </div>
