@@ -134,6 +134,8 @@ const ReviewBooking = () => {
       const newTraceId = response.TraceId;
       const newResultIndex = response.Results.ResultIndex;
       const fareBreakdown = response.Results.FareBreakdown || [];
+      // ✅ Source required for Release PNR
+      const source = response?.Results?.Source;
 
       const getFareByPaxType = (paxType) =>
         fareBreakdown.find((f) => f.PassengerType === paxType) || {};
@@ -222,45 +224,45 @@ const ReviewBooking = () => {
           /* ---------- SEAT ---------- */
           ...(isLcc &&
             isValidSeat && {
-              SeatDynamic: [
-                {
-                  WayType: seat.WayType,
-                  Code: seat.Code,
-                  Origin: seat.Origin,
-                  Destination: seat.Destination,
-                },
-              ],
-            }),
+            SeatDynamic: [
+              {
+                WayType: seat.WayType,
+                Code: seat.Code,
+                Origin: seat.Origin,
+                Destination: seat.Destination,
+              },
+            ],
+          }),
 
           /* ---------- MEAL (FIXED) ---------- */
           ...(isLcc &&
             isValidMeal && {
-              MealDynamic: [
-                {
-                  WayType: meal.WayType,
-                  Code: meal.Code,
-                  Origin: meal.Origin,
-                  Destination: meal.Destination,
-                },
-              ],
-            }),
+            MealDynamic: [
+              {
+                WayType: meal.WayType,
+                Code: meal.Code,
+                Origin: meal.Origin,
+                Destination: meal.Destination,
+              },
+            ],
+          }),
 
           /* ---------- BAGGAGE ---------- */
           ...(isLcc &&
             isValidBaggage && {
-              BaggageDynamic: [
-                {
-                  WayType: baggage.WayType,
-                  Code: baggage.Code,
-                  Description: baggage.Description || "Baggage",
-                  Weight: baggage.Weight || "0",
-                  Currency: baggage.Currency || "INR",
-                  Price: Number(baggage.Price || 0),
-                  Origin: baggage.Origin,
-                  Destination: baggage.Destination,
-                },
-              ],
-            }),
+            BaggageDynamic: [
+              {
+                WayType: baggage.WayType,
+                Code: baggage.Code,
+                Description: baggage.Description || "Baggage",
+                Weight: baggage.Weight || "0",
+                Currency: baggage.Currency || "INR",
+                Price: Number(baggage.Price || 0),
+                Origin: baggage.Origin,
+                Destination: baggage.Destination,
+              },
+            ],
+          }),
         };
       });
 
@@ -288,6 +290,13 @@ const ReviewBooking = () => {
         "flightBookingData",
         JSON.stringify({
           booking: res?.data,
+
+          // ✅ Release PNR ke liye
+          source: source,
+          isLcc: isLcc,
+          traceId: newTraceId,
+          passengers: formattedPassengers,
+
           pricing: {
             flightFare,
             seatPrice,
@@ -305,8 +314,8 @@ const ReviewBooking = () => {
 
       alert(
         error?.response?.data?.Error?.ErrorMessage ||
-          error?.response?.data?.message ||
-          "Booking failed",
+        error?.response?.data?.message ||
+        "Booking failed",
       );
     } finally {
       setLoading(false);
@@ -382,9 +391,8 @@ const ReviewBooking = () => {
       <button
         onClick={handleBook}
         disabled={loading}
-        className={`px-6 py-3 rounded-lg text-white ${
-          loading ? "bg-gray-400" : "bg-green-600"
-        }`}
+        className={`px-6 py-3 rounded-lg text-white ${loading ? "bg-gray-400" : "bg-green-600"
+          }`}
       >
         {loading ? "Booking..." : "Confirm Booking"}
       </button>

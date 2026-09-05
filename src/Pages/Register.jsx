@@ -105,6 +105,7 @@ const Register = () => {
               value={formData.password1}
               onChange={handleChange}
               className="w-full bg-(--bg-secondary) border border-(--border-soft) rounded-xl px-4 py-3 text-white pr-12 focus:border-(--gold-main) outline-none transition"
+              minLength={8}
               required
             />
 
@@ -117,6 +118,10 @@ const Register = () => {
             </button>
           </div>
 
+          <p className="text-xs text-(--text-muted) mt-2 ml-1">
+            Password must be at least 8 characters.
+          </p>
+
           {/* Confirm Password */}
           <div className="relative">
             <input
@@ -126,6 +131,7 @@ const Register = () => {
               value={formData.password2}
               onChange={handleChange}
               className="w-full bg-(--bg-secondary) border border-(--border-soft) rounded-xl px-4 py-3 text-white pr-12 focus:border-(--gold-main) outline-none transition"
+              minLength={8}
               required
             />
 
