@@ -113,9 +113,11 @@ const SSRPage = () => {
       0,
   );
 
-  const convenienceFee = Number(
-    pricing?.ConvenienceFee || fareQuote?.ConvenienceFee || 0,
-  );
+  // const convenienceFee = Number(
+  //   pricing?.ConvenienceFee || fareQuote?.ConvenienceFee || 0,
+  // );
+  // TEMP: Convenience fee disabled for verification
+const convenienceFee = 0;
 
   const isSeatMandatory = toBool(
     flightValidation?.isSeatMandatory ||

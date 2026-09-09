@@ -82,16 +82,21 @@ const getPricing = (fareQuote) => {
       0,
   );
 
-  const convenienceFee = Number(
-    pricing?.ConvenienceFee || fareQuote?.ConvenienceFee || 0,
-  );
+  // const convenienceFee = Number(
+  //   pricing?.ConvenienceFee || fareQuote?.ConvenienceFee || 0,
+  // );
 
-  const totalPayable = Number(
-    pricing?.TotalPayable ||
-      fareQuote?.TotalPayable ||
-      flightFare + convenienceFee ||
-      0,
-  );
+  // const totalPayable = Number(
+  //   pricing?.TotalPayable ||
+  //     fareQuote?.TotalPayable ||
+  //     flightFare + convenienceFee ||
+  //     0,
+  // );
+
+  // TEMP: Convenience fee disabled for verification
+const convenienceFee = 0;
+
+const totalPayable = flightFare;
 
   return {
     flightFare,

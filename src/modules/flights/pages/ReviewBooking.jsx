@@ -67,7 +67,9 @@ const ReviewBooking = () => {
 
   // ✅ EXACT SAME AS SSR PAGE
   const flightFare = getPrice(pricing?.TBOFare);
-  const convenienceFee = getPrice(pricing?.ConvenienceFee);
+  // const convenienceFee = getPrice(pricing?.ConvenienceFee);
+  // TEMP: Convenience fee disabled for verification
+  const convenienceFee = 0;
 
   // SSR
   const seatPrice = selectedSeats.reduce(
@@ -374,10 +376,10 @@ const ReviewBooking = () => {
             </div>
           )}
 
-          <div className="flex justify-between">
+          {/* <div className="flex justify-between">
             <span>Convenience Fee</span>
             <span>₹{convenienceFee}</span>
-          </div>
+          </div> */}
 
           <hr />
 

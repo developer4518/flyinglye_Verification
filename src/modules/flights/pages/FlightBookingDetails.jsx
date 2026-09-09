@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  useNavigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
 import { privateApi } from "../../../services/api";
 
 const safeJSONParse = (value) => {
@@ -100,9 +104,8 @@ const getTicketNumber = (passenger) => {
 };
 
 const getPassengerName = (passenger) => {
-  return `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${
-    passenger?.LastName || ""
-  }`
+  return `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${passenger?.LastName || ""
+    }`
     .replace(/\s+/g, " ")
     .trim();
 };
@@ -160,10 +163,10 @@ const getFareSummary = (stored, itinerary) => {
 
   const flightFare = Number(
     pricing?.flightFare ||
-      fare?.PublishedFare ||
-      fare?.OfferedFare ||
-      fare?.BaseFare ||
-      0,
+    fare?.PublishedFare ||
+    fare?.OfferedFare ||
+    fare?.BaseFare ||
+    0,
   );
 
   const seatPrice = Number(pricing?.seatPrice || 0);
@@ -173,9 +176,9 @@ const getFareSummary = (stored, itinerary) => {
 
   const totalFare = Number(
     pricing?.totalPrice ||
-      fare?.PublishedFare ||
-      flightFare + seatPrice + mealPrice + baggagePrice + convenienceFee ||
-      0,
+    fare?.PublishedFare ||
+    flightFare + seatPrice + mealPrice + baggagePrice + convenienceFee ||
+    0,
   );
 
   return {
@@ -204,6 +207,7 @@ const FlightBookingDetails = () => {
 
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
 
   const fetchBooking = async ({ silent = false } = {}) => {
     try {
@@ -221,12 +225,47 @@ const FlightBookingDetails = () => {
 
       const bookingId = getStoredBookingId(stored, id);
 
+
+      const statePnr = location.state?.pnr;
+
+      const storedPnr = getPNR(
+        getItinerary(stored?.booking),
+        stored?.booking,
+      );
+
+      const pnr =
+        statePnr ||
+        (storedPnr !== "N/A" ? storedPnr : null);
+
       if (!bookingId) {
         throw new Error("BookingId missing");
       }
 
-      const res = await privateApi.post("/api/airlines/booking-details/", {
-        BookingId: Number(bookingId),
+      if (!pnr) {
+        throw new Error("PNR missing");
+      }
+
+      const res = await privateApi.post(
+        "/api/airlines/booking-details/",
+        {
+          PNR: pnr,
+          BookingId: Number(bookingId),
+        },
+      );
+
+
+      console.log("BOOKING DETAILS FULL RESPONSE 👉", data);
+
+      console.log("BOOKING STATUS CHECK 👉", {
+        booking_id: data?.booking_id,
+        pnr: data?.pnr,
+        ticket_id: data?.ticket_id,
+        ticket_number: data?.ticket_number,
+        detected_status: data?.detected_status,
+        booking_status: data?.booking_status,
+        ticket_status: data?.ticket_status,
+        pnr_status: data?.pnr_status,
+        cancellation_status: data?.cancellation_status,
       });
 
       const apiData = res?.data;
@@ -246,10 +285,10 @@ const FlightBookingDetails = () => {
 
       setError(
         err?.response?.data?.Response?.Error?.ErrorMessage ||
-          err?.response?.data?.Error?.ErrorMessage ||
-          err?.response?.data?.message ||
-          err?.message ||
-          "Unable to fetch booking details",
+        err?.response?.data?.Error?.ErrorMessage ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Unable to fetch booking details",
       );
     } finally {
       setLoading(false);
@@ -288,7 +327,37 @@ const FlightBookingDetails = () => {
 
     const statusClass = getStatusClass(itinerary?.Status, hasTicket);
 
-    const priceSummary = getFareSummary(stored, itinerary);
+    const priceSummary = location.state?.fromMyBookings
+      ? {
+        flightFare: Number(
+          itinerary?.Fare?.PublishedFare ||
+          itinerary?.Fare?.OfferedFare ||
+          location.state?.totalAmount ||
+          0,
+        ),
+
+        seatPrice: Number(
+          itinerary?.Fare?.TotalSeatCharges || 0,
+        ),
+
+        mealPrice: Number(
+          itinerary?.Fare?.TotalMealCharges || 0,
+        ),
+
+        baggagePrice: Number(
+          itinerary?.Fare?.TotalBaggageCharges || 0,
+        ),
+
+        convenienceFee: 0,
+
+        totalFare: Number(
+          location.state?.totalAmount ||
+          itinerary?.Fare?.PublishedFare ||
+          itinerary?.Fare?.OfferedFare ||
+          0,
+        ),
+      }
+      : getFareSummary(stored, itinerary);
 
     return {
       itinerary,
@@ -301,7 +370,7 @@ const FlightBookingDetails = () => {
       statusClass,
       priceSummary,
     };
-  }, [data, storedData, id]);
+  }, [data, storedData, id, location.state]);
 
   if (loading) {
     return (
@@ -549,13 +618,15 @@ const FlightBookingDetails = () => {
         </div>
 
         <div className="flex flex-col md:flex-row gap-3 pb-10">
-          <button
-            type="button"
-            onClick={() => navigate("/booking-success")}
-            className="flex-1 rounded-xl border border-gray-700 py-3"
-          >
-            Back to Success
-          </button>
+          {!location.state?.fromMyBookings && (
+            <button
+              type="button"
+              onClick={() => navigate("/booking-success")}
+              className="flex-1 rounded-xl border border-gray-700 py-3"
+            >
+              Back to Success
+            </button>
+          )}
 
           <button
             type="button"
