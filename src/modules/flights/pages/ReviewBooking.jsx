@@ -1,14 +1,33 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useFlightStore } from "../../../store/flightStore";
 import { privateApi } from "../../../services/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const ReviewBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const savedData = JSON.parse(localStorage.getItem("bookingData"));
-  const data = location.state || savedData || {};
+  const savedData =
+    JSON.parse(localStorage.getItem("bookingData")) || {};
+
+  const routeData = location.state || {};
+
+  const data = {
+    ...savedData,
+    ...routeData,
+
+    // refresh ke baad saved fareQuote fallback
+    fareQuote:
+      routeData?.fareQuote ||
+      savedData?.fareQuote ||
+      null,
+
+    // false bhi valid value hai, isliye ?? use kar rahe hain
+    isLcc:
+      routeData?.isLcc ??
+      savedData?.isLcc ??
+      null,
+  };
 
   const getPrice = (val) => Number(val || 0);
   const {
@@ -52,6 +71,28 @@ const ReviewBooking = () => {
     // if object
     return result?.IsLCC ?? false;
   })();
+
+  useEffect(() => {
+    if (!passengers || !selectedFlight || !fareQuote) {
+      return;
+    }
+
+    const dataToSave = {
+      ...data,
+      fareQuote,
+      isLcc,
+    };
+
+    localStorage.setItem(
+      "bookingData",
+      JSON.stringify(dataToSave),
+    );
+  }, [
+    passengers,
+    selectedFlight,
+    fareQuote,
+    isLcc,
+  ]);
 
   if (!passengers || !selectedFlight) {
     return (

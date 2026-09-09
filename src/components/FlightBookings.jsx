@@ -1212,13 +1212,15 @@ const FlightBookings = () => {
                   {!isReleased && (
                     <button
                       type="button"
-                      onClick={() =>
-                        handleViewInvoice(booking)
-                      }
+                      onClick={() => handleViewInvoice(booking)}
                       disabled={
+                        !isTicketed ||
                         actionLoading === `invoice-${booking.id}`
                       }
-                      className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-2 sm:py-2.5 sm:px-3 text-xs sm:text-sm rounded-lg disabled:opacity-60"
+                      className={`font-semibold py-2 px-2 sm:py-2.5 sm:px-3 text-xs sm:text-sm rounded-lg transition ${isTicketed
+                          ? "bg-white/10 hover:bg-white/20 text-white"
+                          : "bg-white/5 text-gray-500 cursor-not-allowed"
+                        }`}
                     >
                       {actionLoading === `invoice-${booking.id}`
                         ? "Opening..."
