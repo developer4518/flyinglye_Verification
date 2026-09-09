@@ -233,6 +233,7 @@ const PassengerDetails = () => {
     passengerCount,
     traceId,
     resultIndex,
+    fareQuote,
   } = useFlightStore();
 
   const totalPassengers = Math.max(1, Number(passengerCount) || 1);
@@ -613,6 +614,7 @@ const PassengerDetails = () => {
         selectedFlight,
         traceId,
         resultIndex,
+        fareQuote,
       }),
     );
 
@@ -625,6 +627,7 @@ const PassengerDetails = () => {
         selectedFlight,
         traceId,
         resultIndex,
+        fareQuote,
       },
     });
   };

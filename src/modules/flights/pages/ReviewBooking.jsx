@@ -105,9 +105,13 @@ const ReviewBooking = () => {
   /* ================= PRICE ================= */
 
   const pricing = fareQuote?.Pricing || {};
+  const fare = fareQuote?.Fare || {};
 
-  // ✅ EXACT SAME AS SSR PAGE
-  const flightFare = getPrice(pricing?.TBOFare);
+  const flightFare = getPrice(
+    fare?.PublishedFare ||
+    fareQuote?.PublishedFare ||
+    0,
+  );
   // const convenienceFee = getPrice(pricing?.ConvenienceFee);
   // TEMP: Convenience fee disabled for verification
   const convenienceFee = 0;
@@ -164,6 +168,21 @@ const ReviewBooking = () => {
 
       const response =
         quoteRes?.data?.data?.Response || quoteRes?.data?.Response;
+      const freshResult = response?.Results || {};
+
+      const freshPublishedFare = Number(
+        freshResult?.Fare?.PublishedFare ||
+        freshResult?.PublishedFare ||
+        flightFare ||
+        0,
+      );
+
+      const freshTotalPrice =
+        freshPublishedFare +
+        seatPrice +
+        mealPrice +
+        baggagePrice +
+        convenienceFee;
 
       console.log("🧾 FARE QUOTE RESPONSE:", response);
 
@@ -341,12 +360,12 @@ const ReviewBooking = () => {
           passengers: formattedPassengers,
 
           pricing: {
-            flightFare,
+            flightFare: freshPublishedFare,
             seatPrice,
             mealPrice,
             baggagePrice,
             convenienceFee,
-            totalPrice,
+            totalPrice: freshTotalPrice,
           },
         }),
       );

@@ -105,38 +105,35 @@ const SSRPage = () => {
   const fare = fareQuote?.Fare || {};
 
   const flightFare = Number(
-    pricing?.TBOFare ||
-      fare?.PublishedFare ||
-      fare?.OfferedFare ||
-      fareQuote?.PublishedFare ||
-      fareQuote?.OfferedFare ||
-      0,
+    fare?.PublishedFare ||
+    fareQuote?.PublishedFare ||
+    0,
   );
 
   // const convenienceFee = Number(
   //   pricing?.ConvenienceFee || fareQuote?.ConvenienceFee || 0,
   // );
   // TEMP: Convenience fee disabled for verification
-const convenienceFee = 0;
+  const convenienceFee = 0;
 
   const isSeatMandatory = toBool(
     flightValidation?.isSeatMandatory ||
-      fareQuote?.isseatmandatory ||
-      fareQuote?.IsSeatMandatory,
+    fareQuote?.isseatmandatory ||
+    fareQuote?.IsSeatMandatory,
   );
 
   const isMealMandatory = toBool(
     flightValidation?.isMealMandatory ||
-      fareQuote?.ismealmandatory ||
-      fareQuote?.IsMealMandatory,
+    fareQuote?.ismealmandatory ||
+    fareQuote?.IsMealMandatory,
   );
 
   const isLcc = toBool(fareQuote?.IsLCC);
 
   const source = String(
     fareQuote?.Source ||
-      fareQuote?.Segments?.[0]?.[0]?.Airline?.AirlineCode ||
-      "",
+    fareQuote?.Segments?.[0]?.[0]?.Airline?.AirlineCode ||
+    "",
   ).toUpperCase();
 
   const isInternational =
@@ -156,7 +153,7 @@ const convenienceFee = 0;
           originCountry &&
           destinationCountry &&
           String(originCountry).toUpperCase() !==
-            String(destinationCountry).toUpperCase()
+          String(destinationCountry).toUpperCase()
         );
       }),
     );
@@ -196,8 +193,7 @@ const convenienceFee = 0;
 
     if (alreadyTakenByOtherPassenger) {
       alert(
-        `Seat ${seat.Code} is already selected for Passenger ${
-          alreadyTakenByOtherPassenger.PassengerIndex + 1
+        `Seat ${seat.Code} is already selected for Passenger ${alreadyTakenByOtherPassenger.PassengerIndex + 1
         }`,
       );
       return;
@@ -348,16 +344,15 @@ const convenienceFee = 0;
         disabled={unavailable}
         onClick={() => handleSeatClick(seat)}
         className={`w-12 h-12 rounded-md text-[10px] flex flex-col justify-center items-center border transition
-          ${
-            unavailable
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : isSelectedByActivePassenger
-                ? "bg-green-600 text-white border-green-700"
-                : isSelectedByOtherPassenger
-                  ? "bg-red-500 text-white border-red-600"
-                  : price > 0
-                    ? "bg-yellow-400 hover:bg-yellow-500 border-yellow-500 text-black"
-                    : "bg-white hover:bg-gray-100 text-black"
+          ${unavailable
+            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+            : isSelectedByActivePassenger
+              ? "bg-green-600 text-white border-green-700"
+              : isSelectedByOtherPassenger
+                ? "bg-red-500 text-white border-red-600"
+                : price > 0
+                  ? "bg-yellow-400 hover:bg-yellow-500 border-yellow-500 text-black"
+                  : "bg-white hover:bg-gray-100 text-black"
           }`}
       >
         <span>{seat?.Code || "-"}</span>
@@ -628,13 +623,12 @@ const convenienceFee = 0;
                   key={index}
                   type="button"
                   onClick={() => setActivePassenger(index)}
-                  className={`px-4 py-2 rounded border text-sm transition ${
-                    activePassenger === index
+                  className={`px-4 py-2 rounded border text-sm transition ${activePassenger === index
                       ? "bg-linear-to-r from-start to-end text-black border-transparent"
                       : hasSeat || hasMeal
                         ? "bg-green-500/10 border-green-500 text-green-400"
                         : "border-(--border-soft)"
-                  }`}
+                    }`}
                 >
                   Passenger {index + 1}
                   {hasSeat ? " Seat✓" : ""}
@@ -698,11 +692,10 @@ const convenienceFee = 0;
                     key={`${getMealKey(meal)}-${index}`}
                     type="button"
                     onClick={() => handleMealSelect(meal)}
-                    className={`p-3 border rounded text-left transition ${
-                      isSelected
+                    className={`p-3 border rounded text-left transition ${isSelected
                         ? "bg-blue-600 text-white border-blue-700"
                         : "bg-(--bg-card) border-(--border-soft) hover:bg-(--bg-secondary)"
-                    }`}
+                      }`}
                   >
                     <div className="font-medium text-sm">
                       {getMealName(meal)}
@@ -748,11 +741,10 @@ const convenienceFee = 0;
               <button
                 type="button"
                 onClick={() => handleBaggageSelect(noBaggageOption)}
-                className={`p-3 border rounded ${
-                  selectedBaggage.length === 0
+                className={`p-3 border rounded ${selectedBaggage.length === 0
                     ? "bg-gray-800 text-white"
                     : "bg-(--bg-card) border-(--border-soft)"
-                }`}
+                  }`}
               >
                 No Extra Baggage
                 <div>₹0</div>
@@ -768,11 +760,10 @@ const convenienceFee = 0;
                     key={`${getBaggageKey(bag)}-${index}`}
                     type="button"
                     onClick={() => handleBaggageSelect(bag)}
-                    className={`p-3 border rounded ${
-                      isSelected
+                    className={`p-3 border rounded ${isSelected
                         ? "bg-purple-600 text-white"
                         : "bg-(--bg-card) border-(--border-soft)"
-                    }`}
+                      }`}
                   >
                     {getBaggageName(bag)}
                     <div>₹{getPrice(bag.Price)}</div>
@@ -809,8 +800,8 @@ const convenienceFee = 0;
               <p className="text-sm text-(--text-muted)">
                 {activePassengerSeat
                   ? `Selected Seat: ${activePassengerSeat.Code} - ₹${getPrice(
-                      activePassengerSeat.Price,
-                    )}`
+                    activePassengerSeat.Price,
+                  )}`
                   : "No seat selected"}
               </p>
             </div>
@@ -884,10 +875,10 @@ const convenienceFee = 0;
               </div>
             )}
 
-            <div className="flex justify-between">
+            {/* <div className="flex justify-between">
               <span>Convenience Fee</span>
               <span>₹{convenienceFee.toFixed(2)}</span>
-            </div>
+            </div> */}
 
             <hr className="border-(--border-soft)" />
 
@@ -903,11 +894,10 @@ const convenienceFee = 0;
           <button
             type="button"
             onClick={handleContinue}
-            className={`px-6 py-3 rounded text-black font-semibold transition ${
-              canContinue
+            className={`px-6 py-3 rounded text-black font-semibold transition ${canContinue
                 ? "bg-linear-to-r from-start to-end hover:opacity-90"
                 : "bg-gray-400 cursor-not-allowed"
-            }`}
+              }`}
           >
             Continue
           </button>

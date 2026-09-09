@@ -73,15 +73,10 @@ const getPricing = (fareQuote) => {
   const fare = fareQuote?.Fare || {};
 
   const flightFare = Number(
-    pricing?.TBOFare ||
-      fare?.PublishedFare ||
-      fare?.OfferedFare ||
-      fare?.BaseFare ||
-      fareQuote?.PublishedFare ||
-      fareQuote?.OfferedFare ||
-      0,
+    fare?.PublishedFare ||
+    fareQuote?.PublishedFare ||
+    0,
   );
-
   // const convenienceFee = Number(
   //   pricing?.ConvenienceFee || fareQuote?.ConvenienceFee || 0,
   // );
@@ -94,9 +89,9 @@ const getPricing = (fareQuote) => {
   // );
 
   // TEMP: Convenience fee disabled for verification
-const convenienceFee = 0;
+  const convenienceFee = 0;
 
-const totalPayable = flightFare;
+  const totalPayable = flightFare;
 
   return {
     flightFare,
@@ -194,9 +189,9 @@ const FareQuote = () => {
         if (isMounted) {
           setError(
             err?.response?.data?.message ||
-              err?.response?.data?.error ||
-              err?.message ||
-              "Unable to fetch fare quote.",
+            err?.response?.data?.error ||
+            err?.message ||
+            "Unable to fetch fare quote.",
           );
         }
       } finally {
@@ -346,44 +341,44 @@ const FareQuote = () => {
           isPassportRequired ||
           isSeatMandatory ||
           isMealMandatory) && (
-          <div className="bg-(--bg-card) border border-(--border-soft) rounded-xl p-4 text-sm">
-            <h2 className="font-semibold text-(--gold-soft) mb-3">
-              Booking Requirements
-            </h2>
+            <div className="bg-(--bg-card) border border-(--border-soft) rounded-xl p-4 text-sm">
+              <h2 className="font-semibold text-(--gold-soft) mb-3">
+                Booking Requirements
+              </h2>
 
-            <div className="flex flex-wrap gap-2">
-              {isGSTMandatory && (
-                <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
-                  GST Required
-                </span>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {isGSTMandatory && (
+                  <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
+                    GST Required
+                  </span>
+                )}
 
-              {isPanRequired && (
-                <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
-                  PAN Required
-                </span>
-              )}
+                {isPanRequired && (
+                  <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
+                    PAN Required
+                  </span>
+                )}
 
-              {isPassportRequired && (
-                <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
-                  Passport Required
-                </span>
-              )}
+                {isPassportRequired && (
+                  <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
+                    Passport Required
+                  </span>
+                )}
 
-              {isSeatMandatory && (
-                <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
-                  Seat Required
-                </span>
-              )}
+                {isSeatMandatory && (
+                  <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
+                    Seat Required
+                  </span>
+                )}
 
-              {isMealMandatory && (
-                <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
-                  Meal Required
-                </span>
-              )}
+                {isMealMandatory && (
+                  <span className="px-3 py-1 rounded-full bg-(--gold-soft) text-black text-xs">
+                    Meal Required
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         <div className="space-y-4">
           {allSegments.length === 0 ? (
@@ -398,9 +393,8 @@ const FareQuote = () => {
 
               return (
                 <div
-                  key={`${airline?.AirlineCode || "air"}-${
-                    airline?.FlightNumber || index
-                  }-${index}`}
+                  key={`${airline?.AirlineCode || "air"}-${airline?.FlightNumber || index
+                    }-${index}`}
                   className="bg-(--bg-card) border border-(--border-soft) rounded-xl p-5"
                 >
                   <div className="flex flex-col md:flex-row justify-between gap-6">
@@ -418,11 +412,10 @@ const FareQuote = () => {
                       </p>
 
                       <span
-                        className={`inline-block mt-2 text-xs px-2 py-1 rounded ${
-                          fareQuote?.IsLCC
+                        className={`inline-block mt-2 text-xs px-2 py-1 rounded ${fareQuote?.IsLCC
                             ? "bg-yellow-500/20 text-yellow-400"
                             : "bg-green-500/20 text-green-400"
-                        }`}
+                          }`}
                       >
                         {fareQuote?.IsLCC ? "LCC" : "Full Service"}
                       </span>
@@ -478,10 +471,10 @@ const FareQuote = () => {
               <span>₹ {pricing.flightFare.toFixed(2)}</span>
             </div>
 
-            <div className="flex justify-between">
+            {/* <div className="flex justify-between">
               <span>Convenience Fee</span>
               <span>₹ {pricing.convenienceFee.toFixed(2)}</span>
-            </div>
+            </div> */}
 
             <div className="border-t border-(--border-soft) pt-3 flex justify-between font-bold">
               <span>Total Payable</span>
