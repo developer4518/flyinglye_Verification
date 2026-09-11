@@ -33,6 +33,8 @@ const FlightsForm = () => {
   const originRef = useRef();
   const destinationRef = useRef();
   const travellerRef = useRef();
+  const departureDateRef = useRef();
+  const returnDateRef = useRef();
 
   const [travellers, setTravellers] = useState({
     adults: 1,
@@ -289,11 +291,10 @@ const FlightsForm = () => {
                 }));
               }
             }}
-            className={`px-4 py-2 rounded-full transition ${
-              tripType === type
-                ? "bg-linear-to-r from-start to-end text-black"
-                : "bg-(--bg-secondary)"
-            }`}
+            className={`px-4 py-2 rounded-full transition ${tripType === type
+              ? "bg-linear-to-r from-start to-end text-black"
+              : "bg-(--bg-secondary)"
+              }`}
           >
             {type === "oneway" ? "One Way" : "Round Trip"}
           </button>
@@ -437,40 +438,76 @@ const FlightsForm = () => {
 
         <div className="grid grid-cols-2 gap-3 md:col-span-6">
           <div>
-            <label className="text-xs text-(--text-muted)">Departure</label>
-            <input
-              type="date"
-              min={today}
-              value={formData.departure_date}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  departure_date: e.target.value,
-                  return_date:
-                    prev.return_date && prev.return_date < e.target.value
-                      ? ""
-                      : prev.return_date,
-                }))
-              }
-              className="bg-(--bg-secondary) border border-(--border-soft) rounded-lg p-2.5 text-sm w-full text-white"
-            />
+            <label className="text-xs text-(--text-muted)">
+              Departure
+            </label>
+
+            <div className="relative">
+              <input
+                ref={departureDateRef}
+                type="date"
+                min={today}
+                value={formData.departure_date}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    departure_date: e.target.value,
+                    return_date:
+                      prev.return_date &&
+                        prev.return_date < e.target.value
+                        ? ""
+                        : prev.return_date,
+                  }))
+                }
+                className="custom-date-input bg-(--bg-secondary) border border-(--border-soft) rounded-lg p-2.5 pr-11 text-sm w-full text-white"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  departureDateRef.current?.showPicker?.()
+                }
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#E6B35C] text-lg z-10"
+                aria-label="Select departure date"
+              >
+                📅
+              </button>
+            </div>
           </div>
 
           <div>
-            <label className="text-xs text-(--text-muted)">Return</label>
-            <input
-              type="date"
-              disabled={tripType === "oneway"}
-              min={formData.departure_date || today}
-              value={formData.return_date}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  return_date: e.target.value,
-                }))
-              }
-              className="bg-(--bg-secondary) border border-(--border-soft) rounded-lg p-2.5 text-sm w-full"
-            />
+            <label className="text-xs text-(--text-muted)">
+              Return
+            </label>
+
+            <div className="relative">
+              <input
+                ref={returnDateRef}
+                type="date"
+                disabled={tripType === "oneway"}
+                min={formData.departure_date || today}
+                value={formData.return_date}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    return_date: e.target.value,
+                  }))
+                }
+                className="custom-date-input bg-(--bg-secondary) border border-(--border-soft) rounded-lg p-2.5 pr-11 text-sm w-full text-white disabled:opacity-50"
+              />
+
+              <button
+                type="button"
+                disabled={tripType === "oneway"}
+                onClick={() =>
+                  returnDateRef.current?.showPicker?.()
+                }
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#E6B35C] text-lg z-10 disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Select return date"
+              >
+                📅
+              </button>
+            </div>
           </div>
         </div>
 
@@ -583,10 +620,9 @@ const FlightsForm = () => {
                         }
                         className={`
                           text-sm px-3 py-2 rounded-lg border transition text-center
-                          ${
-                            travellers.cabin === cabin
-                              ? "bg-linear-to-r from-start to-end text-black border-transparent"
-                              : "border-(--border-soft) hover:bg-(--bg-secondary)"
+                          ${travellers.cabin === cabin
+                            ? "bg-linear-to-r from-start to-end text-black border-transparent"
+                            : "border-(--border-soft) hover:bg-(--bg-secondary)"
                           }
                         `}
                       >

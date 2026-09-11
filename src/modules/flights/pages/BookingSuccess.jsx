@@ -19,6 +19,10 @@ const normalizeBookingResponse = (res) => {
   );
 };
 
+const toBool = (value) => {
+  return value === true || String(value).toLowerCase() === "true";
+};
+
 const BookingSuccess = () => {
   const navigate = useNavigate();
 
@@ -190,6 +194,25 @@ const BookingSuccess = () => {
     return `${date}T00:00:00`;
   };
 
+  const formatDisplayDateTime = (value) => {
+    if (!value) return "N/A";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "N/A";
+    }
+
+    return date.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
+
 
   // ================= CANCEL REQUEST DATA =================
 
@@ -243,16 +266,61 @@ const BookingSuccess = () => {
         localStorage.getItem("flightBookingData") || "{}",
       );
 
+
+      const { data: bookingDetailsResponse } = await privateApi.post(
+        "/api/airlines/booking-details/",
+        {
+          PNR: pnr,
+          BookingId: Number(bookingId),
+        },
+      );
+
+      const latestItinerary =
+        bookingDetailsResponse?.data?.Response?.FlightItinerary ||
+        bookingDetailsResponse?.Response?.FlightItinerary ||
+        null;
+
+      const ticketPassengers = Array.isArray(latestItinerary?.Passenger)
+        ? latestItinerary.Passenger
+        : latestItinerary?.Passenger
+          ? [latestItinerary.Passenger]
+          : [];
+
+      console.log("TICKET PASSENGERS 👉", ticketPassengers);
+
+      if (!ticketPassengers.length) {
+        alert("Passenger details not available from booking details.");
+        return;
+      }
+
       const savedPassengers =
-        latestStored?.passengers ||
         latestStored?.passengerDetails ||
-        JSON.parse(localStorage.getItem("passengers") || "[]") ||
-        JSON.parse(localStorage.getItem("passengerDetails") || "[]");
+        latestStored?.passengers ||
+        JSON.parse(localStorage.getItem("passengerDetails") || "[]") ||
+        JSON.parse(localStorage.getItem("passengers") || "[]");
+
+      const documentRequirements =
+        latestStored?.documentRequirements ||
+        storedData?.documentRequirements ||
+        {};
+
+      const isPanRequiredAtTicket = toBool(
+        documentRequirements?.isPanRequiredAtTicket,
+      );
+
+      const isPassportRequiredAtTicket = toBool(
+        documentRequirements?.isPassportRequiredAtTicket,
+      );
+
+      console.log("TICKET DOCUMENT REQUIREMENTS 👉", {
+        isPanRequiredAtTicket,
+        isPassportRequiredAtTicket,
+      });
 
       let passportPayload = [];
 
-      if (isInternational) {
-        passportPayload = passengers.map((apiPassenger, index) => {
+      if (isPassportRequiredAtTicket) {
+        passportPayload = ticketPassengers.map((apiPassenger, index) => {
           const savedPassenger = savedPassengers?.[index] || {};
 
           return {
@@ -294,11 +362,60 @@ const BookingSuccess = () => {
         }
       }
 
+
+      let panPayload = [];
+
+      if (isPanRequiredAtTicket) {
+        panPayload = ticketPassengers.map((apiPassenger, index) => {
+          const savedPassenger = savedPassengers?.[index] || {};
+
+          const panNumber = String(
+            savedPassenger?.pan ||
+            savedPassenger?.PAN ||
+            "",
+          )
+            .trim()
+            .toUpperCase();
+
+          return {
+            PaxId: apiPassenger?.PaxId,
+            PAN: panNumber,
+          };
+        });
+
+        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+
+        const invalidPan = panPayload.some(
+          (item) =>
+            !item.PaxId ||
+            !panRegex.test(item.PAN),
+        );
+
+        if (invalidPan) {
+          console.log(
+            "PAN PAYLOAD ERROR 👉",
+            panPayload,
+          );
+
+          alert(
+            "Valid PAN details are missing for one or more passengers",
+          );
+
+          return;
+        }
+      }
+
       const ticketPayload = {
         TraceId: traceId,
         PNR: pnr,
         BookingId: Number(bookingId),
+
         Passport: passportPayload,
+        PAN: panPayload,
+
+        IsPanRequiredAtTicket: isPanRequiredAtTicket,
+        IsPassportRequiredAtTicket: isPassportRequiredAtTicket,
+
         IsPriceChangeAccepted: true,
       };
 
@@ -331,19 +448,33 @@ const BookingSuccess = () => {
 
       alert("Ticket generated successfully");
     } catch (error) {
-      console.error("NON-LCC TICKET ERROR 👉", error);
+      console.error("TICKET FULL ERROR 👉", error);
+
+      console.log(
+        "TICKET STATUS 👉",
+        error?.response?.status,
+      );
+
+      console.log(
+        "TICKET RESPONSE FULL 👉\n",
+        JSON.stringify(error?.response?.data, null, 2)
+      );
+      console.log(
+        "TBO RAW DATA 👉\n",
+        JSON.stringify(error?.response?.data?.data, null, 2)
+      );
 
       alert(
         error?.response?.data?.message ||
-        error?.response?.data?.Error?.ErrorMessage ||
-        error?.response?.data?.Response?.Error?.ErrorMessage ||
         error?.message ||
         "Ticket generation failed",
       );
     } finally {
       setTicketLoading(false);
     }
-  };
+
+  }; // ✅ handleGenerateTicket yahan close hoga
+
 
   const handleReleasePnr = async () => {
     if (!isNonLcc) {
@@ -764,9 +895,7 @@ const BookingSuccess = () => {
                     {seg?.Origin?.Airport?.AirportCode}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {seg?.Origin?.DepTime
-                      ? new Date(seg.Origin.DepTime).toLocaleString()
-                      : "N/A"}
+                    {formatDisplayDateTime(seg?.Origin?.DepTime)}
                   </p>
                 </div>
 
@@ -777,9 +906,7 @@ const BookingSuccess = () => {
                     {seg?.Destination?.Airport?.AirportCode}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {seg?.Destination?.ArrTime
-                      ? new Date(seg.Destination.ArrTime).toLocaleString()
-                      : "N/A"}
+                    {formatDisplayDateTime(seg?.Destination?.ArrTime)}
                   </p>
                 </div>
               </div>
@@ -806,9 +933,7 @@ const BookingSuccess = () => {
 
                 <p className="text-gray-500">
                   Issue Date:{" "}
-                  {p?.Ticket?.IssueDate
-                    ? new Date(p.Ticket.IssueDate).toLocaleString()
-                    : "N/A"}
+                  {formatDisplayDateTime(p?.Ticket?.IssueDate)}
                 </p>
 
                 <p className="text-gray-500">

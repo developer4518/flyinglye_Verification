@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { privateApi } from "../../../services/api";
 import { useFlightStore } from "../../../store/flightStore";
-import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../../store/authStore";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const SSRPage = () => {
   const {
@@ -23,6 +24,8 @@ const SSRPage = () => {
   } = useFlightStore();
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const { token } = useAuthStore();
 
   const [baggage, setBaggage] = useState([]);
   const [meals, setMeals] = useState([]);
@@ -160,10 +163,26 @@ const SSRPage = () => {
 
   const shouldAutoIncludeFreeSSR =
     isLcc || source === "I5" || Boolean(isInternational);
+  /* ---------------- Login Guard ---------------- */
 
+  useEffect(() => {
+    if (!token) {
+      navigate("/login", {
+        replace: true,
+        state: {
+          redirectTo: location.pathname,
+        },
+      });
+    }
+  }, [token, navigate, location.pathname]);
   /* ---------------- Session Guard ---------------- */
 
   useEffect(() => {
+    // Login redirect ko priority do
+    if (!token) {
+      return;
+    }
+
     if (!traceId || !isValidResultIndex || !fareQuote) {
       navigate("/", { replace: true });
       return;
@@ -175,7 +194,14 @@ const SSRPage = () => {
       );
       setLoading(false);
     }
-  }, [traceId, isValidResultIndex, fareQuote, sessionExpired, navigate]);
+  }, [
+    token,
+    traceId,
+    isValidResultIndex,
+    fareQuote,
+    sessionExpired,
+    navigate,
+  ]);
 
   /* ---------------- Seat Click ---------------- */
 
@@ -369,7 +395,15 @@ const SSRPage = () => {
   /* ---------------- Fetch SSR ---------------- */
 
   useEffect(() => {
-    if (!traceId || !isValidResultIndex || !fareQuote || sessionExpired) return;
+    if (
+      !token ||
+      !traceId ||
+      !isValidResultIndex ||
+      !fareQuote ||
+      sessionExpired
+    ) {
+      return;
+    }
 
     let isMounted = true;
 
@@ -433,14 +467,32 @@ const SSRPage = () => {
       } catch (err) {
         console.error("SSR ERROR:", err);
 
-        if (isMounted) {
-          const apiMessage =
-            err?.response?.data?.message ||
-            err?.response?.data?.error ||
-            err?.response?.data?.Response?.Error?.ErrorMessage ||
-            err?.message ||
-            "Failed to load SSR data";
+        const status = err?.response?.status;
 
+        const apiMessage =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.response?.data?.Response?.Error?.ErrorMessage ||
+          err?.message ||
+          "Failed to load SSR data";
+
+        const loginExpired =
+          status === 401 ||
+          String(apiMessage).toLowerCase().includes("login again") ||
+          String(apiMessage).toLowerCase().includes("session expired");
+
+        if (loginExpired) {
+          navigate("/login", {
+            replace: true,
+            state: {
+              redirectTo: location.pathname,
+            },
+          });
+
+          return;
+        }
+
+        if (isMounted) {
           setError(apiMessage);
         }
       } finally {
@@ -455,7 +507,13 @@ const SSRPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [traceId, resultIndex, fareQuote, sessionExpired]);
+  }, [
+    token,
+    traceId,
+    resultIndex,
+    fareQuote,
+    sessionExpired,
+  ]);
 
   /* ---------------- Price ---------------- */
 
@@ -624,10 +682,10 @@ const SSRPage = () => {
                   type="button"
                   onClick={() => setActivePassenger(index)}
                   className={`px-4 py-2 rounded border text-sm transition ${activePassenger === index
-                      ? "bg-linear-to-r from-start to-end text-black border-transparent"
-                      : hasSeat || hasMeal
-                        ? "bg-green-500/10 border-green-500 text-green-400"
-                        : "border-(--border-soft)"
+                    ? "bg-linear-to-r from-start to-end text-black border-transparent"
+                    : hasSeat || hasMeal
+                      ? "bg-green-500/10 border-green-500 text-green-400"
+                      : "border-(--border-soft)"
                     }`}
                 >
                   Passenger {index + 1}
@@ -693,8 +751,8 @@ const SSRPage = () => {
                     type="button"
                     onClick={() => handleMealSelect(meal)}
                     className={`p-3 border rounded text-left transition ${isSelected
-                        ? "bg-blue-600 text-white border-blue-700"
-                        : "bg-(--bg-card) border-(--border-soft) hover:bg-(--bg-secondary)"
+                      ? "bg-blue-600 text-white border-blue-700"
+                      : "bg-(--bg-card) border-(--border-soft) hover:bg-(--bg-secondary)"
                       }`}
                   >
                     <div className="font-medium text-sm">
@@ -742,8 +800,8 @@ const SSRPage = () => {
                 type="button"
                 onClick={() => handleBaggageSelect(noBaggageOption)}
                 className={`p-3 border rounded ${selectedBaggage.length === 0
-                    ? "bg-gray-800 text-white"
-                    : "bg-(--bg-card) border-(--border-soft)"
+                  ? "bg-gray-800 text-white"
+                  : "bg-(--bg-card) border-(--border-soft)"
                   }`}
               >
                 No Extra Baggage
@@ -761,8 +819,8 @@ const SSRPage = () => {
                     type="button"
                     onClick={() => handleBaggageSelect(bag)}
                     className={`p-3 border rounded ${isSelected
-                        ? "bg-purple-600 text-white"
-                        : "bg-(--bg-card) border-(--border-soft)"
+                      ? "bg-purple-600 text-white"
+                      : "bg-(--bg-card) border-(--border-soft)"
                       }`}
                   >
                     {getBaggageName(bag)}
@@ -895,8 +953,8 @@ const SSRPage = () => {
             type="button"
             onClick={handleContinue}
             className={`px-6 py-3 rounded text-black font-semibold transition ${canContinue
-                ? "bg-linear-to-r from-start to-end hover:opacity-90"
-                : "bg-gray-400 cursor-not-allowed"
+              ? "bg-linear-to-r from-start to-end hover:opacity-90"
+              : "bg-gray-400 cursor-not-allowed"
               }`}
           >
             Continue

@@ -36,9 +36,10 @@ const FlightsResults = () => {
   };
 
   const formatTime = (iso) =>
-    new Date(iso).toLocaleTimeString([], {
+    new Date(iso).toLocaleTimeString("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
+      hour12: false,
     });
 
   const formatDuration = (minutes) => {
@@ -194,11 +195,10 @@ const FlightsResults = () => {
           <button
             key={type.value}
             onClick={() => setFareType(type.value)}
-            className={`block w-full text-left px-3 py-2 rounded-lg text-sm mb-2 ${
-              fareType === type.value
+            className={`block w-full text-left px-3 py-2 rounded-lg text-sm mb-2 ${fareType === type.value
                 ? "bg-(--gold-main) text-black"
                 : "border border-(--border-soft)"
-            }`}
+              }`}
           >
             {type.label}
           </button>
@@ -230,11 +230,10 @@ const FlightsResults = () => {
                       : [...prev, t.value],
                   )
                 }
-                className={`text-xs rounded-lg px-3 py-2 border transition ${
-                  active
+                className={`text-xs rounded-lg px-3 py-2 border transition ${active
                     ? "bg-(--gold-main) text-black border-(--gold-main)"
                     : "border-(--border-soft)"
-                }`}
+                  }`}
               >
                 {t.label}
               </button>
@@ -353,11 +352,10 @@ const FlightsResults = () => {
                       </p>
 
                       <span
-                        className={`text-xs px-2 py-1 rounded ${
-                          flight.IsLCC
+                        className={`text-xs px-2 py-1 rounded ${flight.IsLCC
                             ? "bg-yellow-500/20 text-yellow-400"
                             : "bg-green-500/20 text-green-400"
-                        }`}
+                          }`}
                       >
                         {flight.IsLCC ? "LCC" : "Full Service"}
                       </span>

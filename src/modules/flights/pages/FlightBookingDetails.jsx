@@ -124,7 +124,14 @@ const formatDateTime = (date) => {
 
   if (Number.isNaN(parsed.getTime())) return "N/A";
 
-  return parsed.toLocaleString();
+  return parsed.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 };
 
 const formatTime = (date) => {
@@ -134,11 +141,13 @@ const formatTime = (date) => {
 
   if (Number.isNaN(parsed.getTime())) return "N/A";
 
-  return parsed.toLocaleTimeString([], {
+  return parsed.toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 };
+
 
 const getStatusLabel = (status, hasTicket) => {
   if (hasTicket) return "Ticketed";

@@ -57,4 +57,18 @@
   --bg-login: url("/images/login.jpg");
 }
 
+/* Date picker calendar icon visibility */
+/* Hide browser's default calendar icon.
+   Custom calendar button is used in FlightsForm.jsx */
+.custom-date-input::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.custom-date-input {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+
 

@@ -41,12 +41,13 @@ const formatDate = (value) => {
     return "N/A";
   }
 
-  return date.toLocaleString("en-IN", {
+  return date.toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 };
 const formatTicketDate = (date) => {
@@ -311,12 +312,41 @@ const FlightBookings = () => {
         itinerary,
       );
 
+
+
+      const savedPassenger =
+        booking?.request_payload?.Passengers?.[0] || {};
+
+      const customerGST =
+        savedPassenger?.GSTNumber
+          ? {
+            GSTNumber:
+              savedPassenger.GSTNumber,
+
+            GSTCompanyName:
+              savedPassenger.GSTCompanyName || "",
+
+            GSTCompanyEmail:
+              savedPassenger.GSTCompanyEmail || "",
+
+            GSTCompanyContactNumber:
+              savedPassenger.GSTCompanyContactNumber || "",
+
+            GSTCompanyAddress:
+              savedPassenger.GSTCompanyAddress || "",
+          }
+          : null;
+
+      const bookingData = {
+        gstDetails: customerGST,
+      };
+
       const blob = await pdf(
         <FlightInvoicePDF
           booking={response}
           pricing={pricing}
-          bookingData={{}}
-        />,
+          bookingData={bookingData}
+        />
       ).toBlob();
 
       const url = URL.createObjectURL(blob);
@@ -401,7 +431,7 @@ const FlightBookings = () => {
 
           const destinationCountry =
             segment?.Destination?.Airport?.CountryCode ||
-            "";
+            ""; 
 
           if (
             !originCountry ||
@@ -1218,8 +1248,8 @@ const FlightBookings = () => {
                         actionLoading === `invoice-${booking.id}`
                       }
                       className={`font-semibold py-2 px-2 sm:py-2.5 sm:px-3 text-xs sm:text-sm rounded-lg transition ${isTicketed
-                          ? "bg-white/10 hover:bg-white/20 text-white"
-                          : "bg-white/5 text-gray-500 cursor-not-allowed"
+                        ? "bg-white/10 hover:bg-white/20 text-white"
+                        : "bg-white/5 text-gray-500 cursor-not-allowed"
                         }`}
                     >
                       {actionLoading === `invoice-${booking.id}`

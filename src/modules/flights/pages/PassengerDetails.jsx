@@ -64,10 +64,10 @@ const buildPassengerTypes = (flight, totalPassengers) => {
       0,
       Number(
         item?.PassengerCount ??
-          item?.PaxCount ??
-          item?.Count ??
-          item?.passengerCount ??
-          0,
+        item?.PaxCount ??
+        item?.Count ??
+        item?.passengerCount ??
+        0,
       ) || 0,
     );
 
@@ -205,6 +205,7 @@ const createEmptyPassenger = (title = "Mr") => ({
   lastName: "",
   gender: getGenderFromTitle(title),
   dob: "",
+  pan: "",
   passport: "",
   passportIssueDate: "",
   passportExpiry: "",
@@ -216,11 +217,21 @@ const createEmptyPassenger = (title = "Mr") => ({
   country: "India",
 });
 
+
+const toBool = (value) => {
+  return value === true || String(value).toLowerCase() === "true";
+};
+
 const cleanNameForDuplicateCheck = (value) =>
   String(value || "")
     .trim()
     .toLowerCase()
     .replace(/[.\s]+/g, "");
+
+
+
+const GST_REGEX =
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 const PassengerDetails = () => {
   const navigate = useNavigate();
@@ -237,6 +248,49 @@ const PassengerDetails = () => {
   } = useFlightStore();
 
   const totalPassengers = Math.max(1, Number(passengerCount) || 1);
+
+
+
+
+  const fareQuoteResult =
+    fareQuote?.data?.Response?.Results ||
+    fareQuote?.Response?.Results ||
+    fareQuote?.Results ||
+    fareQuote ||
+    {};
+
+  const isGSTMandatory = toBool(
+    fareQuoteResult?.IsGSTMandatory,
+  );
+
+  const isGSTAllowed =
+    toBool(fareQuoteResult?.GSTAllowed) ||
+    isGSTMandatory;
+
+  const isPanRequiredAtBook = toBool(
+    fareQuoteResult?.IsPanRequiredAtBook,
+  );
+
+  const isPanRequiredAtTicket = toBool(
+    fareQuoteResult?.IsPanRequiredAtTicket,
+  );
+
+  const isPassportRequiredAtBook = toBool(
+    fareQuoteResult?.IsPassportRequiredAtBook,
+  );
+
+  const isPassportRequiredAtTicket = toBool(
+    fareQuoteResult?.IsPassportRequiredAtTicket,
+  );
+
+  // Passenger Details par field tabhi lenge
+  // jab Book YA Ticket me required ho
+  const isPanRequired =
+    isPanRequiredAtBook || isPanRequiredAtTicket;
+
+  const isPassportRequired =
+    isPassportRequiredAtBook ||
+    isPassportRequiredAtTicket;
 
   /* ---------------- SEGMENTS ---------------- */
 
@@ -271,6 +325,16 @@ const PassengerDetails = () => {
       return createEmptyPassenger(titleOptions[0]);
     }),
   );
+
+
+
+  const [gstDetails, setGstDetails] = useState({
+    GSTNumber: "",
+    GSTCompanyName: "",
+    GSTCompanyEmail: "",
+    GSTCompanyContactNumber: "",
+    GSTCompanyAddress: "",
+  });
 
   /* ---------------- KEEP PASSENGER COUNT IN SYNC ---------------- */
 
@@ -321,21 +385,89 @@ const PassengerDetails = () => {
       const updatedPassengers = [...previousPassengers];
       const currentPassenger = updatedPassengers[index];
 
-      const nextValue =
-        name === "passport" ? value.toUpperCase().replace(/\s/g, "") : value;
+      let nextValue = value;
+
+      if (name === "passport") {
+        const cleaned = value
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+
+        if (!cleaned) {
+          nextValue = "";
+        } else {
+          // Passport must start with 1 or 2 letters
+          const letters =
+            cleaned.match(/^[A-Z]{1,2}/)?.[0] || "";
+
+          if (!letters) {
+            nextValue = "";
+          } else {
+            // After letters only numbers are allowed
+            const digits = cleaned
+              .slice(letters.length)
+              .replace(/\D/g, "");
+
+            // Old passport: 1 letter + 7 digits
+            // New format: 2 letters + 6 digits
+            const maxDigits =
+              letters.length === 2 ? 6 : 7;
+
+            nextValue =
+              letters + digits.slice(0, maxDigits);
+          }
+        }
+      }
+
+      if (name === "phone") {
+        nextValue = value
+          .replace(/\D/g, "")
+          .slice(0, 10);
+      }
+      if (name === "pan") {
+        nextValue = value
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "")
+          .slice(0, 10);
+      }
 
       updatedPassengers[index] = {
         ...currentPassenger,
         [name]: nextValue,
         ...(name === "title"
           ? {
-              gender: getGenderFromTitle(nextValue, currentPassenger.gender),
-            }
+            gender: getGenderFromTitle(nextValue, currentPassenger.gender),
+          }
           : {}),
       };
 
       return updatedPassengers;
     });
+  };
+
+
+
+  const handleGSTChange = (event) => {
+    const { name, value } = event.target;
+
+    let nextValue = value;
+
+    if (name === "GSTNumber") {
+      nextValue = value
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 15);
+    }
+
+    if (name === "GSTCompanyContactNumber") {
+      nextValue = value
+        .replace(/\D/g, "")
+        .slice(0, 10);
+    }
+
+    setGstDetails((previous) => ({
+      ...previous,
+      [name]: nextValue,
+    }));
   };
 
   /* ---------------- COUNTRY HELPER ---------------- */
@@ -384,18 +516,29 @@ const PassengerDetails = () => {
 
   /* ---------------- CLEAR PASSPORT FOR DOMESTIC ---------------- */
 
+  /* ---------------- CLEAR UNUSED PAN / PASSPORT ---------------- */
+
   useEffect(() => {
-    if (!isInternational) {
-      setPassengers((previousPassengers) =>
-        previousPassengers.map((passenger) => ({
-          ...passenger,
-          passport: "",
-          passportIssueDate: "",
-          passportExpiry: "",
-        })),
-      );
-    }
-  }, [isInternational]);
+    setPassengers((previousPassengers) =>
+      previousPassengers.map((passenger) => ({
+        ...passenger,
+
+        ...(isPanRequired
+          ? {}
+          : {
+            pan: "",
+          }),
+
+        ...(isPassportRequired
+          ? {}
+          : {
+            passport: "",
+            passportIssueDate: "",
+            passportExpiry: "",
+          }),
+      })),
+    );
+  }, [isPanRequired, isPassportRequired]);
 
   /* ---------------- NAME VALIDATION ---------------- */
 
@@ -459,12 +602,79 @@ const PassengerDetails = () => {
     return true;
   };
 
+
+  const validateGSTDetails = () => {
+    if (!isGSTAllowed) {
+      return true;
+    }
+
+    const {
+      GSTNumber,
+      GSTCompanyName,
+      GSTCompanyEmail,
+      GSTCompanyContactNumber,
+      GSTCompanyAddress,
+    } = gstDetails;
+
+    const hasAnyGSTDetail =
+      GSTNumber.trim() ||
+      GSTCompanyName.trim() ||
+      GSTCompanyEmail.trim() ||
+      GSTCompanyContactNumber.trim() ||
+      GSTCompanyAddress.trim();
+
+    // Optional GST and user filled nothing
+    if (!isGSTMandatory && !hasAnyGSTDetail) {
+      return true;
+    }
+
+    // Mandatory OR user started entering GST
+    if (
+      !GSTNumber.trim() ||
+      !GSTCompanyName.trim() ||
+      !GSTCompanyEmail.trim() ||
+      !GSTCompanyContactNumber.trim() ||
+      !GSTCompanyAddress.trim()
+    ) {
+      alert("Please fill all GST details.");
+      return false;
+    }
+
+    if (!GST_REGEX.test(GSTNumber.trim().toUpperCase())) {
+      alert("Please enter a valid 15-character GST number.");
+      return false;
+    }
+
+    const emailRegex =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(GSTCompanyEmail.trim())) {
+      alert("Please enter a valid GST company email.");
+      return false;
+    }
+
+    if (
+      !/^[0-9]{10}$/.test(
+        GSTCompanyContactNumber.trim(),
+      )
+    ) {
+      alert(
+        "GST company contact number must be 10 digits.",
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   /* ---------------- COMPLETE VALIDATION ---------------- */
 
   const validatePassengers = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9]{10}$/;
-    const passportRegex = /^[A-Z0-9]{6,9}$/;
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    const passportRegex =
+      /^(?:[A-Z][0-9]{7}|[A-Z]{2}[0-9]{6})$/;
     const duplicateNameMap = new Map();
 
     for (let index = 0; index < passengers.length; index += 1) {
@@ -475,8 +685,7 @@ const PassengerDetails = () => {
 
       if (!allowedTitles.includes(passenger.title)) {
         alert(
-          `Passenger ${passengerNumber}: Invalid title for ${
-            PAX_TYPE_LABELS[paxType] || "Passenger"
+          `Passenger ${passengerNumber}: Invalid title for ${PAX_TYPE_LABELS[paxType] || "Passenger"
           } on ${airlineProfile.label}`,
         );
         return false;
@@ -511,6 +720,23 @@ const PassengerDetails = () => {
         return false;
       }
 
+
+      if (isPanRequired) {
+        if (!passenger.pan?.trim()) {
+          alert(
+            `Passenger ${passengerNumber}: PAN is required for this flight`,
+          );
+          return false;
+        }
+
+        if (!panRegex.test(passenger.pan.trim().toUpperCase())) {
+          alert(
+            `Passenger ${passengerNumber}: Invalid PAN format. Example: ABCDE1234F`,
+          );
+          return false;
+        }
+      }
+
       if (!passenger.address.trim() || !passenger.city.trim()) {
         alert(`Passenger ${passengerNumber}: Address and City are required`);
         return false;
@@ -518,50 +744,42 @@ const PassengerDetails = () => {
 
       /* -------- INTERNATIONAL -------- */
 
-      if (isInternational) {
+      /* -------- PASSPORT REQUIRED BY FARE QUOTE -------- */
+
+      if (isPassportRequired) {
         if (
           !passenger.passport ||
           !passenger.passportIssueDate ||
           !passenger.passportExpiry
         ) {
           alert(
-            `Passenger ${passengerNumber}: Passport details are required for international travel`,
+            `Passenger ${passengerNumber}: Passport details are required for this flight`,
           );
           return false;
         }
 
-        if (!passportRegex.test(passenger.passport.trim().toUpperCase())) {
-          alert(`Passenger ${passengerNumber}: Invalid passport format`);
+        if (
+          !passportRegex.test(
+            passenger.passport.trim().toUpperCase(),
+          )
+        ) {
+          alert(
+            `Passenger ${passengerNumber}: Invalid passport format`,
+          );
           return false;
         }
 
         const expiry = new Date(passenger.passportExpiry);
         const today = new Date();
+
         const sixMonthsLater = new Date(today);
-        sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+        sixMonthsLater.setMonth(
+          sixMonthsLater.getMonth() + 6,
+        );
 
         if (expiry < sixMonthsLater) {
           alert(
             `Passenger ${passengerNumber}: Passport must be valid for at least 6 months`,
-          );
-          return false;
-        }
-      } else {
-        /* -------- DOMESTIC -------- */
-
-        const hasAnyPassportDetail =
-          passenger.passport ||
-          passenger.passportIssueDate ||
-          passenger.passportExpiry;
-
-        if (
-          hasAnyPassportDetail &&
-          (!passenger.passport ||
-            !passenger.passportIssueDate ||
-            !passenger.passportExpiry)
-        ) {
-          alert(
-            `Passenger ${passengerNumber}: Complete passport details or remove them`,
           );
           return false;
         }
@@ -584,25 +802,67 @@ const PassengerDetails = () => {
   const handleContinue = () => {
     if (!validatePassengers()) return;
 
-   const normalizedPassengers = passengers.map((passenger, index) => ({
-  ...passenger,
+    if (!validateGSTDetails()) return;
+    if (!selectedFlight) {
+      alert("Selected flight data is missing. Please search the flight again.");
+      navigate("/");
+      return;
+    }
 
-  // ✅ Save actual passenger type
-  paxType: passengerTypes[index] || 1,
+    if (!fareQuote) {
+      alert("Fare quote data is missing. Please search the flight again.");
+      navigate("/");
+      return;
+    }
 
-  firstName: normalizeText(passenger.firstName),
-  lastName: normalizeText(passenger.lastName),
-  email: passenger.email.trim(),
-  phone: passenger.phone.trim(),
-  address: normalizeText(passenger.address),
-  city: normalizeText(passenger.city),
-  country: normalizeText(passenger.country),
-  nationality: passenger.nationality.trim().toUpperCase(),
-  passport: passenger.passport.trim().toUpperCase(),
-  dob: formatDate(passenger.dob),
-  passportIssueDate: formatDate(passenger.passportIssueDate),
-  passportExpiry: formatDate(passenger.passportExpiry),
-}));
+    if (!traceId || resultIndex === null || resultIndex === undefined) {
+      alert("Flight session data is missing. Please search the flight again.");
+      navigate("/");
+      return;
+    }
+
+    const normalizedPassengers = passengers.map((passenger, index) => ({
+      ...passenger,
+
+      // ✅ Save actual passenger type
+      paxType: passengerTypes[index] || 1,
+
+      firstName: normalizeText(passenger.firstName),
+      lastName: normalizeText(passenger.lastName),
+      pan: passenger.pan.trim().toUpperCase(),
+      email: passenger.email.trim(),
+      phone: passenger.phone.trim(),
+      address: normalizeText(passenger.address),
+      city: normalizeText(passenger.city),
+      country: normalizeText(passenger.country),
+      nationality: passenger.nationality.trim().toUpperCase(),
+      passport: passenger.passport.trim().toUpperCase(),
+      dob: formatDate(passenger.dob),
+      passportIssueDate: formatDate(passenger.passportIssueDate),
+      passportExpiry: formatDate(passenger.passportExpiry),
+    }));
+
+    const hasGSTDetails = Boolean(
+      gstDetails.GSTNumber.trim() ||
+      gstDetails.GSTCompanyName.trim() ||
+      gstDetails.GSTCompanyEmail.trim() ||
+      gstDetails.GSTCompanyContactNumber.trim() ||
+      gstDetails.GSTCompanyAddress.trim()
+    );
+
+    const normalizedGSTDetails =
+      isGSTAllowed && hasGSTDetails
+        ? {
+          GSTNumber: gstDetails.GSTNumber.trim().toUpperCase(),
+          GSTCompanyName: normalizeText(gstDetails.GSTCompanyName),
+          GSTCompanyEmail: gstDetails.GSTCompanyEmail.trim(),
+          GSTCompanyContactNumber:
+            gstDetails.GSTCompanyContactNumber.trim(),
+          GSTCompanyAddress: normalizeText(
+            gstDetails.GSTCompanyAddress
+          ),
+        }
+        : null;
 
     localStorage.setItem(
       "bookingData",
@@ -615,6 +875,11 @@ const PassengerDetails = () => {
         traceId,
         resultIndex,
         fareQuote,
+
+        gstDetails: normalizedGSTDetails,
+
+        isGSTMandatory,
+        isGSTAllowed,
       }),
     );
 
@@ -628,6 +893,11 @@ const PassengerDetails = () => {
         traceId,
         resultIndex,
         fareQuote,
+
+        gstDetails: normalizedGSTDetails,
+
+        isGSTMandatory,
+        isGSTAllowed,
       },
     });
   };
@@ -772,7 +1042,28 @@ const PassengerDetails = () => {
                   />
                 </div>
 
-                {isInternational && (
+
+
+                {isPanRequired && (
+                  <div>
+                    <label className="text-sm font-medium">
+                      PAN Number *
+                    </label>
+
+                    <input
+                      name="pan"
+                      value={passenger.pan}
+                      onChange={(event) => handleChange(index, event)}
+                      maxLength={10}
+                      autoCapitalize="characters"
+                      placeholder="ABCDE1234F"
+                      className={inputStyle}
+                    />
+                  </div>
+                )}
+
+                {isPassportRequired && (
+
                   <>
                     <div>
                       <label className="text-sm font-medium">
@@ -782,6 +1073,9 @@ const PassengerDetails = () => {
                         name="passport"
                         value={passenger.passport}
                         onChange={(event) => handleChange(index, event)}
+                        maxLength={8}
+                        autoCapitalize="characters"
+                        placeholder="A1234567 or AB123456"
                         className={inputStyle}
                       />
                     </div>
@@ -830,11 +1124,14 @@ const PassengerDetails = () => {
                   <input
                     type="tel"
                     inputMode="numeric"
+                    pattern="[0-9]*"
                     name="phone"
                     value={passenger.phone}
                     onChange={(event) => handleChange(index, event)}
                     maxLength={10}
+                    autoComplete="tel"
                     className={inputStyle}
+                    placeholder="Enter 10 digit mobile number"
                   />
                 </div>
 
@@ -873,6 +1170,140 @@ const PassengerDetails = () => {
         })}
       </div>
 
+
+
+
+
+      {isGSTAllowed && (
+        <div className="max-w-5xl mx-auto px-4 mt-2 mb-6">
+          <div className="bg-white shadow-sm rounded-xl p-5 md:p-8 border border-gray-200">
+
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  GST Details
+                </h3>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  {isGSTMandatory
+                    ? "GST details are mandatory for this booking."
+                    : "GST details are optional for this booking."}
+                </p>
+              </div>
+
+              {isGSTMandatory && (
+                <span className="text-xs px-3 py-1 rounded-full bg-red-50 text-red-600 font-medium">
+                  Required
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+              {/* GST NUMBER */}
+              <div>
+                <label className="text-sm font-medium">
+                  GST/UIN Number
+                  {isGSTMandatory && " *"}
+                </label>
+
+                <input
+                  type="text"
+                  name="GSTNumber"
+                  value={gstDetails.GSTNumber}
+                  onChange={handleGSTChange}
+                  maxLength={15}
+                  autoCapitalize="characters"
+                  className={inputStyle}
+                  placeholder="Enter GST number"
+                />
+              </div>
+
+              {/* COMPANY NAME */}
+              <div>
+                <label className="text-sm font-medium">
+                  GST Company Name
+                  {isGSTMandatory && " *"}
+                </label>
+
+                <input
+                  type="text"
+                  name="GSTCompanyName"
+                  value={gstDetails.GSTCompanyName}
+                  onChange={handleGSTChange}
+                  className={inputStyle}
+                  placeholder="Enter company name"
+                />
+              </div>
+
+              {/* COMPANY EMAIL */}
+              <div>
+                <label className="text-sm font-medium">
+                  GST Company Email
+                  {isGSTMandatory && " *"}
+                </label>
+
+                <input
+                  type="email"
+                  name="GSTCompanyEmail"
+                  value={gstDetails.GSTCompanyEmail}
+                  onChange={handleGSTChange}
+                  className={inputStyle}
+                  placeholder="Enter company email"
+                />
+              </div>
+
+              {/* COMPANY CONTACT */}
+              <div>
+                <label className="text-sm font-medium">
+                  GST Company Contact No
+                  {isGSTMandatory && " *"}
+                </label>
+
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  name="GSTCompanyContactNumber"
+                  value={
+                    gstDetails.GSTCompanyContactNumber
+                  }
+                  onChange={handleGSTChange}
+                  maxLength={10}
+                  className={inputStyle}
+                  placeholder="Enter 10 digit number"
+                />
+              </div>
+
+              {/* COMPANY ADDRESS */}
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium">
+                  GST Company Address
+                  {isGSTMandatory && " *"}
+                </label>
+
+                <input
+                  type="text"
+                  name="GSTCompanyAddress"
+                  value={gstDetails.GSTCompanyAddress}
+                  onChange={handleGSTChange}
+                  className={inputStyle}
+                  placeholder="Enter company address"
+                />
+              </div>
+
+            </div>
+
+            {!isGSTMandatory && (
+              <p className="mt-4 text-xs text-gray-500">
+                Fill GST details only if you want GST
+                information associated with this booking.
+              </p>
+            )}
+
+          </div>
+        </div>
+      )}
+
       <div className="fixed bottom-0 left-0 w-full bg-white border-t p-4">
         <div className="max-w-5xl mx-auto flex justify-end">
           <button
@@ -884,6 +1315,7 @@ const PassengerDetails = () => {
           </button>
         </div>
       </div>
+
     </div>
   );
 };

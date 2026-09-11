@@ -3,6 +3,10 @@ import { useFlightStore } from "../../../store/flightStore";
 import { privateApi } from "../../../services/api";
 import { useEffect, useState } from "react";
 
+const toBool = (value) => {
+  return value === true || String(value).toLowerCase() === "true";
+};
+
 const ReviewBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,6 +44,7 @@ const ReviewBooking = () => {
     resultIndex,
     fareQuote: stateFareQuote,
     isLcc: stateIsLcc,
+    gstDetails = null, // ✅ ADD
   } = data;
 
   const [loading, setLoading] = useState(false);
@@ -170,6 +175,65 @@ const ReviewBooking = () => {
         quoteRes?.data?.data?.Response || quoteRes?.data?.Response;
       const freshResult = response?.Results || {};
 
+      const isPanRequiredAtBook = toBool(
+        freshResult?.IsPanRequiredAtBook,
+      );
+
+      const isPanRequiredAtTicket = toBool(
+        freshResult?.IsPanRequiredAtTicket,
+      );
+
+      const isPassportRequiredAtBook = toBool(
+        freshResult?.IsPassportRequiredAtBook,
+      );
+
+      const isPassportRequiredAtTicket = toBool(
+        freshResult?.IsPassportRequiredAtTicket,
+      );
+
+      const isGSTMandatory = toBool(
+        freshResult?.IsGSTMandatory,
+      );
+
+      const isGSTAllowed =
+        toBool(freshResult?.GSTAllowed) ||
+        isGSTMandatory;
+
+
+
+      const hasGSTDetails = Boolean(
+        gstDetails?.GSTNumber &&
+        gstDetails?.GSTCompanyName &&
+        gstDetails?.GSTCompanyEmail &&
+        gstDetails?.GSTCompanyContactNumber &&
+        gstDetails?.GSTCompanyAddress
+      );
+
+      if (isGSTMandatory && !hasGSTDetails) {
+        alert(
+          "GST details are now mandatory for this fare. Please enter GST details.",
+        );
+
+        navigate("/passenger-details");
+        return;
+      }
+
+      const shouldSendGST =
+        isGSTAllowed && hasGSTDetails;
+
+
+      // LCC me booking + ticket ek saath hota hai
+      const shouldSendPan =
+        isLcc
+          ? isPanRequiredAtBook || isPanRequiredAtTicket
+          : isPanRequiredAtBook;
+
+      const shouldSendPassport =
+        isLcc
+          ? isPassportRequiredAtBook || isPassportRequiredAtTicket
+          : isPassportRequiredAtBook;
+
+
       const freshPublishedFare = Number(
         freshResult?.Fare?.PublishedFare ||
         freshResult?.PublishedFare ||
@@ -219,14 +283,7 @@ const ReviewBooking = () => {
 
           DateOfBirth: formatDate(p.dob),
 
-          PassportNo: p.passport || "",
-          PassportExpiry: p.passportExpiry
-            ? formatDate(p.passportExpiry)
-            : null,
 
-          PassportIssueDate: p.passportIssueDate
-            ? formatDate(p.passportIssueDate)
-            : null,
 
           AddressLine1: p.address || "Delhi",
           City: p.city || "Delhi",
@@ -237,6 +294,46 @@ const ReviewBooking = () => {
           ContactNo: p.phone,
           Email: p.email,
           IsLeadPax: index === 0,
+
+          // PAN - only when required for current Book/Ticket request
+          ...(shouldSendPan && {
+            PAN: p.pan || "",
+          }),
+
+          // Passport - only when required for current Book/Ticket request
+          ...(shouldSendPassport && {
+            PassportNo: p.passport || "",
+
+            PassportExpiry: p.passportExpiry
+              ? formatDate(p.passportExpiry)
+              : null,
+
+            PassportIssueDate: p.passportIssueDate
+              ? formatDate(p.passportIssueDate)
+              : null,
+          }),
+
+
+          ...(shouldSendGST && {
+            GSTCompanyAddress:
+              gstDetails.GSTCompanyAddress,
+
+            GSTCompanyContactNumber:
+              gstDetails.GSTCompanyContactNumber,
+
+            GSTCompanyName:
+              gstDetails.GSTCompanyName,
+
+            GSTNumber:
+              gstDetails.GSTNumber,
+
+            GSTCompanyEmail:
+              gstDetails.GSTCompanyEmail,
+          }),
+
+
+
+
         };
 
         const selectedMeal = getSSR(selectedMeals, index);
@@ -327,13 +424,14 @@ const ReviewBooking = () => {
           }),
         };
       });
-
       const payload = {
         TraceId: newTraceId,
         ResultIndex: newResultIndex,
         Passengers: formattedPassengers,
-      };
 
+        IsGSTMandatory: isGSTMandatory,
+        GSTAllowed: isGSTAllowed,
+      };
       console.log("🚀 FINAL PAYLOAD:", payload);
 
       /* ---------- API CALL ---------- */
@@ -358,6 +456,26 @@ const ReviewBooking = () => {
           isLcc: isLcc,
           traceId: newTraceId,
           passengers: formattedPassengers,
+
+          passengerDetails: passengers,
+
+          documentRequirements: {
+            isPanRequiredAtBook,
+            isPanRequiredAtTicket,
+            isPassportRequiredAtBook,
+            isPassportRequiredAtTicket,
+          },
+
+
+
+          gstDetails: shouldSendGST
+            ? gstDetails
+            : null,
+
+          gstRequirements: {
+            isGSTAllowed,
+            isGSTMandatory,
+          },
 
           pricing: {
             flightFare: freshPublishedFare,

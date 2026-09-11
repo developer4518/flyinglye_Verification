@@ -54,9 +54,8 @@ const getPaxType = (type) => {
 };
 
 const getPassengerName = (passenger) =>
-  `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${
-    passenger?.LastName || ""
-  }`
+  `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${passenger?.LastName || ""
+    }`
     .replace(/\s+/g, " ")
     .trim();
 
@@ -329,11 +328,11 @@ const FlightInvoicePDF = ({
 
   const totalFare = Number(
     pricing?.totalPrice ||
-      flightFare +
-        seatPrice +
-        mealPrice +
-        baggagePrice +
-        convenienceFee,
+    flightFare +
+    seatPrice +
+    mealPrice +
+    baggagePrice +
+    convenienceFee,
   );
 
   const selectedSeats =
@@ -344,6 +343,9 @@ const FlightInvoicePDF = ({
 
   const selectedBaggage =
     bookingData?.selectedBaggage || [];
+
+  const customerGST =
+    bookingData?.gstDetails || null;
 
   const getSelectedPrice = (
     list,
@@ -361,12 +363,10 @@ const FlightInvoicePDF = ({
   const sectors = segments
     .map(
       (segment) =>
-        `${
-          segment?.Origin?.Airport
-            ?.AirportCode || "--"
-        }-${
-          segment?.Destination?.Airport
-            ?.AirportCode || "--"
+        `${segment?.Origin?.Airport
+          ?.AirportCode || "--"
+        }-${segment?.Destination?.Airport
+          ?.AirportCode || "--"
         }`,
     )
     .join(" / ");
@@ -374,12 +374,10 @@ const FlightInvoicePDF = ({
   const flightNumbers = segments
     .map(
       (segment) =>
-        `${
-          segment?.Airline?.AirlineCode ||
-          ""
-        }${
-          segment?.Airline?.FlightNumber ||
-          ""
+        `${segment?.Airline?.AirlineCode ||
+        ""
+        }${segment?.Airline?.FlightNumber ||
+        ""
         }`,
     )
     .join(" / ");
@@ -561,11 +559,11 @@ const FlightInvoicePDF = ({
 
               const baseFare = Number(
                 paxFare?.BaseFare ||
-                  flightFare /
-                    Math.max(
-                      passengers.length,
-                      1,
-                    ),
+                flightFare /
+                Math.max(
+                  passengers.length,
+                  1,
+                ),
               );
 
               const tax = Number(
@@ -696,7 +694,7 @@ const FlightInvoicePDF = ({
                     {money(
                       passengers.length
                         ? convenienceFee /
-                            passengers.length
+                        passengers.length
                         : convenienceFee,
                     )}
                   </Cell>
@@ -729,9 +727,9 @@ const FlightInvoicePDF = ({
               <Text>
                 {money(
                   flightFare +
-                    seatPrice +
-                    mealPrice +
-                    baggagePrice,
+                  seatPrice +
+                  mealPrice +
+                  baggagePrice,
                 )}
               </Text>
             </View>
@@ -915,28 +913,23 @@ const FlightInvoicePDF = ({
             </Cell>
 
             <Cell width="12%">
-              {passengers[0]?.GSTNumber ||
-                "-"}
+              {customerGST?.GSTNumber || "-"}
             </Cell>
 
             <Cell width="14%">
-              {passengers[0]?.ContactNo ||
-                "-"}
+              {customerGST?.GSTCompanyContactNumber || "-"}
             </Cell>
 
             <Cell width="22%">
-              {passengers[0]
-                ?.GSTCompanyAddress || "-"}
+             {customerGST?.GSTCompanyAddress || "-"}
             </Cell>
 
             <Cell width="17%">
-              {passengers[0]
-                ?.GSTCompanyEmail || "-"}
+              {customerGST?.GSTCompanyEmail || "-"}
             </Cell>
 
             <Cell width="18%">
-              {passengers[0]
-                ?.GSTCompanyName || "-"}
+              {customerGST?.GSTCompanyName || "-"}
             </Cell>
           </View>
         </View>
