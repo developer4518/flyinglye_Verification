@@ -49,6 +49,50 @@ const ReviewBooking = () => {
 
   const [loading, setLoading] = useState(false);
 
+
+  const [popup, setPopup] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "error",
+    actionLabel: "Okay",
+    onAction: null,
+  });
+
+  const showPopup = ({
+    title,
+    message,
+    type = "error",
+    actionLabel = "Okay",
+    onAction = null,
+  }) => {
+    setPopup({
+      show: true,
+      title,
+      message,
+      type,
+      actionLabel,
+      onAction,
+    });
+  };
+
+  const closePopup = () => {
+    const action = popup.onAction;
+
+    setPopup({
+      show: false,
+      title: "",
+      message: "",
+      type: "error",
+      actionLabel: "Okay",
+      onAction: null,
+    });
+
+    if (typeof action === "function") {
+      action();
+    }
+  };
+
   const store = useFlightStore();
   const fareQuote = store.fareQuote || stateFareQuote;
 
@@ -154,8 +198,15 @@ const ReviewBooking = () => {
 
   const handleBook = async () => {
     if (!traceId || !resultIndex) {
-      alert("Session expired. Please search again.");
-      navigate("/");
+      showPopup({
+        title: "Session Expired",
+        message:
+          "Your flight search session has expired. Please search for the flight again.",
+        type: "warning",
+        actionLabel: "Search Flights Again",
+        onAction: () => navigate("/"),
+      });
+
       return;
     }
 
@@ -210,11 +261,16 @@ const ReviewBooking = () => {
       );
 
       if (isGSTMandatory && !hasGSTDetails) {
-        alert(
-          "GST details are now mandatory for this fare. Please enter GST details.",
-        );
+        showPopup({
+          title: "GST Details Required",
+          message:
+            "GST details are now mandatory for this fare. Please update the passenger details before continuing.",
+          type: "warning",
+          actionLabel: "Update Passenger Details",
+          onAction: () =>
+            navigate("/passenger-details"),
+        });
 
-        navigate("/passenger-details");
         return;
       }
 
@@ -424,37 +480,132 @@ const ReviewBooking = () => {
           }),
         };
       });
+
+
+
+
+      /* ==========================================
+   DISPLAY ITINERARY FOR MY BOOKINGS
+
+   Agar LCC ticket session expire / fail ho jaye,
+   tab bhi route, airline aur dates My Bookings
+   me available rahengi.
+========================================== */
+
+      const rawDisplaySegments =
+        freshResult?.Segments ||
+        selectedFlight?.Segments ||
+        selectedFlight?.segments ||
+        [];
+
+      const displaySegments =
+        Array.isArray(rawDisplaySegments)
+          ? rawDisplaySegments.flat(Infinity)
+          : [];
+
+      const firstDisplaySegment =
+        displaySegments[0] || {};
+
+      const lastDisplaySegment =
+        displaySegments[
+        displaySegments.length - 1
+        ] || {};
+
+      const displayItinerary = {
+        Origin:
+          freshResult?.Origin ||
+          firstDisplaySegment?.Origin?.Airport
+            ?.AirportCode ||
+          firstDisplaySegment?.Origin
+            ?.AirportCode ||
+          "",
+
+        Destination:
+          freshResult?.Destination ||
+          lastDisplaySegment?.Destination?.Airport
+            ?.AirportCode ||
+          lastDisplaySegment?.Destination
+            ?.AirportCode ||
+          "",
+
+        Segments:
+          displaySegments,
+
+        IsLCC:
+          true,
+      };
       const payload = {
         TraceId: newTraceId,
         ResultIndex: newResultIndex,
-        Passengers: formattedPassengers,
 
-        IsGSTMandatory: isGSTMandatory,
-        GSTAllowed: isGSTAllowed,
+        Passengers:
+          formattedPassengers,
+
+        IsGSTMandatory:
+          isGSTMandatory,
+
+        GSTAllowed:
+          isGSTAllowed,
+
+        ...(isLcc === true && {
+          DisplayItinerary:
+            displayItinerary,
+        }),
       };
       console.log("🚀 FINAL PAYLOAD:", payload);
 
       /* ---------- API CALL ---------- */
 
-      let res;
+      /* ==========================================
+    LCC → PAYU → TICKET
+ ========================================== */
 
       if (isLcc === true) {
-        res = await privateApi.post("/api/airlines/booking/ticket/", payload);
-      } else {
-        res = await privateApi.post("/api/airlines/book/", payload);
-      }
+        const leadPassenger =
+          formattedPassengers.find(
+            (passenger) =>
+              passenger?.IsLeadPax === true,
+          ) || formattedPassengers?.[0];
 
-      console.log("✅ BOOKING RESPONSE:", res.data);
+        if (
+          !leadPassenger?.FirstName ||
+          !leadPassenger?.Email ||
+          !leadPassenger?.ContactNo
+        ) {
+          showPopup({
+            title: "Passenger Details Missing",
+            message:
+              "Lead passenger name, email or mobile number is missing. Please update passenger details before payment.",
+            type: "error",
+            actionLabel: "Update Passenger Details",
+            onAction: () =>
+              navigate("/passenger-details"),
+          });
 
-      localStorage.setItem(
-        "flightBookingData",
-        JSON.stringify({
-          booking: res?.data,
+          return;
+        }
 
-          // ✅ Release PNR ke liye
-          source: source,
-          isLcc: isLcc,
+        if (
+          !freshTotalPrice ||
+          Number(freshTotalPrice) <= 0
+        ) {
+          showPopup({
+            title: "Payment Amount Missing",
+            message:
+              "We could not determine the final payable amount. Please try the booking again.",
+            type: "error",
+          });
+
+          return;
+        }
+
+        const flightBookingBaseData = {
+          source,
+          isLcc: true,
+
           traceId: newTraceId,
+          TraceId: newTraceId,
+
           passengers: formattedPassengers,
 
           passengerDetails: passengers,
@@ -465,8 +616,6 @@ const ReviewBooking = () => {
             isPassportRequiredAtBook,
             isPassportRequiredAtTicket,
           },
-
-
 
           gstDetails: shouldSendGST
             ? gstDetails
@@ -485,18 +634,169 @@ const ReviewBooking = () => {
             convenienceFee,
             totalPrice: freshTotalPrice,
           },
+        };
+
+        /*
+         * Save exact ticket payload BEFORE PayU.
+         * FlightPaymentSuccess will use this
+         * after payment verification.
+         */
+        localStorage.setItem(
+          "pendingFlightPayment",
+          JSON.stringify({
+            paymentAction: "lcc_ticket",
+
+            ticketPayload: payload,
+
+            successRedirect:
+              "/booking-success",
+
+            source,
+
+            origin: "review_booking",
+
+            flightBookingData:
+              flightBookingBaseData,
+
+            paymentAmount:
+              freshTotalPrice,
+          }),
+        );
+
+        /* ========================================
+           NORMAL HTML POST TO PAYU INITIATE
+           Same approach as hotel payment
+        ======================================== */
+
+        const form =
+          document.createElement("form");
+
+        form.method = "POST";
+
+        form.action = `${import.meta.env.VITE_API_BASE_URL
+          }/payment/airline/initiate/`;
+
+        const paymentData = {
+          amount: freshTotalPrice,
+
+          firstname:
+            leadPassenger.FirstName,
+
+          email:
+            leadPassenger.Email,
+
+          phone:
+            leadPassenger.ContactNo,
+
+          payment_action:
+            "lcc_ticket",
+
+          trace_id:
+            newTraceId,
+        };
+
+        Object.entries(
+          paymentData,
+        ).forEach(([key, value]) => {
+          const input =
+            document.createElement("input");
+
+          input.type = "hidden";
+          input.name = key;
+          input.value = value ?? "";
+
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+
+        form.submit();
+
+        return;
+      }
+
+      /* ==========================================
+         NON-LCC → EXISTING HOLD FLOW
+         NO PAYU HERE
+      ========================================== */
+
+      const res = await privateApi.post(
+        "/api/airlines/book/",
+        payload,
+      );
+
+      console.log(
+        "✅ BOOKING RESPONSE:",
+        res.data,
+      );
+
+      localStorage.setItem(
+        "flightBookingData",
+        JSON.stringify({
+          booking: res?.data,
+
+          source,
+          isLcc: false,
+
+          traceId: newTraceId,
+          TraceId: newTraceId,
+
+          passengers:
+            formattedPassengers,
+
+          passengerDetails:
+            passengers,
+
+          documentRequirements: {
+            isPanRequiredAtBook,
+            isPanRequiredAtTicket,
+            isPassportRequiredAtBook,
+            isPassportRequiredAtTicket,
+          },
+
+          gstDetails: shouldSendGST
+            ? gstDetails
+            : null,
+
+          gstRequirements: {
+            isGSTAllowed,
+            isGSTMandatory,
+          },
+
+          pricing: {
+            flightFare:
+              freshPublishedFare,
+
+            seatPrice,
+            mealPrice,
+            baggagePrice,
+            convenienceFee,
+
+            totalPrice:
+              freshTotalPrice,
+          },
         }),
       );
 
       navigate("/booking-success");
-    } catch (error) {
-      console.error("❌ BOOKING ERROR:", error?.response?.data);
 
-      alert(
-        error?.response?.data?.Error?.ErrorMessage ||
-        error?.response?.data?.message ||
-        "Booking failed",
+
+    } catch (error) {
+      console.error(
+        "❌ BOOKING ERROR:",
+        error?.response?.data || error,
       );
+
+      showPopup({
+        title: "Unable To Continue",
+        message:
+          error?.response?.data?.Error
+            ?.ErrorMessage ||
+          error?.response?.data?.message ||
+          error?.message ||
+          "We could not continue your booking. Please try again.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -576,6 +876,49 @@ const ReviewBooking = () => {
       >
         {loading ? "Booking..." : "Confirm Booking"}
       </button>
+
+
+      {popup.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#11141B] text-white shadow-2xl">
+
+            <div className="p-7 text-center">
+
+              <div
+                className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl ${popup.type === "warning"
+                  ? "bg-amber-400/10 text-amber-300"
+                  : popup.type === "success"
+                    ? "bg-green-400/10 text-green-300"
+                    : "bg-red-400/10 text-red-300"
+                  }`}
+              >
+                {popup.type === "warning"
+                  ? "!"
+                  : popup.type === "success"
+                    ? "✓"
+                    : "×"}
+              </div>
+
+              <h3 className="mt-5 text-xl font-bold">
+                {popup.title}
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-gray-400">
+                {popup.message}
+              </p>
+
+              <button
+                type="button"
+                onClick={closePopup}
+                className="mt-7 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 px-5 py-3 font-bold text-black transition hover:scale-[1.01]"
+              >
+                {popup.actionLabel}
+              </button>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

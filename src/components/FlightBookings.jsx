@@ -17,9 +17,41 @@ const toArray = (value) => {
 };
 
 const getStoredItinerary = (booking) => {
+  const normalizedItinerary =
+    booking?.flight_itinerary;
+
+  const hasNormalizedItinerary =
+    normalizedItinerary &&
+    typeof normalizedItinerary === "object" &&
+    Object.keys(normalizedItinerary).length > 0;
+
+  if (hasNormalizedItinerary) {
+    return normalizedItinerary;
+  }
+
   return (
-    booking?.tbo_response?.Response?.Response?.FlightItinerary ||
-    booking?.tbo_response?.Response?.FlightItinerary ||
+    // Normal book/ticket response
+    booking?.tbo_response?.Response
+      ?.Response?.FlightItinerary ||
+
+    booking?.tbo_response?.Response
+      ?.FlightItinerary ||
+
+    // Synced Booking Details response
+    booking?.tbo_response
+      ?.booking_details_response
+      ?.Response?.FlightItinerary ||
+
+    // Successful LCC ticket response
+    booking?.tbo_response
+      ?.issue_ticket_response
+      ?.Response?.Response
+      ?.FlightItinerary ||
+
+    // Failed / session-timeout LCC fallback
+    booking?.request_payload
+      ?.DisplayItinerary ||
+
     {}
   );
 };
@@ -75,6 +107,52 @@ const FlightBookings = () => {
   /* ================= PDF LOADING ================= */
 
   const [actionLoading, setActionLoading] = useState("");
+
+
+  /* ================= POPUP ================= */
+
+  const [popup, setPopup] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "error",
+    actionLabel: "Okay",
+    onAction: null,
+  });
+
+  const showPopup = ({
+    title,
+    message,
+    type = "error",
+    actionLabel = "Okay",
+    onAction = null,
+  }) => {
+    setPopup({
+      show: true,
+      title,
+      message,
+      type,
+      actionLabel,
+      onAction,
+    });
+  };
+
+  const closePopup = () => {
+    const action = popup.onAction;
+
+    setPopup({
+      show: false,
+      title: "",
+      message: "",
+      type: "error",
+      actionLabel: "Okay",
+      onAction: null,
+    });
+
+    if (typeof action === "function") {
+      action();
+    }
+  };
 
   /* ================= CANCEL REQUEST ================= */
 
@@ -405,12 +483,35 @@ const FlightBookings = () => {
         "";
 
       if (!traceId) {
-        alert("TraceId missing.");
+        showPopup({
+          title: "Booking Session Missing",
+          message:
+            "TraceId is missing for this booking. We cannot safely start ticket payment.",
+          type: "error",
+        });
+
         return;
       }
 
       if (!pnr || !bookingId) {
-        alert("PNR or Booking ID missing.");
+        showPopup({
+          title: "Booking Details Missing",
+          message:
+            "PNR or Booking ID is missing for this booking.",
+          type: "error",
+        });
+
+        return;
+      }
+
+      if (itinerary?.IsLCC === true) {
+        showPopup({
+          title: "Invalid Ticket Action",
+          message:
+            "Get Ticketed from My Bookings is available only for Full Service held bookings.",
+          type: "error",
+        });
+
         return;
       }
 
@@ -431,7 +532,7 @@ const FlightBookings = () => {
 
           const destinationCountry =
             segment?.Destination?.Airport?.CountryCode ||
-            ""; 
+            "";
 
           if (
             !originCountry ||
@@ -508,10 +609,12 @@ const FlightBookings = () => {
             passportPayload,
           );
 
-          alert(
-            "Passport details missing for one or more passengers.",
-          );
-
+          showPopup({
+            title: "Passport Details Required",
+            message:
+              "Valid passport details are missing for one or more passengers.",
+            type: "warning",
+          });
           return;
         }
       }
@@ -529,27 +632,173 @@ const FlightBookings = () => {
         payload,
       );
 
-      const { data } = await privateApi.post(
-        "/api/airlines/ticket/",
-        payload,
-      );
+      /* ========================================
+         PAYMENT DETAILS
+      ======================================== */
 
-      console.log(
-        "MY BOOKINGS GET TICKETED RESPONSE 👉",
-        data,
-      );
+      const leadApiPassenger =
+        passengers?.[0] || {};
 
-      if (!data?.success) {
-        throw new Error(
-          data?.message ||
-          "Ticket generation failed.",
-        );
+      const leadSavedPassenger =
+        savedPassengers?.[0] || {};
+
+      const paymentFirstName = String(
+        leadApiPassenger?.FirstName ||
+        leadSavedPassenger?.FirstName ||
+        leadSavedPassenger?.firstName ||
+        booking?.firstname ||
+        "",
+      ).trim();
+
+      const paymentEmail = String(
+        leadApiPassenger?.Email ||
+        leadSavedPassenger?.Email ||
+        leadSavedPassenger?.email ||
+        booking?.email ||
+        booking?.user_email ||
+        "",
+      ).trim();
+
+      const paymentPhone = String(
+        leadApiPassenger?.ContactNo ||
+        leadApiPassenger?.ContactNumber ||
+        leadSavedPassenger?.ContactNo ||
+        leadSavedPassenger?.ContactNumber ||
+        leadSavedPassenger?.phone ||
+        booking?.phone ||
+        booking?.user_phone ||
+        "",
+      ).trim();
+
+      /* ========================================
+         VALIDATE PAYMENT DETAILS
+      ======================================== */
+
+      if (
+        !paymentFirstName ||
+        !paymentEmail ||
+        !paymentPhone
+      ) {
+        showPopup({
+          title: "Contact Details Missing",
+          message:
+            "Lead passenger name, email or mobile number is missing. Payment cannot be started.",
+          type: "error",
+        });
+
+        return;
       }
 
-      alert("Ticket generated successfully.");
+      const pricing = getPricing(
+        booking,
+        itinerary,
+      );
 
-      // ✅ My Bookings API dubara fetch
-      await refetch();
+      const paymentAmount = Number(
+        pricing?.totalPrice || 0,
+      );
+
+      if (
+        !paymentAmount ||
+        paymentAmount <= 0
+      ) {
+        showPopup({
+          title: "Payment Amount Missing",
+          message:
+            "The payable flight amount is not available. Please contact support before generating the ticket.",
+          type: "error",
+        });
+
+        return;
+      }
+
+      /* ========================================
+         SAVE BEFORE PAYU
+      ======================================== */
+
+      localStorage.setItem(
+        "pendingFlightPayment",
+        JSON.stringify({
+          paymentAction:
+            "non_lcc_hold_ticket",
+
+          ticketPayload:
+            payload,
+
+          successRedirect:
+            "/bookings",
+
+          source:
+            "my_bookings",
+
+          origin:
+            "my_bookings",
+
+          paymentAmount,
+
+          bookingId:
+            Number(bookingId),
+
+          pnr,
+
+          traceId,
+        }),
+      );
+
+      /* ========================================
+         REDIRECT TO PAYU
+      ======================================== */
+
+      const form =
+        document.createElement("form");
+
+      form.method = "POST";
+
+      form.action = `${import.meta.env.VITE_API_BASE_URL}/payment/airline/initiate/`;
+
+      const paymentData = {
+        amount:
+          paymentAmount,
+
+        firstname:
+          paymentFirstName,
+
+        email:
+          paymentEmail,
+
+        phone:
+          paymentPhone,
+
+        payment_action:
+          "non_lcc_hold_ticket",
+
+        booking_id:
+          Number(bookingId),
+
+        pnr,
+
+        trace_id:
+          traceId,
+      };
+
+      Object.entries(
+        paymentData,
+      ).forEach(([key, value]) => {
+        const input =
+          document.createElement("input");
+
+        input.type = "hidden";
+        input.name = key;
+        input.value = value ?? "";
+
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+
+      form.submit();
+
+      return;
 
     } catch (error) {
       console.error(
@@ -557,15 +806,16 @@ const FlightBookings = () => {
         error,
       );
 
-      alert(
-        error?.response?.data?.message ||
-        error?.response?.data?.Error
-          ?.ErrorMessage ||
-        error?.response?.data?.Response?.Error
-          ?.ErrorMessage ||
-        error?.message ||
-        "Ticket generation failed.",
-      );
+      showPopup({
+        title: "Unable To Continue",
+        message:
+          error?.response?.data?.message ||
+          error?.response?.data?.Error?.ErrorMessage ||
+          error?.response?.data?.Response?.Error?.ErrorMessage ||
+          error?.message ||
+          "Unable to prepare ticket payment.",
+        type: "error",
+      });
     } finally {
       setActionLoading("");
     }
@@ -1049,6 +1299,27 @@ const FlightBookings = () => {
           const isTicketed =
             ticketStatus === "ticketed";
 
+          const isLcc =
+            booking?.is_lcc === true ||
+            String(
+              booking?.is_lcc ?? "",
+            ).toLowerCase() === "true" ||
+
+            itinerary?.IsLCC === true ||
+            String(
+              itinerary?.IsLCC ?? "",
+            ).toLowerCase() === "true" ||
+
+            booking?.tbo_response?.book_meta?.IsLCC === true ||
+            String(
+              booking?.tbo_response?.book_meta?.IsLCC ?? "",
+            ).toLowerCase() === "true" ||
+
+            booking?.request_payload?.IsLCC === true ||
+            String(
+              booking?.request_payload?.IsLCC ?? "",
+            ).toLowerCase() === "true";
+
           const isHold =
             ticketStatus === "hold" ||
             ticketStatus === "on_hold";
@@ -1222,6 +1493,8 @@ const FlightBookings = () => {
 
               {/* ================= ACTIONS ================= */}
 
+              {/* ================= ACTIONS ================= */}
+
               {(isTicketed || isHold || isReleased || isCancelled) && (
                 <div className="grid grid-cols-2 gap-2 mt-4">
 
@@ -1236,6 +1509,28 @@ const FlightBookings = () => {
                   >
                     Booking Details
                   </button>
+
+                  {/* ================= FLIGHT AMENDMENT - LCC ONLY ================= */}
+
+                  {false && isLcc && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/flight-amendment/${bookingId}`,
+                          {
+                            state: {
+                              booking,
+                              pnr,
+                            },
+                          },
+                        )
+                      }
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-2 sm:py-2.5 sm:px-3 text-xs sm:text-sm rounded-lg"
+                    >
+                      Flight Amendment
+                    </button>
+                  )}
 
                   {/* ================= VIEW INVOICE ================= */}
 
@@ -1915,6 +2210,50 @@ const FlightBookings = () => {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+
+      {/* ================= PREMIUM POPUP ================= */}
+
+      {popup.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#11141B] text-white shadow-2xl">
+            <div className="p-7 text-center">
+
+              <div
+                className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl ${popup.type === "warning"
+                  ? "bg-amber-400/10 text-amber-300"
+                  : popup.type === "success"
+                    ? "bg-green-400/10 text-green-300"
+                    : "bg-red-400/10 text-red-300"
+                  }`}
+              >
+                {popup.type === "warning"
+                  ? "!"
+                  : popup.type === "success"
+                    ? "✓"
+                    : "×"}
+              </div>
+
+              <h3 className="mt-5 text-xl font-bold">
+                {popup.title}
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-gray-400">
+                {popup.message}
+              </p>
+
+              <button
+                type="button"
+                onClick={closePopup}
+                className="mt-7 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 px-5 py-3 font-bold text-black"
+              >
+                {popup.actionLabel}
+              </button>
+
+            </div>
           </div>
         </div>
       )}

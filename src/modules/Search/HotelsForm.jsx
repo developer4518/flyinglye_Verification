@@ -1,4 +1,5 @@
- "use client";
+"use client";
+import SearchScreenLoader from "./SearchScreenLoader";
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -154,8 +155,8 @@ const normalizeHotelSearchResponse = (payload) => {
 
   const nestedData =
     payload?.data &&
-    typeof payload.data === "object" &&
-    !Array.isArray(payload.data)
+      typeof payload.data === "object" &&
+      !Array.isArray(payload.data)
       ? payload.data
       : null;
 
@@ -472,8 +473,7 @@ const HotelsForm = () => {
 
         if (!age || age < MIN_CHILD_AGE || age > MAX_CHILD_AGE) {
           setErrorMsg(
-            `Room ${roomIndex + 1}: enter valid child ${
-              childIndex + 1
+            `Room ${roomIndex + 1}: enter valid child ${childIndex + 1
             } age between 1 and 12`,
           );
           return false;
@@ -719,512 +719,514 @@ const HotelsForm = () => {
   };
 
   return (
-    <div className="bg-(--bg-card) border border-(--border-soft) rounded-3xl shadow-2xl p-4 md:p-6 lg:p-8 space-y-6 backdrop-blur-md">
-      {errorMsg && (
-        <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 px-4 py-3 rounded-2xl text-center">
-          {errorMsg}
-        </div>
-      )}
+    <>
+      {loading && <SearchScreenLoader type="hotels" />}
+      <div className="bg-(--bg-card) border border-(--border-soft) rounded-3xl shadow-2xl p-4 md:p-6 lg:p-8 space-y-6 backdrop-blur-md">
+        {errorMsg && (
+          <div className="text-red-400 text-sm bg-red-900/20 border border-red-800 px-4 py-3 rounded-2xl text-center">
+            {errorMsg}
+          </div>
+        )}
 
-      <form
-        onSubmit={handleSearch}
-        className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"
-      >
-        <div className="relative md:col-span-3 w-full" ref={cityRef}>
-          <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
-            City
-          </label>
+        <form
+          onSubmit={handleSearch}
+          className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"
+        >
+          <div className="relative md:col-span-3 w-full" ref={cityRef}>
+            <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
+              City
+            </label>
 
-          <input
-            type="text"
-            placeholder="Search city"
-            value={cityInput}
-            onChange={(e) => {
-              const value = e.target.value;
+            <input
+              type="text"
+              placeholder="Search city"
+              value={cityInput}
+              onChange={(e) => {
+                const value = e.target.value;
 
-              setCityInput(value);
-              setFormData((prev) => ({
-                ...prev,
-                city: "",
-                cityName: "",
-                cityCountry: "",
-              }));
-              setCitySuggestions(searchCities(value));
-            }}
-            className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
-          />
+                setCityInput(value);
+                setFormData((prev) => ({
+                  ...prev,
+                  city: "",
+                  cityName: "",
+                  cityCountry: "",
+                }));
+                setCitySuggestions(searchCities(value));
+              }}
+              className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
+            />
 
-          {citySuggestions.length > 0 && (
-            <div className="absolute top-full left-0 mt-2 w-full bg-(--bg-card) border border-(--border-soft) rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto p-1">
-              {citySuggestions.map((city, index) => {
-                const selectedCityName = getCityName(city);
-                const selectedCityCode = getCityCode(city);
-                const selectedCityCountry = getCityCountry(city);
-                const selectedIsInternational = isInternationalDestination(
-                  selectedCityName,
-                  selectedCityCountry,
-                );
+            {citySuggestions.length > 0 && (
+              <div className="absolute top-full left-0 mt-2 w-full bg-(--bg-card) border border-(--border-soft) rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto p-1">
+                {citySuggestions.map((city, index) => {
+                  const selectedCityName = getCityName(city);
+                  const selectedCityCode = getCityCode(city);
+                  const selectedCityCountry = getCityCountry(city);
+                  const selectedIsInternational = isInternationalDestination(
+                    selectedCityName,
+                    selectedCityCountry,
+                  );
 
-                return (
+                  return (
+                    <button
+                      type="button"
+                      key={`${selectedCityCode}-${index}`}
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          city: selectedCityCode,
+                          cityName: selectedCityName,
+                          cityCountry: selectedCityCountry,
+                          nationality: selectedIsInternational
+                            ? INDIA_NATIONALITY.Code
+                            : prev.nationality || INDIA_NATIONALITY.Code,
+                          nationalityName: selectedIsInternational
+                            ? INDIA_NATIONALITY.Name
+                            : prev.nationalityName || INDIA_NATIONALITY.Name,
+                        }));
+
+                        setCityInput(selectedCityName);
+                        setCitySuggestions([]);
+
+                        if (selectedIsInternational) {
+                          setNationalityInput(INDIA_NATIONALITY.Name);
+                          setNationalitySuggestions([]);
+                        }
+                      }}
+                      className="w-full p-3 rounded-xl hover:bg-(--bg-secondary) cursor-pointer text-sm flex items-center justify-between gap-3 text-left transition"
+                    >
+                      <span>
+                        {selectedCityName}
+                        {selectedCityCountry ? `, ${selectedCityCountry}` : ""}
+                      </span>
+
+                      <span className="text-xs text-(--text-muted)">
+                        {selectedCityCode}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="relative md:col-span-3 w-full" ref={nationalityRef}>
+            <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
+              Nationality
+            </label>
+
+            <input
+              type="text"
+              placeholder="Search nationality"
+              value={nationalityInput}
+              readOnly={isInternationalHotelSearch}
+              onFocus={() => {
+                if (isInternationalHotelSearch) {
+                  setNationalityInput(INDIA_NATIONALITY.Name);
+                  setNationalitySuggestions([INDIA_NATIONALITY]);
+
+                  setFormData((prev) => ({
+                    ...prev,
+                    nationality: INDIA_NATIONALITY.Code,
+                    nationalityName: INDIA_NATIONALITY.Name,
+                  }));
+
+                  return;
+                }
+
+                if (nationalityInput) {
+                  setNationalitySuggestions(
+                    searchNationalities(nationalityInput),
+                  );
+                }
+              }}
+              onChange={(e) => {
+                if (isInternationalHotelSearch) {
+                  setNationalityInput(INDIA_NATIONALITY.Name);
+                  setNationalitySuggestions([INDIA_NATIONALITY]);
+
+                  setFormData((prev) => ({
+                    ...prev,
+                    nationality: INDIA_NATIONALITY.Code,
+                    nationalityName: INDIA_NATIONALITY.Name,
+                  }));
+
+                  return;
+                }
+
+                const value = e.target.value;
+
+                setNationalityInput(value);
+                setFormData((prev) => ({
+                  ...prev,
+                  nationality: "",
+                  nationalityName: "",
+                }));
+                setNationalitySuggestions(searchNationalities(value));
+              }}
+              className={`w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition ${isInternationalHotelSearch ? "cursor-not-allowed opacity-80" : ""
+                }`}
+            />
+
+            {isInternationalHotelSearch && (
+              <p className="mt-1 text-[11px] text-(--gold-main) text-center">
+                For international hotel search, only Indian nationality is
+                allowed.
+              </p>
+            )}
+
+            {nationalitySuggestions.length > 0 && (
+              <div className="absolute top-full left-0 mt-2 w-full bg-(--bg-card) border border-(--border-soft) rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto p-1">
+                {nationalitySuggestions.map((country) => (
                   <button
                     type="button"
-                    key={`${selectedCityCode}-${index}`}
+                    key={country.Code}
                     onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        city: selectedCityCode,
-                        cityName: selectedCityName,
-                        cityCountry: selectedCityCountry,
-                        nationality: selectedIsInternational
-                          ? INDIA_NATIONALITY.Code
-                          : prev.nationality || INDIA_NATIONALITY.Code,
-                        nationalityName: selectedIsInternational
-                          ? INDIA_NATIONALITY.Name
-                          : prev.nationalityName || INDIA_NATIONALITY.Name,
-                      }));
+                      if (isInternationalHotelSearch) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          nationality: INDIA_NATIONALITY.Code,
+                          nationalityName: INDIA_NATIONALITY.Name,
+                        }));
 
-                      setCityInput(selectedCityName);
-                      setCitySuggestions([]);
-
-                      if (selectedIsInternational) {
                         setNationalityInput(INDIA_NATIONALITY.Name);
                         setNationalitySuggestions([]);
+                        return;
                       }
-                    }}
-                    className="w-full p-3 rounded-xl hover:bg-(--bg-secondary) cursor-pointer text-sm flex items-center justify-between gap-3 text-left transition"
-                  >
-                    <span>
-                      {selectedCityName}
-                      {selectedCityCountry ? `, ${selectedCityCountry}` : ""}
-                    </span>
 
-                    <span className="text-xs text-(--text-muted)">
-                      {selectedCityCode}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="relative md:col-span-3 w-full" ref={nationalityRef}>
-          <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
-            Nationality
-          </label>
-
-          <input
-            type="text"
-            placeholder="Search nationality"
-            value={nationalityInput}
-            readOnly={isInternationalHotelSearch}
-            onFocus={() => {
-              if (isInternationalHotelSearch) {
-                setNationalityInput(INDIA_NATIONALITY.Name);
-                setNationalitySuggestions([INDIA_NATIONALITY]);
-
-                setFormData((prev) => ({
-                  ...prev,
-                  nationality: INDIA_NATIONALITY.Code,
-                  nationalityName: INDIA_NATIONALITY.Name,
-                }));
-
-                return;
-              }
-
-              if (nationalityInput) {
-                setNationalitySuggestions(
-                  searchNationalities(nationalityInput),
-                );
-              }
-            }}
-            onChange={(e) => {
-              if (isInternationalHotelSearch) {
-                setNationalityInput(INDIA_NATIONALITY.Name);
-                setNationalitySuggestions([INDIA_NATIONALITY]);
-
-                setFormData((prev) => ({
-                  ...prev,
-                  nationality: INDIA_NATIONALITY.Code,
-                  nationalityName: INDIA_NATIONALITY.Name,
-                }));
-
-                return;
-              }
-
-              const value = e.target.value;
-
-              setNationalityInput(value);
-              setFormData((prev) => ({
-                ...prev,
-                nationality: "",
-                nationalityName: "",
-              }));
-              setNationalitySuggestions(searchNationalities(value));
-            }}
-            className={`w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition ${
-              isInternationalHotelSearch ? "cursor-not-allowed opacity-80" : ""
-            }`}
-          />
-
-          {isInternationalHotelSearch && (
-            <p className="mt-1 text-[11px] text-(--gold-main) text-center">
-              For international hotel search, only Indian nationality is
-              allowed.
-            </p>
-          )}
-
-          {nationalitySuggestions.length > 0 && (
-            <div className="absolute top-full left-0 mt-2 w-full bg-(--bg-card) border border-(--border-soft) rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto p-1">
-              {nationalitySuggestions.map((country) => (
-                <button
-                  type="button"
-                  key={country.Code}
-                  onClick={() => {
-                    if (isInternationalHotelSearch) {
                       setFormData((prev) => ({
                         ...prev,
-                        nationality: INDIA_NATIONALITY.Code,
-                        nationalityName: INDIA_NATIONALITY.Name,
+                        nationality: country.Code,
+                        nationalityName: country.Name,
                       }));
 
-                      setNationalityInput(INDIA_NATIONALITY.Name);
+                      setNationalityInput(country.Name);
                       setNationalitySuggestions([]);
-                      return;
-                    }
-
-                    setFormData((prev) => ({
-                      ...prev,
-                      nationality: country.Code,
-                      nationalityName: country.Name,
-                    }));
-
-                    setNationalityInput(country.Name);
-                    setNationalitySuggestions([]);
-                  }}
-                  className="w-full p-3 rounded-xl hover:bg-(--bg-secondary) cursor-pointer text-sm flex items-center justify-between text-left transition"
-                >
-                  <span>{country.Name}</span>
-                  <span className="text-xs text-(--text-muted)">
-                    {country.Code}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-4 w-full">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
-              Check-in
-            </label>
-
-            <input
-              type="date"
-              min={today}
-              value={formData.checkIn}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  checkIn: e.target.value,
-                }))
-              }
-              className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
-            />
+                    }}
+                    className="w-full p-3 rounded-xl hover:bg-(--bg-secondary) cursor-pointer text-sm flex items-center justify-between text-left transition"
+                  >
+                    <span>{country.Name}</span>
+                    <span className="text-xs text-(--text-muted)">
+                      {country.Code}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
-              Check-out
-            </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-4 w-full">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
+                Check-in
+              </label>
 
-            <input
-              type="date"
-              min={formData.checkIn || today}
-              value={formData.checkOut}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  checkOut: e.target.value,
-                }))
-              }
-              className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
-            />
-          </div>
-        </div>
-
-        <div className="relative md:col-span-2 w-full" ref={guestRef}>
-          <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
-            Guests
-          </label>
-
-          <button
-            type="button"
-            onClick={() => setGuestOpen(true)}
-            className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) text-left flex items-center justify-between gap-2 hover:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
-          >
-            <span className="truncate">
-              {totalGuests} Guest{totalGuests > 1 && "s"} · {guests.rooms} Room
-              {guests.rooms > 1 && "s"}
-            </span>
-
-            <span className="text-(--gold-main)">▾</span>
-          </button>
-
-          {guestOpen && (
-            <>
-              <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-                onClick={() => setGuestOpen(false)}
+              <input
+                type="date"
+                min={today}
+                value={formData.checkIn}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    checkIn: e.target.value,
+                  }))
+                }
+                className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
               />
+            </div>
 
-              <div
-                className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] md:w-160 lg:w-180 h-[78vh] md:h-[62vh] rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-soft) shadow-2xl overflow-hidden flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="shrink-0 bg-(--bg-card) border-b border-(--border-soft) p-4 sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base sm:text-lg font-bold text-(--text-main)">
-                        Rooms & Guests
-                      </h3>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
+                Check-out
+              </label>
 
-                      <p className="mt-1 text-xs text-(--text-muted)">
-                        Add rooms, adults, children and child age.
-                      </p>
+              <input
+                type="date"
+                min={formData.checkIn || today}
+                value={formData.checkOut}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    checkOut: e.target.value,
+                  }))
+                }
+                className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
+              />
+            </div>
+          </div>
+
+          <div className="relative md:col-span-2 w-full" ref={guestRef}>
+            <label className="mb-1.5 block text-xs font-medium text-(--text-muted)">
+              Guests
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setGuestOpen(true)}
+              className="w-full h-12 px-4 rounded-2xl text-sm bg-(--bg-secondary) border border-(--border-soft) text-left flex items-center justify-between gap-2 hover:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
+            >
+              <span className="truncate">
+                {totalGuests} Guest{totalGuests > 1 && "s"} · {guests.rooms} Room
+                {guests.rooms > 1 && "s"}
+              </span>
+
+              <span className="text-(--gold-main)">▾</span>
+            </button>
+
+            {guestOpen && (
+              <>
+                <div
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+                  onClick={() => setGuestOpen(false)}
+                />
+
+                <div
+                  className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] md:w-160 lg:w-180 h-[78vh] md:h-[62vh] rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-soft) shadow-2xl overflow-hidden flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="shrink-0 bg-(--bg-card) border-b border-(--border-soft) p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold text-(--text-main)">
+                          Rooms & Guests
+                        </h3>
+
+                        <p className="mt-1 text-xs text-(--text-muted)">
+                          Add rooms, adults, children and child age.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setGuestOpen(false)}
+                        className="w-9 h-9 rounded-full bg-(--bg-secondary) border border-(--border-soft) flex items-center justify-center text-sm hover:border-(--gold-main) hover:text-(--gold-main) transition"
+                      >
+                        ✕
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setGuestOpen(false)}
-                      className="w-9 h-9 rounded-full bg-(--bg-secondary) border border-(--border-soft) flex items-center justify-center text-sm hover:border-(--gold-main) hover:text-(--gold-main) transition"
-                    >
-                      ✕
-                    </button>
+                    <div className="grid grid-cols-3 gap-2 mt-4">
+                      <div className="rounded-2xl bg-(--bg-secondary) border border-(--border-soft) p-3 text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-(--text-muted)">
+                          Adults
+                        </p>
+                        <p className="text-lg sm:text-xl font-bold text-(--gold-main)">
+                          {guests.adults}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-(--bg-secondary) border border-(--border-soft) p-3 text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-(--text-muted)">
+                          Children
+                        </p>
+                        <p className="text-lg sm:text-xl font-bold text-(--gold-main)">
+                          {guests.children}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-(--bg-secondary) border border-(--border-soft) p-3 text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-(--text-muted)">
+                          Rooms
+                        </p>
+                        <p className="text-lg sm:text-xl font-bold text-(--gold-main)">
+                          {guests.rooms}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 mt-4">
-                    <div className="rounded-2xl bg-(--bg-secondary) border border-(--border-soft) p-3 text-center">
-                      <p className="text-[10px] uppercase tracking-wide text-(--text-muted)">
-                        Adults
-                      </p>
-                      <p className="text-lg sm:text-xl font-bold text-(--gold-main)">
-                        {guests.adults}
-                      </p>
-                    </div>
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                    {rooms.map((room, roomIndex) => (
+                      <div
+                        key={roomIndex}
+                        className="rounded-3xl border border-(--border-soft) bg-(--bg-secondary) p-4 space-y-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-(--text-main)">
+                              Room {roomIndex + 1}
+                            </p>
 
-                    <div className="rounded-2xl bg-(--bg-secondary) border border-(--border-soft) p-3 text-center">
-                      <p className="text-[10px] uppercase tracking-wide text-(--text-muted)">
-                        Children
-                      </p>
-                      <p className="text-lg sm:text-xl font-bold text-(--gold-main)">
-                        {guests.children}
-                      </p>
-                    </div>
+                            <p className="text-xs text-(--text-muted)">
+                              {room.adults} Adult{room.adults > 1 && "s"} ·{" "}
+                              {room.children} Child
+                              {room.children !== 1 && "ren"}
+                            </p>
+                          </div>
 
-                    <div className="rounded-2xl bg-(--bg-secondary) border border-(--border-soft) p-3 text-center">
-                      <p className="text-[10px] uppercase tracking-wide text-(--text-muted)">
-                        Rooms
-                      </p>
-                      <p className="text-lg sm:text-xl font-bold text-(--gold-main)">
-                        {guests.rooms}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-                  {rooms.map((room, roomIndex) => (
-                    <div
-                      key={roomIndex}
-                      className="rounded-3xl border border-(--border-soft) bg-(--bg-secondary) p-4 space-y-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-(--text-main)">
-                            Room {roomIndex + 1}
-                          </p>
-
-                          <p className="text-xs text-(--text-muted)">
-                            {room.adults} Adult{room.adults > 1 && "s"} ·{" "}
-                            {room.children} Child
-                            {room.children !== 1 && "ren"}
-                          </p>
+                          {rooms.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeRoom(roomIndex)}
+                              className="px-3 py-1.5 rounded-full text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition"
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
 
-                        {rooms.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeRoom(roomIndex)}
-                            className="px-3 py-1.5 rounded-full text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition"
-                          >
-                            Remove
-                          </button>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="rounded-2xl bg-(--bg-card) border border-(--border-soft) p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-(--text-main)">
+                                  Adults
+                                </p>
+                                <p className="text-xs text-(--text-muted)">
+                                  Age 12+
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRoomValue(roomIndex, "adults", "dec")
+                                  }
+                                  disabled={room.adults <= 1}
+                                  className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
+                                >
+                                  -
+                                </button>
+
+                                <span className="min-w-6 text-center font-bold">
+                                  {room.adults}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRoomValue(roomIndex, "adults", "inc")
+                                  }
+                                  disabled={room.adults >= MAX_ADULTS_PER_ROOM}
+                                  className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl bg-(--bg-card) border border-(--border-soft) p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-(--text-main)">
+                                  Children
+                                </p>
+                                <p className="text-xs text-(--text-muted)">
+                                  Age 1 - 12
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRoomValue(roomIndex, "children", "dec")
+                                  }
+                                  disabled={room.children <= 0}
+                                  className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
+                                >
+                                  -
+                                </button>
+
+                                <span className="min-w-6 text-center font-bold">
+                                  {room.children}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRoomValue(roomIndex, "children", "inc")
+                                  }
+                                  disabled={
+                                    room.children >= MAX_CHILDREN_PER_ROOM
+                                  }
+                                  className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {room.children > 0 && (
+                          <div className="rounded-2xl bg-(--bg-card) border border-(--border-soft) p-3">
+                            <p className="text-xs font-semibold text-(--text-muted) mb-3">
+                              Child age is required
+                            </p>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {Array.from({ length: room.children }).map(
+                                (_, childIndex) => (
+                                  <div key={childIndex}>
+                                    <label className="text-[11px] text-(--text-muted)">
+                                      Child {childIndex + 1}
+                                    </label>
+
+                                    <input
+                                      type="number"
+                                      min={MIN_CHILD_AGE}
+                                      max={MAX_CHILD_AGE}
+                                      value={room.childAges?.[childIndex] || ""}
+                                      onChange={(e) =>
+                                        updateChildAge(
+                                          roomIndex,
+                                          childIndex,
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="1-12"
+                                      className="w-full mt-1 h-10 px-3 rounded-xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
+                                    />
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
+                    ))}
+                  </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="rounded-2xl bg-(--bg-card) border border-(--border-soft) p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-medium text-(--text-main)">
-                                Adults
-                              </p>
-                              <p className="text-xs text-(--text-muted)">
-                                Age 12+
-                              </p>
-                            </div>
+                  <div className="shrink-0 bg-(--bg-card) border-t border-(--border-soft) p-4 sm:p-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={addRoom}
+                        disabled={rooms.length >= MAX_ROOMS}
+                        className="w-full py-3 rounded-2xl border border-(--border-soft) bg-(--bg-secondary) text-sm font-semibold hover:border-(--gold-main) hover:text-(--gold-main) disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      >
+                        + Add Room
+                      </button>
 
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateRoomValue(roomIndex, "adults", "dec")
-                                }
-                                disabled={room.adults <= 1}
-                                className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
-                              >
-                                -
-                              </button>
-
-                              <span className="min-w-6 text-center font-bold">
-                                {room.adults}
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateRoomValue(roomIndex, "adults", "inc")
-                                }
-                                disabled={room.adults >= MAX_ADULTS_PER_ROOM}
-                                className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-(--bg-card) border border-(--border-soft) p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-medium text-(--text-main)">
-                                Children
-                              </p>
-                              <p className="text-xs text-(--text-muted)">
-                                Age 1 - 12
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateRoomValue(roomIndex, "children", "dec")
-                                }
-                                disabled={room.children <= 0}
-                                className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
-                              >
-                                -
-                              </button>
-
-                              <span className="min-w-6 text-center font-bold">
-                                {room.children}
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateRoomValue(roomIndex, "children", "inc")
-                                }
-                                disabled={
-                                  room.children >= MAX_CHILDREN_PER_ROOM
-                                }
-                                className="w-9 h-9 rounded-full border border-(--border-soft) bg-(--bg-secondary) flex items-center justify-center text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:border-(--gold-main) hover:text-(--gold-main) transition"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {room.children > 0 && (
-                        <div className="rounded-2xl bg-(--bg-card) border border-(--border-soft) p-3">
-                          <p className="text-xs font-semibold text-(--text-muted) mb-3">
-                            Child age is required
-                          </p>
-
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            {Array.from({ length: room.children }).map(
-                              (_, childIndex) => (
-                                <div key={childIndex}>
-                                  <label className="text-[11px] text-(--text-muted)">
-                                    Child {childIndex + 1}
-                                  </label>
-
-                                  <input
-                                    type="number"
-                                    min={MIN_CHILD_AGE}
-                                    max={MAX_CHILD_AGE}
-                                    value={room.childAges?.[childIndex] || ""}
-                                    onChange={(e) =>
-                                      updateChildAge(
-                                        roomIndex,
-                                        childIndex,
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="1-12"
-                                    className="w-full mt-1 h-10 px-3 rounded-xl text-sm bg-(--bg-secondary) border border-(--border-soft) outline-none focus:border-(--gold-main) focus:ring-2 focus:ring-(--gold-main)/20 transition"
-                                  />
-                                </div>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setGuestOpen(false)}
+                        className="w-full py-3 rounded-2xl bg-linear-to-r from-start to-end text-black text-sm font-bold hover:scale-[1.01] active:scale-[0.98] transition"
+                      >
+                        Done
+                      </button>
                     </div>
-                  ))}
-                </div>
-
-                <div className="shrink-0 bg-(--bg-card) border-t border-(--border-soft) p-4 sm:p-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={addRoom}
-                      disabled={rooms.length >= MAX_ROOMS}
-                      className="w-full py-3 rounded-2xl border border-(--border-soft) bg-(--bg-secondary) text-sm font-semibold hover:border-(--gold-main) hover:text-(--gold-main) disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    >
-                      + Add Room
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setGuestOpen(false)}
-                      className="w-full py-3 rounded-2xl bg-linear-to-r from-start to-end text-black text-sm font-bold hover:scale-[1.01] active:scale-[0.98] transition"
-                    >
-                      Done
-                    </button>
                   </div>
                 </div>
-              </div>
-            </>
-          )}
-        </div>
+              </>
+            )}
+          </div>
 
-        <div className="md:col-span-12 flex justify-center pt-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full md:w-auto px-10 py-3.5 rounded-2xl font-bold text-black bg-linear-to-r from-start to-end hover:scale-[1.02] active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? "Searching Hotels..." : "Search Hotels"}
-          </button>
-        </div>
-      </form>
-    </div>
+          <div className="md:col-span-12 flex justify-center pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full md:w-auto px-10 py-3.5 rounded-2xl font-bold text-black bg-linear-to-r from-start to-end hover:scale-[1.02] active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? "Searching Hotels..." : "Search Hotels"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </>
   );
 };
 

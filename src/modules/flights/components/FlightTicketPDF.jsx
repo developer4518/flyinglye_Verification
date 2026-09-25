@@ -46,6 +46,40 @@ const formatDateTime = (value) => {
   });
 };
 
+
+const getLayoverDuration = (arrivalTime, nextDepartureTime) => {
+  if (!arrivalTime || !nextDepartureTime) return null;
+
+  const arrival = new Date(arrivalTime);
+  const departure = new Date(nextDepartureTime);
+
+  if (
+    Number.isNaN(arrival.getTime()) ||
+    Number.isNaN(departure.getTime())
+  ) {
+    return null;
+  }
+
+  const diffMs = departure.getTime() - arrival.getTime();
+
+  if (diffMs <= 0) return null;
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+
+  return `${minutes}m`;
+};
+
 const getPaxType = (type) => {
   if (Number(type) === 1) return "Adult";
   if (Number(type) === 2) return "Child";
@@ -55,13 +89,28 @@ const getPaxType = (type) => {
 };
 
 const getPassengerName = (passenger) =>
-  `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${
-    passenger?.LastName || ""
-  }`
+  `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${passenger?.LastName || ""
+    }`
     .replace(/\s+/g, " ")
     .trim();
 
 const styles = StyleSheet.create({
+
+
+  layoverRow: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    textAlign: "center",
+    backgroundColor: "#f5f5f5",
+    borderBottomWidth: 0.7,
+    borderColor: "#C9D7E2",
+  },
+
+  layoverText: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 7.5,
+    textAlign: "center",
+  },
   page: {
     padding: 20,
     fontFamily: "Helvetica",
@@ -72,7 +121,7 @@ const styles = StyleSheet.create({
 
   borderBox: {
     borderWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
   },
 
   header: {
@@ -109,16 +158,35 @@ const styles = StyleSheet.create({
   confirmed: {
     fontFamily: "Helvetica-Bold",
     fontSize: 9,
+    color: "#4E9F3D",
+    borderWidth: 1,
+    borderColor: "#6FB35A",
+    borderRadius: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    alignSelf: "flex-end",
+    textAlign: "center",
+    marginBottom: 4,
   },
 
   bold: {
     fontFamily: "Helvetica-Bold",
   },
+  pnrText: {
+    fontFamily: "Helvetica-Bold",
+    color: "#344A8A",
+    fontSize: 8.5,
+  },
+
+  issuedText: {
+    color: "#666666",
+    fontSize: 7,
+  },
 
   table: {
     borderLeftWidth: 0.7,
     borderTopWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
     marginTop: 5,
   },
 
@@ -129,33 +197,34 @@ const styles = StyleSheet.create({
   cell: {
     borderRightWidth: 0.7,
     borderBottomWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
     padding: 3,
   },
 
   tableHeader: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#ECF5FB",
     fontFamily: "Helvetica-Bold",
   },
 
   section: {
     borderWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
     marginTop: 8,
   },
 
   sectionHeading: {
     fontFamily: "Helvetica-Bold",
     padding: 4,
+    backgroundColor: "#ECF5FB",
     borderBottomWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
   },
 
   segment: {
     flexDirection: "row",
     padding: 6,
     borderBottomWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
   },
 
   segmentAirline: {
@@ -191,14 +260,14 @@ const styles = StyleSheet.create({
   ancillaryRow: {
     flexDirection: "row",
     borderBottomWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
   },
 
   route: {
     width: "18%",
     padding: 5,
     borderRightWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
     fontFamily: "Helvetica-Bold",
   },
 
@@ -206,7 +275,7 @@ const styles = StyleSheet.create({
     width: "62%",
     padding: 5,
     borderRightWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
   },
 
   barcode: {
@@ -228,14 +297,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginTop: 8,
     borderWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
   },
 
   general: {
     width: "65%",
     padding: 6,
     borderRightWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
     lineHeight: 1.4,
   },
 
@@ -246,22 +315,26 @@ const styles = StyleSheet.create({
   paymentTitle: {
     fontFamily: "Helvetica-Bold",
     padding: 5,
+    backgroundColor: "#ECF5FB",
     borderBottomWidth: 0.7,
-    borderColor: "#cfd6df",
+    borderColor: "#C9D7E2",
   },
 
   paymentRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 5,
     borderBottomWidth: 0.5,
-    borderColor: "#ddd",
+    borderColor: "#DCE3E8",
   },
 
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 5,
+    backgroundColor: "#F2F2F2",
     fontFamily: "Helvetica-Bold",
   },
 });
@@ -282,6 +355,7 @@ const FlightTicketPDF = ({
   const itinerary = normalized?.FlightItinerary || {};
 
   const passengers = toArray(itinerary?.Passenger);
+ 
   const segments = toArray(itinerary?.Segments);
 
   const pnr =
@@ -342,7 +416,7 @@ const FlightTicketPDF = ({
 
   const totalFare = Number(
     pricing?.totalPrice ||
-      flightFare + feeAndSurcharge,
+    flightFare + feeAndSurcharge,
   );
 
   return (
@@ -358,10 +432,9 @@ const FlightTicketPDF = ({
             </Text>
 
             <Text>
-              316 Basement Gagan Vihar,
+              Gagan Vihar,
               New Delhi East Delhi
             </Text>
-
             <Text>Delhi</Text>
             <Text>Contact No: 9999055591</Text>
           </View>
@@ -375,13 +448,12 @@ const FlightTicketPDF = ({
               Confirmed
             </Text>
 
-            <Text style={styles.bold}>
+            <Text style={styles.pnrText}>
               PNR: {pnr}
             </Text>
 
-            <Text>
-              Issued Date:{" "}
-              {formatDateTime(issueDate)}
+            <Text style={styles.issuedText}>
+              Issued Date: {formatDateTime(issueDate)}
             </Text>
 
             <Text>
@@ -463,85 +535,123 @@ const FlightTicketPDF = ({
             Flight Details
           </Text>
 
-          {segments.map((segment, index) => (
-            <View style={styles.segment} key={index}>
-              <View style={styles.segmentAirline}>
-                <Text style={styles.airlineName}>
-                  {segment?.Airline?.AirlineName ||
-                    "Airline"}{" "}
-                  {segment?.Airline?.AirlineCode ||
-                    ""}{" "}
-                  {segment?.Airline?.FlightNumber ||
-                    ""}
-                </Text>
+          {segments.map((segment, index) => {
+            const nextSegment = segments[index + 1];
 
-                <Text>
-                  Economy
-                  {segment?.Airline?.FareClass
-                    ? `, Class ${segment.Airline.FareClass}`
-                    : ""}
-                </Text>
+            const layoverDuration = nextSegment
+              ? getLayoverDuration(
+                segment?.Destination?.ArrTime,
+                nextSegment?.Origin?.DepTime,
+              )
+              : null;
 
-                <Text>
-                  Aircraft:{" "}
-                  {segment?.Craft || "--"}
-                </Text>
+            const layoverCity =
+              segment?.Destination?.Airport?.CityName ||
+              segment?.Destination?.Airport?.AirportName ||
+              segment?.Destination?.Airport?.AirportCode ||
+              "";
 
-                <Text style={styles.bold}>
-                  Airline PNR: {pnr}
-                </Text>
-              </View>
+            return (
+              <React.Fragment key={index}>
+                <View style={styles.segment}>
 
-              <View style={styles.segmentPoint}>
-                <Text style={styles.airportCode}>
-                  {segment?.Origin?.Airport
-                    ?.AirportCode || "--"}
-                </Text>
+                  {/* AIRLINE */}
+                  <View style={styles.segmentAirline}>
+                    <Text style={styles.airlineName}>
+                      {segment?.Airline?.AirlineName || "Airline"}{" "}
+                      {segment?.Airline?.AirlineCode || ""}{" "}
+                      {segment?.Airline?.FlightNumber || ""}
+                    </Text>
 
-                <Text>
-                  {segment?.Origin?.Airport
-                    ?.AirportName ||
-                    segment?.Origin?.Airport
-                      ?.CityName ||
-                    "--"}
-                </Text>
+                    <Text>
+                      Economy
+                      {segment?.Airline?.FareClass
+                        ? `, Class ${segment.Airline.FareClass}`
+                        : ""}
+                    </Text>
 
-                <Text>
-                  {formatDateTime(
-                    segment?.Origin?.DepTime,
-                  )}
-                </Text>
-              </View>
+                    <Text>
+                      Aircraft: {segment?.Craft || "--"}
+                    </Text>
 
-              <View style={styles.segmentMiddle}>
-                <Text>--------&gt;</Text>
-              </View>
 
-              <View style={styles.arrival}>
-                <Text style={styles.airportCode}>
-                  {segment?.Destination?.Airport
-                    ?.AirportCode || "--"}
-                </Text>
+                    <Text>
+                      Operating Carrier:{" "}
+                      {segment?.Airline?.OperatingCarrier ||
+                        segment?.OperatingCarrier ||
+                        "--"}
+                    </Text>
 
-                <Text>
-                  {segment?.Destination?.Airport
-                    ?.AirportName ||
-                    segment?.Destination?.Airport
-                      ?.CityName ||
-                    "--"}
-                </Text>
+                    <Text style={styles.bold}>
+                      Airline PNR: {pnr}
+                    </Text>
+                  </View>
 
-                <Text>
-                  {formatDateTime(
-                    segment?.Destination?.ArrTime,
-                  )}
-                </Text>
-              </View>
-            </View>
-          ))}
+                  {/* DEPARTURE */}
+                  <View style={styles.segmentPoint}>
+                    <Text style={styles.airportCode}>
+                      {segment?.Origin?.Airport?.AirportCode || "--"}
+                    </Text>
+
+                    <Text>
+                      {segment?.Origin?.Airport?.AirportName ||
+                        segment?.Origin?.Airport?.CityName ||
+                        "--"}
+                    </Text>
+
+                    <Text>
+                      Terminal:{" "}
+                      {segment?.Origin?.Airport?.Terminal || "--"}
+                    </Text>
+
+                    <Text>
+                      {formatDateTime(segment?.Origin?.DepTime)}
+                    </Text>
+                  </View>
+
+                  {/* ARROW */}
+                  <View style={styles.segmentMiddle}>
+                    <Text>--------&gt;</Text>
+                  </View>
+
+                  {/* ARRIVAL */}
+                  <View style={styles.arrival}>
+                    <Text style={styles.airportCode}>
+                      {segment?.Destination?.Airport?.AirportCode || "--"}
+                    </Text>
+
+                    <Text>
+                      {segment?.Destination?.Airport?.AirportName ||
+                        segment?.Destination?.Airport?.CityName ||
+                        "--"}
+                    </Text>
+
+                    <Text>
+                      Terminal:{" "}
+                      {segment?.Destination?.Airport?.Terminal || "--"}
+                    </Text>
+
+                    <Text>
+                      {formatDateTime(segment?.Destination?.ArrTime)}
+                    </Text>
+                  </View>
+
+                </View>
+
+                {/* LAYOVER */}
+                {nextSegment && layoverDuration && (
+                  <View style={styles.layoverRow}>
+                    <Text style={styles.layoverText}>
+                      ---------- Layover : {layoverDuration}
+                      {layoverCity ? `, ${layoverCity}` : ""} ----------
+                    </Text>
+                  </View>
+                )}
+
+              </React.Fragment>
+            );
+          })}
         </View>
-
-        {/* ANCILLARY DETAILS */}
 
         <View style={styles.section}>
           <Text style={styles.sectionHeading}>
@@ -603,9 +713,24 @@ const FlightTicketPDF = ({
                           </Text>
 
                           <Text>
+                            Cabin:{" "}
+                            {segment?.CabinBaggage ||
+                              segment?.CabinBaggageAllowance ||
+                              "--"}
+                          </Text>
+
+                          <Text>
+                            Check-In:{" "}
+                            {segment?.Baggage ||
+                              segment?.CheckInBaggage ||
+                              "--"}
+                          </Text>
+
+                          <Text>
+                            Excess:{" "}
                             {baggage?.Description ||
                               baggage?.Weight ||
-                              segment?.Baggage ||
+                              baggage?.Code ||
                               "--"}
                           </Text>
                         </View>
@@ -720,7 +845,7 @@ const FlightTicketPDF = ({
         </View>
 
       </Page>
-    </Document>
+    </Document >
   );
 };
 

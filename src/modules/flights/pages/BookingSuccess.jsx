@@ -37,6 +37,52 @@ const BookingSuccess = () => {
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [isReleased, setIsReleased] = useState(false);
 
+
+  /* ================= POPUP ================= */
+
+  const [popup, setPopup] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "error",
+    actionLabel: "Okay",
+    onAction: null,
+  });
+
+  const showPopup = ({
+    title,
+    message,
+    type = "error",
+    actionLabel = "Okay",
+    onAction = null,
+  }) => {
+    setPopup({
+      show: true,
+      title,
+      message,
+      type,
+      actionLabel,
+      onAction,
+    });
+  };
+
+  const closePopup = () => {
+    const action = popup.onAction;
+
+    setPopup({
+      show: false,
+      title: "",
+      message: "",
+      type: "error",
+      actionLabel: "Okay",
+      onAction: null,
+    });
+
+    if (typeof action === "function") {
+      action();
+    }
+  };
+
   // ✅ CANCEL REQUEST
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelType, setCancelType] = useState("");
@@ -172,6 +218,21 @@ const BookingSuccess = () => {
     itinerary?.IsLCC === false ||
     booking?.IsLCC === false;
 
+
+  const isLcc =
+    toBool(storedData?.isLcc) ||
+    toBool(storedData?.isLCC) ||
+    toBool(stored?.isLcc) ||
+    toBool(stored?.isLCC) ||
+    toBool(
+      storedData?.fareQuote?.Response?.Results?.IsLCC,
+    ) ||
+    toBool(
+      storedData?.fareQuote?.Response?.Results?.[0]?.IsLCC,
+    ) ||
+    toBool(itinerary?.IsLCC) ||
+    toBool(booking?.IsLCC);
+
   // Non-LCC booking created but ticket not issued yet
   const isOnHold =
     isNonLcc &&
@@ -244,19 +305,35 @@ const BookingSuccess = () => {
           storeTraceId,
         });
 
-        alert(
-          "TraceId missing. Please book again or save TraceId in flightBookingData.",
-        );
+        showPopup({
+          title: "Booking Session Missing",
+          message:
+            "TraceId is missing. We cannot safely generate this ticket. Please contact support or create the booking again.",
+          type: "error",
+        });
+
         return;
       }
 
       if (!bookingId || bookingId === "N/A") {
-        alert("Booking ID missing");
+        showPopup({
+          title: "Booking ID Missing",
+          message:
+            "Booking ID is not available for this flight.",
+          type: "error",
+        });
+
         return;
       }
 
       if (!pnr || pnr === "N/A") {
-        alert("PNR missing");
+        showPopup({
+          title: "PNR Missing",
+          message:
+            "PNR is not available for this booking.",
+          type: "error",
+        });
+
         return;
       }
 
@@ -287,12 +364,16 @@ const BookingSuccess = () => {
           : [];
 
       console.log("TICKET PASSENGERS 👉", ticketPassengers);
-
       if (!ticketPassengers.length) {
-        alert("Passenger details not available from booking details.");
+        showPopup({
+          title: "Passenger Details Missing",
+          message:
+            "Passenger details could not be fetched from the booking. Please try again.",
+          type: "error",
+        });
+
         return;
       }
-
       const savedPassengers =
         latestStored?.passengerDetails ||
         latestStored?.passengers ||
@@ -354,9 +435,17 @@ const BookingSuccess = () => {
         );
 
         if (missingPassport) {
-          console.log("PASSPORT PAYLOAD ERROR 👉", passportPayload);
+          console.log(
+            "PASSPORT PAYLOAD ERROR 👉",
+            passportPayload,
+          );
 
-          alert("Passport details missing for one or more passengers");
+          showPopup({
+            title: "Passport Details Required",
+            message:
+              "Valid passport details are missing for one or more passengers.",
+            type: "warning",
+          });
 
           return;
         }
@@ -397,9 +486,12 @@ const BookingSuccess = () => {
             panPayload,
           );
 
-          alert(
-            "Valid PAN details are missing for one or more passengers",
-          );
+          showPopup({
+            title: "PAN Details Required",
+            message:
+              "Valid PAN details are missing for one or more passengers.",
+            type: "warning",
+          });
 
           return;
         }
@@ -419,34 +511,173 @@ const BookingSuccess = () => {
         IsPriceChangeAccepted: true,
       };
 
-      console.log("NON-LCC TICKET PAYLOAD 👉", ticketPayload);
-
-      const { data } = await privateApi.post(
-        "/api/airlines/ticket/",
+      console.log(
+        "NON-LCC TICKET PAYLOAD 👉",
         ticketPayload,
       );
 
-      console.log("NON-LCC TICKET RESPONSE 👉", data);
+      /* ========================================
+         GET LEAD PASSENGER PAYMENT DETAILS
+      ======================================== */
 
-      const updatedStored = {
-        ...latestStored,
-        booking: data,
-        pricing: latestStored?.pricing,
-        traceId:
-          data?.data?.Response?.TraceId || data?.Response?.TraceId || traceId,
-        TraceId:
-          data?.data?.Response?.TraceId || data?.Response?.TraceId || traceId,
-        isLcc: false,
+      const leadApiPassenger =
+        ticketPassengers?.[0] || {};
+
+      const leadSavedPassenger =
+        savedPassengers?.[0] || {};
+
+      const paymentFirstName = String(
+        leadApiPassenger?.FirstName ||
+        leadSavedPassenger?.FirstName ||
+        leadSavedPassenger?.firstName ||
+        "",
+      ).trim();
+
+      const paymentEmail = String(
+        leadApiPassenger?.Email ||
+        leadSavedPassenger?.Email ||
+        leadSavedPassenger?.email ||
+        "",
+      ).trim();
+
+      const paymentPhone = String(
+        leadApiPassenger?.ContactNo ||
+        leadApiPassenger?.ContactNumber ||
+        leadSavedPassenger?.ContactNo ||
+        leadSavedPassenger?.phone ||
+        "",
+      ).trim();
+
+      /* ========================================
+         VALIDATE PAYMENT DETAILS
+      ======================================== */
+
+      if (
+        !paymentFirstName ||
+        !paymentEmail ||
+        !paymentPhone
+      ) {
+        showPopup({
+          title: "Contact Details Missing",
+          message:
+            "Lead passenger name, email or mobile number is missing. Payment cannot be started safely.",
+          type: "error",
+        });
+
+        return;
+      }
+
+      if (!totalFare || Number(totalFare) <= 0) {
+        showPopup({
+          title: "Payment Amount Missing",
+          message:
+            "The payable flight amount is not available. Please contact support before generating the ticket.",
+          type: "error",
+        });
+
+        return;
+      }
+
+      /* ========================================
+         SAVE DATA BEFORE PAYU
+      ======================================== */
+
+      localStorage.setItem(
+        "pendingFlightPayment",
+        JSON.stringify({
+          paymentAction:
+            "non_lcc_hold_ticket",
+
+          ticketPayload,
+
+          successRedirect:
+            "/booking-success",
+
+          source:
+            "booking_success",
+
+          origin:
+            "booking_success",
+
+          flightBookingData: {
+            ...latestStored,
+
+            isLcc: false,
+
+            traceId,
+            TraceId: traceId,
+
+            pricing:
+              latestStored?.pricing ||
+              pricingData,
+          },
+
+          paymentAmount:
+            totalFare,
+
+          bookingId:
+            Number(bookingId),
+
+          pnr,
+        }),
+      );
+
+      /* ========================================
+         REDIRECT TO PAYU
+      ======================================== */
+
+      const form =
+        document.createElement("form");
+
+      form.method = "POST";
+
+      form.action = `${import.meta.env.VITE_API_BASE_URL
+        }/payment/airline/initiate/`;
+
+      const paymentData = {
+        amount:
+          totalFare,
+
+        firstname:
+          paymentFirstName,
+
+        email:
+          paymentEmail,
+
+        phone:
+          paymentPhone,
+
+        payment_action:
+          "non_lcc_hold_ticket",
+
+        booking_id:
+          Number(bookingId),
+
+        pnr:
+          pnr,
+
+        trace_id:
+          traceId,
       };
 
-      localStorage.setItem("flightBookingData", JSON.stringify(updatedStored));
+      Object.entries(
+        paymentData,
+      ).forEach(([key, value]) => {
+        const input =
+          document.createElement("input");
 
-      const normalized = normalizeBookingResponse(data);
+        input.type = "hidden";
+        input.name = key;
+        input.value = value ?? "";
 
-      setBooking(normalized);
-      setStoredData(updatedStored);
+        form.appendChild(input);
+      });
 
-      alert("Ticket generated successfully");
+      document.body.appendChild(form);
+
+      form.submit();
+
+      return;
     } catch (error) {
       console.error("TICKET FULL ERROR 👉", error);
 
@@ -464,11 +695,14 @@ const BookingSuccess = () => {
         JSON.stringify(error?.response?.data?.data, null, 2)
       );
 
-      alert(
-        error?.response?.data?.message ||
-        error?.message ||
-        "Ticket generation failed",
-      );
+      showPopup({
+        title: "Unable To Continue",
+        message:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Unable to prepare ticket payment. Please try again.",
+        type: "error",
+      });
     } finally {
       setTicketLoading(false);
     }
@@ -833,12 +1067,12 @@ const BookingSuccess = () => {
 
   return (
     <>
-      <div className="bg-gray-100 min-h-screen py-20 px-3 md:px-6 print:hidden">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <div className="bg-gray-100 min-h-screen pt-16 pb-10  px-2 sm:px-3 md:py-20 md:px-6 print:hidden">
+        <div className="max-w-5xl mx-auto space-y-3 md:space-y-6">
           {/* HEADER */}
-          <div className="bg-linear-to-r from-green-500 to-emerald-600 text-white p-6 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between">
+          <div className="bg-linear-to-r from-green-500 to-emerald-600 text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg flex flex-col md:flex-row justify-between gap-3"> 
             <div>
-              <h2 className="text-2xl md:text-3xl font-bold">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">
                 {isReleased
                   ? "PNR Released"
                   : isOnHold
@@ -856,7 +1090,7 @@ const BookingSuccess = () => {
                       : "Your booking has been created successfully."}
               </p>
 
-              <div className="mt-3 text-sm space-y-1 break-all">
+              <div className="mt-2 text-xs sm:text-sm space-y-0.5 break-all">
                 <p>PNR: {pnr}</p>
                 <p>Booking ID: {bookingId}</p>
                 <p>TraceId: {traceId || "N/A"}</p>
@@ -866,14 +1100,14 @@ const BookingSuccess = () => {
               </div>
             </div>
 
-            <div className="mt-4 md:mt-0 bg-white text-black px-6 py-3 rounded-xl font-semibold shadow-md h-fit">
+            <div className="mt-1 md:mt-0 bg-white text-black px-4 py-2.5 rounded-lg md:rounded-xl text-sm md:text-base font-semibold shadow-md h-fit">
               ₹ {totalFare}
             </div>
           </div>
 
           {/* FLIGHTS */}
           {segments.map((seg, i) => (
-            <div key={i} className="bg-white rounded-2xl shadow-md p-5 border">
+            <div key={i} className="bg-white rounded-xl md:rounded-2xl shadow-sm md:shadow-md p-3.5 md:p-5 border">
               <div className="flex justify-between mb-4">
                 <div>
                   <h3 className="font-semibold text-lg">
@@ -914,11 +1148,11 @@ const BookingSuccess = () => {
           ))}
 
           {/* PASSENGERS */}
-          <div className="bg-white rounded-2xl shadow-md p-5 border">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-sm md:shadow-md p-3.5 md:p-5 border">
             <h3 className="font-semibold text-lg mb-4">Passengers</h3>
 
             {passengers.map((p, i) => (
-              <div key={i} className="border-b py-3 text-sm space-y-1">
+              <div key={i} className="border-b py-2 text-xs sm:text-sm space-y-0.5">
                 <p className="font-medium">
                   {p?.Title} {p?.FirstName} {p?.LastName}
                 </p>
@@ -949,7 +1183,7 @@ const BookingSuccess = () => {
           </div>
 
           {/* FARE DETAILS */}
-          <div className="bg-white rounded-2xl shadow-md p-5 border mb-24">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-sm md:shadow-md p-3.5 md:p-5 border">
             <h3 className="font-semibold text-lg mb-4">Fare Details</h3>
 
             <Row label="Flight Fare" value={flightFare} />
@@ -968,8 +1202,15 @@ const BookingSuccess = () => {
 
           {/* ACTIONS */}
           {/* ACTIONS */}
-          <div className="fixed bottom-0 left-0 w-full bg-white border-t p-4">
-            <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
+          <div className="fixed bottom-0 left-0 z-40 w-full bg-white/95 backdrop-blur border-t p-2 sm:p-3">
+            <div
+              className={`max-w-5xl mx-auto grid gap-1.5 sm:gap-2 ${hasTicket
+                ? "grid-cols-4"
+                : canGenerateTicket && isNonLcc && !isReleased
+                  ? "grid-cols-3"
+                  : "grid-cols-1"
+                }`}
+            >
               {/* VIEW FULL BOOKING */}
               <button
                 onClick={() => {
@@ -980,9 +1221,14 @@ const BookingSuccess = () => {
 
                   navigate(`/flight-booking-details/${bookingId}`);
                 }}
-                className="flex-1 bg-gray-200 py-3 rounded-xl"
+                className="min-w-0 h-12 bg-gray-200 px-1 rounded-lg text-[10px] sm:text-sm font-semibold leading-tight"
               >
-                View Full Booking
+                <>
+                  <span className="sm:hidden">Booking</span>
+                  <span className="hidden sm:inline">
+                    View Full Booking
+                  </span>
+                </>
               </button>
 
               {/* ==============================
@@ -994,7 +1240,7 @@ const BookingSuccess = () => {
                     <button
                       onClick={handleGenerateTicket}
                       disabled={ticketLoading}
-                      className="flex-1 bg-emerald-600 text-white py-3 rounded-xl disabled:opacity-60"
+                      className="flex-1 min-w-0 bg-emerald-600 text-white px-1 py-3 rounded-xl text-[10px] sm:text-sm font-medium leading-tight disabled:opacity-60"
                     >
                       {ticketLoading ? "Generating..." : "Generate Ticket"}
                     </button>
@@ -1004,7 +1250,7 @@ const BookingSuccess = () => {
                     <button
                       onClick={handleReleasePnr}
                       disabled={releaseLoading}
-                      className="flex-1 bg-red-600 text-white py-3 rounded-xl disabled:opacity-60"
+                      className="flex-1 min-w-0 bg-red-600 text-white px-1 py-3 rounded-xl text-[10px] sm:text-sm font-medium leading-tight disabled:opacity-60"
                     >
                       {releaseLoading ? "Releasing..." : "Release PNR"}
                     </button>
@@ -1020,25 +1266,78 @@ const BookingSuccess = () => {
                   <button
                     onClick={handleDownloadTicket}
                     disabled={ticketPdfLoading}
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl disabled:opacity-60"
+                    className="min-w-0 h-12 bg-blue-600 text-white px-1 rounded-lg text-[10px] sm:text-sm font-semibold leading-tight disabled:opacity-60"
                   >
-                    {ticketPdfLoading ? "Generating Ticket..." : "Print Ticket"}
+                    {ticketPdfLoading ? (
+                      "..."
+                    ) : (
+                      <>
+                        <span className="sm:hidden">
+                          Ticket
+                        </span>
+
+                        <span className="hidden sm:inline">
+                          Print Ticket
+                        </span>
+                      </>
+                    )}
                   </button>
 
                   <button
                     onClick={handlePrintInvoice}
                     disabled={invoiceLoading}
-                    className="flex-1 bg-amber-500 text-black py-3 rounded-xl disabled:opacity-60"
+                    className="min-w-0 h-12 bg-amber-500 text-black px-1 rounded-lg text-[10px] sm:text-sm font-semibold leading-tight disabled:opacity-60"
                   >
-                    {invoiceLoading ? "Generating Invoice..." : "Print Invoice"}
+                    {invoiceLoading ? (
+                      "..."
+                    ) : (
+                      <>
+                        <span className="sm:hidden">
+                          Invoice
+                        </span>
+
+                        <span className="hidden sm:inline">
+                          Print Invoice
+                        </span>
+                      </>
+                    )}
                   </button>
+
+                  {/* FLIGHT AMENDMENT - ONLY FOR LCC */}
+
+                  {false && isLcc && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/flight-amendment/${bookingId}`,
+                          {
+                            state: {
+                              pnr,
+                            },
+                          },
+                        )
+                      }
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl"
+                    >
+                      Flight Amendment
+                    </button>
+                  )}
 
                   {allPassengersTicketed && !isReleased && (
                     <button
                       onClick={handleOpenCancelRequest}
-                      className="flex-1 bg-red-600 text-white py-3 rounded-xl"
+                      className="min-w-0 h-12 bg-red-600 text-white px-1 rounded-lg text-[10px] sm:text-sm font-semibold leading-tight"
                     >
-                      Cancel Request
+                      <>
+                        <span className="sm:hidden">
+                          Cancel
+                        </span>
+
+                        <span className="hidden sm:inline">
+                          Cancel Request
+                        </span>
+                      </>
                     </button>
                   )}
                 </>
@@ -1366,6 +1665,51 @@ const BookingSuccess = () => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
+      {/* ================= PREMIUM POPUP ================= */}
+
+      {popup.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#11141B] text-white shadow-2xl">
+            <div className="p-7 text-center">
+
+              <div
+                className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl ${popup.type === "warning"
+                  ? "bg-amber-400/10 text-amber-300"
+                  : popup.type === "success"
+                    ? "bg-green-400/10 text-green-300"
+                    : "bg-red-400/10 text-red-300"
+                  }`}
+              >
+                {popup.type === "warning"
+                  ? "!"
+                  : popup.type === "success"
+                    ? "✓"
+                    : "×"}
+              </div>
+
+              <h3 className="mt-5 text-xl font-bold">
+                {popup.title}
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-gray-400">
+                {popup.message}
+              </p>
+
+              <button
+                type="button"
+                onClick={closePopup}
+                className="mt-7 w-full rounded-xl bg-linear-to-r from-yellow-400 to-orange-400 px-5 py-3 font-bold text-black transition hover:scale-[1.01]"
+              >
+                {popup.actionLabel}
+              </button>
+
             </div>
           </div>
         </div>

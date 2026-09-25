@@ -8,6 +8,7 @@ import Navbar from "./components/Home/Navbar";
 import FareRule from "./modules/flights/pages/FareRule";
 import FareQuote from "./modules/flights/pages/FareQuote";
 import SSRPage from "./modules/flights/pages/SSRPage";
+import FlightAmendment from "./modules/flights/pages/FlightAmendment";
 import PassengerDetails from "./modules/flights/pages/PassengerDetails";
 import ReviewBooking from "./modules/flights/pages/ReviewBooking";
 import BookingSuccess from "./modules/flights/pages/BookingSuccess";
@@ -36,6 +37,7 @@ import HotelReviewBooking from "./modules/hotels/pages/HotelReviewBooking";
 import HotelVoucher from "./modules/hotels/pages/HotelVoucher";
 import HotelInvoice from "./modules/hotels/pages/HotelInvoice";
 import PaymentSuccess from "./modules/hotels/pages/PaymentSuccess";
+import FlightPaymentSuccess from "./modules/flights/pages/FlightPaymentSuccess";
 
 const App = () => {
   return (
@@ -94,12 +96,22 @@ const App = () => {
         <Route path="/fare-rule" element={<FareRule />} />
         <Route path="/fare-quote" element={<FareQuote />} />
         <Route path="/ssr" element={<SSRPage />} />
+        <Route
+          path="/flight-amendment/:bookingId"
+          element={<FlightAmendment />}
+        />
         <Route path="/passenger-details" element={<PassengerDetails />} />
         <Route path="/review-booking" element={<ReviewBooking />} />
         <Route path="/booking-success" element={<BookingSuccess />} />
         <Route
           path="/flight-booking-details/:id"
           element={<FlightBookingDetails />}
+        />
+
+
+        <Route
+          path="/flight-payment-success"
+          element={<FlightPaymentSuccess />}
         />
       </Routes>
 

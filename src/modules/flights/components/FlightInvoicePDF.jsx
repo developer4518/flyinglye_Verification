@@ -59,6 +59,35 @@ const getPassengerName = (passenger) =>
     .replace(/\s+/g, " ")
     .trim();
 
+
+
+const getTaxBreakupValue = (fare, keys = []) => {
+  const taxBreakup = toArray(
+    fare?.TaxBreakup ||
+    fare?.TaxBreakUp ||
+    [],
+  );
+
+  const normalizedKeys = keys.map((key) =>
+    String(key).toLowerCase(),
+  );
+
+  const matchedTax = taxBreakup.find((item) => {
+    const taxKey = String(
+      item?.key ??
+      item?.Key ??
+      "",
+    ).toLowerCase();
+
+    return normalizedKeys.includes(taxKey);
+  });
+
+  return Number(
+    matchedTax?.value ??
+    matchedTax?.Value ??
+    0,
+  );
+};
 /* ================= COMPANY DETAILS ================= */
 
 /*
@@ -81,8 +110,8 @@ const FLYING_LYTE_DETAILS = {
   name: "FLYING LYTE",
   owner: "Anu Jain",
   address:
-    "316 Basement Gagan Vihar Gagan Vihar New Delhi East Delhi, Delhi",
-  phone: "9999055591",
+    "Gagan Vihar Gagan Vihar New Delhi East Delhi, Delhi",
+  phone: "9667455591",
   pan: "AALFF0579Q",
   gstin: "07AALFF0579Q1ZP",
 };
@@ -269,6 +298,11 @@ const FlightInvoicePDF = ({
     itinerary?.Passenger,
   );
 
+  const leadPassenger =
+    passengers.find((passenger) => passenger?.IsLeadPax) ||
+    passengers[0] ||
+    {};
+
   const segments = toArray(
     itinerary?.Segments,
   );
@@ -411,47 +445,7 @@ const FlightInvoicePDF = ({
         <View style={styles.companyRow}>
           <View style={styles.companyLeft}>
             <Text style={styles.bold}>
-              {TBO_DETAILS.name}
-            </Text>
-
-            <Text>
-              {TBO_DETAILS.address}
-            </Text>
-
-            <Text>
-              Phone: {TBO_DETAILS.phone}
-            </Text>
-
-            <Text>
-              CIN: {TBO_DETAILS.cin}
-            </Text>
-
-            <Text>
-              PAN: {TBO_DETAILS.pan}
-            </Text>
-
-            <Text>
-              GST State:{" "}
-              {TBO_DETAILS.gstState}
-            </Text>
-
-            <Text>
-              GSTIN: {TBO_DETAILS.gstin}
-            </Text>
-          </View>
-
-          <Text style={styles.invoiceTitle}>
-            Invoice
-          </Text>
-
-          <View style={styles.companyRight}>
-            <Text style={styles.bold}>
               {FLYING_LYTE_DETAILS.name}
-            </Text>
-
-            <Text>
-              Owner&apos;s Name:{" "}
-              {FLYING_LYTE_DETAILS.owner}
             </Text>
 
             <Text>
@@ -459,8 +453,7 @@ const FlightInvoicePDF = ({
             </Text>
 
             <Text>
-              Phone:{" "}
-              {FLYING_LYTE_DETAILS.phone}
+              Phone: {FLYING_LYTE_DETAILS.phone}
             </Text>
 
             <Text>
@@ -468,9 +461,51 @@ const FlightInvoicePDF = ({
             </Text>
 
             <Text>
-              GSTIN:{" "}
-              {FLYING_LYTE_DETAILS.gstin}
+              GSTIN: {FLYING_LYTE_DETAILS.gstin}
             </Text>
+          </View>
+          <Text style={styles.invoiceTitle}>
+            Invoice
+          </Text>
+
+          <View style={styles.companyRight}>
+            <Text style={styles.bold}>
+              Billed To
+            </Text>
+
+            <Text style={styles.bold}>
+              {getPassengerName(leadPassenger) || "--"}
+            </Text>
+
+            <Text>
+              {leadPassenger?.AddressLine1 || "--"}
+            </Text>
+
+            {leadPassenger?.AddressLine2 && (
+              <Text>
+                {leadPassenger.AddressLine2}
+              </Text>
+            )}
+
+            <Text>
+              {[leadPassenger?.City, leadPassenger?.CountryName]
+                .filter(Boolean)
+                .join(", ") || "--"}
+            </Text>
+
+            <Text>
+              Phone: {leadPassenger?.ContactNo || "--"}
+            </Text>
+
+            <Text>
+              Email: {leadPassenger?.Email || "--"}
+            </Text>
+
+            {customerGST?.GSTNumber && (
+              <Text>
+                GSTIN: {customerGST.GSTNumber}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -566,12 +601,37 @@ const FlightInvoicePDF = ({
                 ),
               );
 
-              const tax = Number(
-                paxFare?.Tax || 0,
+              const otherTax = Number(
+                paxFare?.OtherTaxes ??
+                paxFare?.OtherTax ??
+                getTaxBreakupValue(
+                  paxFare,
+                  ["OtherTaxes", "OtherTax"],
+                )
+              );
+
+              const k3Tax = Number(
+                paxFare?.K3 ??
+                getTaxBreakupValue(
+                  paxFare,
+                  ["K3"],
+                )
               );
 
               const yqTax = Number(
-                paxFare?.YQTax || 0,
+                paxFare?.YQTax ??
+                getTaxBreakupValue(
+                  paxFare,
+                  ["YQTax", "YQ"],
+                )
+              );
+
+              const yrTax = Number(
+                paxFare?.YR ??
+                getTaxBreakupValue(
+                  paxFare,
+                  ["YR"],
+                )
               );
 
               return (
@@ -627,14 +687,14 @@ const FlightInvoicePDF = ({
                     width="7%"
                     align="right"
                   >
-                    {money(tax)}
+                    {money(otherTax)}
                   </Cell>
 
                   <Cell
                     width="6%"
                     align="right"
                   >
-                    0.00
+                    {money(k3Tax)}
                   </Cell>
 
                   <Cell
@@ -648,7 +708,7 @@ const FlightInvoicePDF = ({
                     width="5%"
                     align="right"
                   >
-                    0.00
+                    {money(yrTax)}
                   </Cell>
 
                   <Cell
@@ -921,7 +981,7 @@ const FlightInvoicePDF = ({
             </Cell>
 
             <Cell width="22%">
-             {customerGST?.GSTCompanyAddress || "-"}
+              {customerGST?.GSTCompanyAddress || "-"}
             </Cell>
 
             <Cell width="17%">
@@ -942,7 +1002,7 @@ const FlightInvoicePDF = ({
           </Text>
 
           <Text>
-            Billed by : Travel Boutique Online
+            Billed by : FLYING LYTE
           </Text>
 
           <Text>
