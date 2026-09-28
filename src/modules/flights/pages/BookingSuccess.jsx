@@ -658,6 +658,9 @@ const BookingSuccess = () => {
 
         trace_id:
           traceId,
+
+        frontend_url:
+          window.location.origin,
       };
 
       Object.entries(
@@ -1070,7 +1073,7 @@ const BookingSuccess = () => {
       <div className="bg-gray-100 min-h-screen pt-16 pb-10  px-2 sm:px-3 md:py-20 md:px-6 print:hidden">
         <div className="max-w-5xl mx-auto space-y-3 md:space-y-6">
           {/* HEADER */}
-          <div className="bg-linear-to-r from-green-500 to-emerald-600 text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg flex flex-col md:flex-row justify-between gap-3"> 
+          <div className="bg-linear-to-r from-green-500 to-emerald-600 text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg flex flex-col md:flex-row justify-between gap-3">
             <div>
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">
                 {isReleased

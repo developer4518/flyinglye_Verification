@@ -779,6 +779,9 @@ const FlightBookings = () => {
 
         trace_id:
           traceId,
+          
+        frontend_url:
+          window.location.origin,
       };
 
       Object.entries(

@@ -693,6 +693,9 @@ const ReviewBooking = () => {
 
           trace_id:
             newTraceId,
+
+          frontend_url:
+            window.location.origin,
         };
 
         Object.entries(
