@@ -235,49 +235,26 @@ const FlightBookingDetails = () => {
       const bookingId = getStoredBookingId(stored, id);
 
 
-      const statePnr = location.state?.pnr;
-
-      const storedPnr = getPNR(
-        getItinerary(stored?.booking),
-        stored?.booking,
-      );
-
-      const pnr =
-        statePnr ||
-        (storedPnr !== "N/A" ? storedPnr : null);
-
       if (!bookingId) {
         throw new Error("BookingId missing");
-      }
-
-      if (!pnr) {
-        throw new Error("PNR missing");
       }
 
       const res = await privateApi.post(
         "/api/airlines/booking-details/",
         {
-          PNR: pnr,
           BookingId: Number(bookingId),
         },
       );
 
 
-      console.log("BOOKING DETAILS FULL RESPONSE 👉", data);
 
-      console.log("BOOKING STATUS CHECK 👉", {
-        booking_id: data?.booking_id,
-        pnr: data?.pnr,
-        ticket_id: data?.ticket_id,
-        ticket_number: data?.ticket_number,
-        detected_status: data?.detected_status,
-        booking_status: data?.booking_status,
-        ticket_status: data?.ticket_status,
-        pnr_status: data?.pnr_status,
-        cancellation_status: data?.cancellation_status,
-      });
 
       const apiData = res?.data;
+
+      console.log(
+        "BOOKING DETAILS FULL RESPONSE 👉",
+        apiData,
+      );
 
       const normalized = normalizeResponse(apiData);
 
@@ -337,37 +314,71 @@ const FlightBookingDetails = () => {
     const statusClass = getStatusClass(itinerary?.Status, hasTicket);
 
     const priceSummary = location.state?.fromMyBookings
-      ? {
-        flightFare: Number(
+      ? (() => {
+        const savedPricing =
+          location.state?.pricing || {};
+
+        const seatPrice = Number(
+          savedPricing?.seatPrice ||
+          itinerary?.Fare?.TotalSeatCharges ||
+          0
+        );
+
+        const mealPrice = Number(
+          savedPricing?.mealPrice ||
+          itinerary?.Fare?.TotalMealCharges ||
+          0
+        );
+
+        const baggagePrice = Number(
+          savedPricing?.baggagePrice ||
+          itinerary?.Fare?.TotalBaggageCharges ||
+          0
+        );
+
+        const convenienceFee = Number(
+          savedPricing?.convenienceFee || 0
+        );
+
+        const totalFare = Number(
+          savedPricing?.totalPrice ||
+          location.state?.totalAmount ||
           itinerary?.Fare?.PublishedFare ||
           itinerary?.Fare?.OfferedFare ||
-          location.state?.totalAmount ||
-          0,
-        ),
+          0
+        );
 
-        seatPrice: Number(
-          itinerary?.Fare?.TotalSeatCharges || 0,
-        ),
+        const savedFlightFare = Number(
+          savedPricing?.flightFare || 0
+        );
 
-        mealPrice: Number(
-          itinerary?.Fare?.TotalMealCharges || 0,
-        ),
+        const ssrTotal =
+          seatPrice +
+          mealPrice +
+          baggagePrice +
+          convenienceFee;
 
-        baggagePrice: Number(
-          itinerary?.Fare?.TotalBaggageCharges || 0,
-        ),
+        const flightFare =
+          savedFlightFare > 0
+            ? savedFlightFare
+            : totalFare > 0
+              ? Math.max(totalFare - ssrTotal, 0)
+              : Number(
+                itinerary?.Fare?.PublishedFare ||
+                itinerary?.Fare?.OfferedFare ||
+                0
+              );
 
-        convenienceFee: 0,
-
-        totalFare: Number(
-          location.state?.totalAmount ||
-          itinerary?.Fare?.PublishedFare ||
-          itinerary?.Fare?.OfferedFare ||
-          0,
-        ),
-      }
+        return {
+          flightFare,
+          seatPrice,
+          mealPrice,
+          baggagePrice,
+          convenienceFee,
+          totalFare,
+        };
+      })()
       : getFareSummary(stored, itinerary);
-
     return {
       itinerary,
       passengers,
@@ -426,6 +437,27 @@ const FlightBookingDetails = () => {
     statusClass,
     priceSummary,
   } = parsed;
+
+
+  const paymentDetails =
+    location.state?.fromMyBookings
+      ? {
+        amount:
+          location.state?.paidAmount,
+
+        status:
+          location.state?.paymentStatus,
+
+        txnid:
+          location.state?.paymentTxnid,
+
+        action:
+          location.state?.paymentAction,
+
+        refundStatus:
+          location.state?.paymentRefundStatus,
+      }
+      : null;
 
   const firstSeg = segments?.[0];
   const lastSeg = segments?.[segments.length - 1];
@@ -625,6 +657,83 @@ const FlightBookingDetails = () => {
             </div>
           </div>
         </div>
+
+
+        {paymentDetails?.status && (
+          <div className="bg-[#15151C]/80 p-6 rounded-3xl border border-gray-800">
+            <h3 className="text-yellow-300 mb-4 font-semibold text-lg">
+              Payment Details
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+
+              <div>
+                <p className="text-gray-500">
+                  Amount Paid
+                </p>
+
+                <p className="font-semibold text-green-400">
+                  ₹{" "}
+                  {Number(
+                    paymentDetails?.amount || 0,
+                  ).toLocaleString("en-IN")}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-gray-500">
+                  Payment Status
+                </p>
+
+                <p className="font-semibold capitalize text-green-400">
+                  {String(
+                    paymentDetails.status,
+                  ).replaceAll("_", " ")}
+                </p>
+              </div>
+
+              <div className="sm:col-span-2">
+                <p className="text-gray-500">
+                  Transaction ID
+                </p>
+
+                <p className="font-semibold break-all">
+                  {paymentDetails?.txnid ||
+                    "N/A"}
+                </p>
+              </div>
+
+              {paymentDetails?.action && (
+                <div>
+                  <p className="text-gray-500">
+                    Payment Type
+                  </p>
+
+                  <p className="font-semibold capitalize">
+                    {String(
+                      paymentDetails.action,
+                    ).replaceAll("_", " ")}
+                  </p>
+                </div>
+              )}
+
+              {paymentDetails?.refundStatus && (
+                <div>
+                  <p className="text-gray-500">
+                    Refund Status
+                  </p>
+
+                  <p className="font-semibold capitalize">
+                    {String(
+                      paymentDetails.refundStatus,
+                    ).replaceAll("_", " ")}
+                  </p>
+                </div>
+              )}
+
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row gap-3 pb-10">
           {!location.state?.fromMyBookings && (

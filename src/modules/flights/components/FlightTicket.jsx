@@ -82,9 +82,8 @@ const getPaxType = (type) => {
 };
 
 const getPassengerName = (passenger) =>
-  `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${
-    passenger?.LastName || ""
-  }`
+  `${passenger?.Title || ""} ${passenger?.FirstName || ""} ${passenger?.LastName || ""
+    }`
     .replace(/\s+/g, " ")
     .trim();
 
@@ -117,6 +116,12 @@ const FlightTicket = ({ booking, pricing, storedData }) => {
   const selectedSeats = bookingData?.selectedSeats || [];
   const selectedMeals = bookingData?.selectedMeals || [];
   const selectedBaggage = bookingData?.selectedBaggage || [];
+
+  const customerGST =
+    bookingData?.gstDetails || null;
+
+  const customerGSTNumber =
+    customerGST?.GSTNumber || "";
 
   const pnr =
     itinerary?.PNR ||
@@ -159,7 +164,7 @@ const FlightTicket = ({ booking, pricing, storedData }) => {
 
   const totalFare = Number(
     pricingData?.totalPrice ||
-      flightFare + feeAndSurcharge,
+    flightFare + feeAndSurcharge,
   );
 
   const getSeat = (passengerIndex) => {
@@ -638,9 +643,9 @@ const FlightTicket = ({ booking, pricing, storedData }) => {
 
               const layover = nextSegment
                 ? formatLayover(
-                    segment?.Destination?.ArrTime,
-                    nextSegment?.Origin?.DepTime,
-                  )
+                  segment?.Destination?.ArrTime,
+                  nextSegment?.Origin?.DepTime,
+                )
                 : null;
 
               return (
@@ -825,7 +830,7 @@ const FlightTicket = ({ booking, pricing, storedData }) => {
 
                   <div className="flight-ticket-barcode">
                     {passenger?.Ticket?.TicketNumber ||
-                    passenger?.TicketNumber ? (
+                      passenger?.TicketNumber ? (
                       <div
                         className="flight-ticket-barcode-box"
                         title="Ticket barcode area"
@@ -913,7 +918,7 @@ const FlightTicket = ({ booking, pricing, storedData }) => {
         </div>
       </div>
 
-      
+
     </>
   );
 };

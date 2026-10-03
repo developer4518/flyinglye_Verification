@@ -250,8 +250,8 @@ const FlightBookings = () => {
       booking?.ticket_pnr ||
       itinerary?.PNR;
 
-    if (!bookingId || !pnr) {
-      alert("Booking ID or PNR is missing.");
+    if (!bookingId) {
+      alert("Booking ID is missing.");
       return;
     }
 
@@ -261,7 +261,54 @@ const FlightBookings = () => {
         state: {
           bookingId,
           pnr,
-          totalAmount: Number(booking?.total_amount || 0),
+
+          totalAmount: Number(
+            booking?.payment_status === "success" &&
+              Number(booking?.paid_amount || 0) > 0
+              ? booking.paid_amount
+              : booking?.total_amount || 0,
+          ),
+
+          paidAmount:
+            booking?.paid_amount || null,
+
+          paymentStatus:
+            booking?.payment_status || null,
+
+          paymentTxnid:
+            booking?.payment_txnid || null,
+
+          paymentAction:
+            booking?.payment_action || null,
+
+          paymentRefundStatus:
+            booking?.payment_refund_status || null,
+
+          pricing: {
+            flightFare: Number(
+              booking?.payment_pricing?.flight_fare || 0
+            ),
+
+            seatPrice: Number(
+              booking?.payment_pricing?.seat_amount || 0
+            ),
+
+            mealPrice: Number(
+              booking?.payment_pricing?.meal_amount || 0
+            ),
+
+            baggagePrice: Number(
+              booking?.payment_pricing?.baggage_amount || 0
+            ),
+
+            totalPrice: Number(
+              booking?.payment_pricing?.total_amount ||
+              booking?.paid_amount ||
+              booking?.total_amount ||
+              0
+            ),
+          },
+
           fromMyBookings: true,
         },
       },
@@ -273,35 +320,79 @@ const FlightBookings = () => {
   const getPricing = (booking, itinerary) => {
     const fare = itinerary?.Fare || {};
 
-    const totalAmount = Number(
+    const savedPricing =
+      booking?.payment_pricing || {};
+
+    const savedFlightFare = Number(
+      savedPricing?.flight_fare || 0
+    );
+
+    const savedSeatPrice = Number(
+      savedPricing?.seat_amount || 0
+    );
+
+    const savedMealPrice = Number(
+      savedPricing?.meal_amount || 0
+    );
+
+    const savedBaggagePrice = Number(
+      savedPricing?.baggage_amount || 0
+    );
+
+    const hasSavedBreakdown =
+      savedFlightFare > 0 ||
+      savedSeatPrice > 0 ||
+      savedMealPrice > 0 ||
+      savedBaggagePrice > 0;
+
+    const flightFare = hasSavedBreakdown
+      ? savedFlightFare
+      : Number(
+        fare?.PublishedFare ||
+        fare?.OfferedFare ||
+        booking?.total_amount ||
+        0
+      );
+
+    const seatPrice = hasSavedBreakdown
+      ? savedSeatPrice
+      : Number(
+        fare?.TotalSeatCharges || 0
+      );
+
+    const mealPrice = hasSavedBreakdown
+      ? savedMealPrice
+      : Number(
+        fare?.TotalMealCharges || 0
+      );
+
+    const baggagePrice = hasSavedBreakdown
+      ? savedBaggagePrice
+      : Number(
+        fare?.TotalBaggageCharges || 0
+      );
+
+    const calculatedTotal =
+      flightFare +
+      seatPrice +
+      mealPrice +
+      baggagePrice;
+
+    const totalPrice = Number(
+      savedPricing?.total_amount ||
+      booking?.paid_amount ||
       booking?.total_amount ||
-      fare?.PublishedFare ||
-      fare?.OfferedFare ||
-      0,
+      calculatedTotal ||
+      0
     );
 
     return {
-      flightFare: Number(
-        fare?.PublishedFare ||
-        fare?.OfferedFare ||
-        totalAmount,
-      ),
-
-      seatPrice: Number(
-        fare?.TotalSeatCharges || 0,
-      ),
-
-      mealPrice: Number(
-        fare?.TotalMealCharges || 0,
-      ),
-
-      baggagePrice: Number(
-        fare?.TotalBaggageCharges || 0,
-      ),
-
+      flightFare,
+      seatPrice,
+      mealPrice,
+      baggagePrice,
       convenienceFee: 0,
-
-      totalPrice: totalAmount,
+      totalPrice,
     };
   };
 
@@ -325,11 +416,39 @@ const FlightBookings = () => {
         itinerary,
       );
 
+
+      const savedPassenger =
+        booking?.request_payload?.Passengers?.[0] || {};
+
+      const customerGST =
+        savedPassenger?.GSTNumber
+          ? {
+            GSTNumber:
+              savedPassenger.GSTNumber,
+
+            GSTCompanyName:
+              savedPassenger.GSTCompanyName || "",
+
+            GSTCompanyEmail:
+              savedPassenger.GSTCompanyEmail || "",
+
+            GSTCompanyContactNumber:
+              savedPassenger.GSTCompanyContactNumber || "",
+
+            GSTCompanyAddress:
+              savedPassenger.GSTCompanyAddress || "",
+          }
+          : null;
+
+      const ticketBookingData = {
+        gstDetails: customerGST,
+      };
+
       const blob = await pdf(
         <FlightTicketPDF
           booking={response}
           pricing={pricing}
-          bookingData={{}}
+          bookingData={ticketBookingData}
         />,
       ).toBlob();
 
@@ -689,14 +808,77 @@ const FlightBookings = () => {
         return;
       }
 
-      const pricing = getPricing(
-        booking,
-        itinerary,
+      const savedPricing =
+        booking?.payment_pricing || {};
+
+      const savedFlightFare = Number(
+        savedPricing?.flight_fare || 0
       );
 
-      const paymentAmount = Number(
-        pricing?.totalPrice || 0,
+      const savedSeatPrice = Number(
+        savedPricing?.seat_amount || 0
       );
+
+      const savedMealPrice = Number(
+        savedPricing?.meal_amount || 0
+      );
+
+      const savedBaggagePrice = Number(
+        savedPricing?.baggage_amount || 0
+      );
+
+      const savedTotalAmount = Number(
+        savedPricing?.total_amount ||
+        booking?.total_amount ||
+        0
+      );
+
+      // Fresh bookings me saved breakdown available hoga.
+      // Old bookings ke liye TBO fallback preserve kiya hai.
+      const hasSavedBreakdown =
+        savedFlightFare > 0 ||
+        savedSeatPrice > 0 ||
+        savedMealPrice > 0 ||
+        savedBaggagePrice > 0;
+
+      const flightFare = hasSavedBreakdown
+        ? savedFlightFare
+        : Number(
+          itinerary?.Fare?.PublishedFare ||
+          itinerary?.Fare?.OfferedFare ||
+          booking?.total_amount ||
+          0
+        );
+
+      const seatPrice = hasSavedBreakdown
+        ? savedSeatPrice
+        : Number(
+          itinerary?.Fare?.TotalSeatCharges || 0
+        );
+
+      const mealPrice = hasSavedBreakdown
+        ? savedMealPrice
+        : Number(
+          itinerary?.Fare?.TotalMealCharges || 0
+        );
+
+      const baggagePrice = hasSavedBreakdown
+        ? savedBaggagePrice
+        : Number(
+          itinerary?.Fare?.TotalBaggageCharges || 0
+        );
+
+      const calculatedPaymentAmount =
+        flightFare +
+        seatPrice +
+        mealPrice +
+        baggagePrice;
+
+      const paymentAmount =
+        hasSavedBreakdown &&
+          savedTotalAmount > 0
+          ? savedTotalAmount
+          : calculatedPaymentAmount;
 
       if (
         !paymentAmount ||
@@ -736,6 +918,14 @@ const FlightBookings = () => {
 
           paymentAmount,
 
+          pricing: {
+            flightFare,
+            seatPrice,
+            mealPrice,
+            baggagePrice,
+            totalPrice: paymentAmount,
+          },
+
           bookingId:
             Number(bookingId),
 
@@ -757,31 +947,24 @@ const FlightBookings = () => {
       form.action = `${import.meta.env.VITE_API_BASE_URL}/payment/airline/initiate/`;
 
       const paymentData = {
-        amount:
-          paymentAmount,
+        amount: paymentAmount,
 
-        firstname:
-          paymentFirstName,
+        firstname: paymentFirstName,
+        email: paymentEmail,
+        phone: paymentPhone,
 
-        email:
-          paymentEmail,
+        payment_action: "non_lcc_hold_ticket",
 
-        phone:
-          paymentPhone,
-
-        payment_action:
-          "non_lcc_hold_ticket",
-
-        booking_id:
-          Number(bookingId),
-
+        booking_id: Number(bookingId),
         pnr,
+        trace_id: traceId,
 
-        trace_id:
-          traceId,
-          
-        frontend_url:
-          window.location.origin,
+        flight_fare: flightFare,
+        seat_amount: seatPrice,
+        meal_amount: mealPrice,
+        baggage_amount: baggagePrice,
+
+        frontend_url: window.location.origin,
       };
 
       Object.entries(
@@ -1357,9 +1540,24 @@ const FlightBookings = () => {
             booking?.status ||
             "pending";
 
-          const totalAmount = Number(
-            booking?.total_amount || 0,
-          );
+          const hasSuccessfulPayment =
+            String(
+              booking?.payment_status || "",
+            )
+              .trim()
+              .toLowerCase() === "success" &&
+            Number(
+              booking?.paid_amount || 0,
+            ) > 0;
+
+          const totalAmount =
+            hasSuccessfulPayment
+              ? Number(
+                booking.paid_amount,
+              )
+              : Number(
+                booking?.total_amount || 0,
+              );
 
 
 

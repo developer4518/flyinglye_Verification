@@ -357,6 +357,37 @@ const BookingSuccess = () => {
         bookingDetailsResponse?.Response?.FlightItinerary ||
         null;
 
+      const freshFlightFare = Number(
+        pricingData?.flightFare ||
+        latestItinerary?.Fare?.PublishedFare ||
+        latestItinerary?.Fare?.OfferedFare ||
+        0
+      );
+
+      const freshSeatPrice = Number(
+        pricingData?.seatPrice || 0
+      );
+
+      const freshMealPrice = Number(
+        pricingData?.mealPrice || 0
+      );
+
+      const freshBaggagePrice = Number(
+        pricingData?.baggagePrice || 0
+      );
+
+      const calculatedPaymentAmount =
+        freshFlightFare +
+        freshSeatPrice +
+        freshMealPrice +
+        freshBaggagePrice;
+
+      const freshPaymentAmount = Number(
+        pricingData?.totalPrice ||
+        calculatedPaymentAmount ||
+        0
+      );
+
       const ticketPassengers = Array.isArray(latestItinerary?.Passenger)
         ? latestItinerary.Passenger
         : latestItinerary?.Passenger
@@ -567,7 +598,7 @@ const BookingSuccess = () => {
         return;
       }
 
-      if (!totalFare || Number(totalFare) <= 0) {
+      if (!freshPaymentAmount || freshPaymentAmount <= 0) {
         showPopup({
           title: "Payment Amount Missing",
           message:
@@ -607,13 +638,19 @@ const BookingSuccess = () => {
             traceId,
             TraceId: traceId,
 
-            pricing:
-              latestStored?.pricing ||
-              pricingData,
+            pricing: {
+              ...(latestStored?.pricing || pricingData || {}),
+
+              flightFare: freshFlightFare,
+              seatPrice: freshSeatPrice,
+              mealPrice: freshMealPrice,
+              baggagePrice: freshBaggagePrice,
+
+              totalPrice: freshPaymentAmount,
+            },
           },
 
-          paymentAmount:
-            totalFare,
+          paymentAmount: freshPaymentAmount,
 
           bookingId:
             Number(bookingId),
@@ -634,33 +671,27 @@ const BookingSuccess = () => {
       form.action = `${import.meta.env.VITE_API_BASE_URL
         }/payment/airline/initiate/`;
 
+
+
+
       const paymentData = {
-        amount:
-          totalFare,
+        amount: freshPaymentAmount,
+        firstname: paymentFirstName,
+        email: paymentEmail,
+        phone: paymentPhone,
 
-        firstname:
-          paymentFirstName,
+        payment_action: "non_lcc_hold_ticket",
+        booking_id: Number(bookingId),
+        pnr,
+        trace_id: traceId,
 
-        email:
-          paymentEmail,
+        // ✅ SAVE EXACT PRICE BREAKDOWN
+        flight_fare: freshFlightFare,
+        seat_amount: freshSeatPrice,
+        meal_amount: freshMealPrice,
+        baggage_amount: freshBaggagePrice,
 
-        phone:
-          paymentPhone,
-
-        payment_action:
-          "non_lcc_hold_ticket",
-
-        booking_id:
-          Number(bookingId),
-
-        pnr:
-          pnr,
-
-        trace_id:
-          traceId,
-
-        frontend_url:
-          window.location.origin,
+        frontend_url: window.location.origin,
       };
 
       Object.entries(

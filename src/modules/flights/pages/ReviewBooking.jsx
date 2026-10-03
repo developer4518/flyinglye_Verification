@@ -225,6 +225,20 @@ const ReviewBooking = () => {
       const response =
         quoteRes?.data?.data?.Response || quoteRes?.data?.Response;
       const freshResult = response?.Results || {};
+      const bookingIsLcc =
+        freshResult?.IsLCC !== undefined &&
+          freshResult?.IsLCC !== null
+          ? toBool(freshResult.IsLCC)
+          : toBool(isLcc);
+
+      console.log(
+        "✈️ BOOKING TYPE CHECK:",
+        {
+          oldIsLcc: isLcc,
+          freshIsLcc: freshResult?.IsLCC,
+          bookingIsLcc,
+        },
+      );
 
       const isPanRequiredAtBook = toBool(
         freshResult?.IsPanRequiredAtBook,
@@ -279,13 +293,15 @@ const ReviewBooking = () => {
 
 
       // LCC me booking + ticket ek saath hota hai
+      // 1
       const shouldSendPan =
-        isLcc
+        bookingIsLcc
           ? isPanRequiredAtBook || isPanRequiredAtTicket
           : isPanRequiredAtBook;
 
+      // 2
       const shouldSendPassport =
-        isLcc
+        bookingIsLcc
           ? isPassportRequiredAtBook || isPassportRequiredAtTicket
           : isPassportRequiredAtBook;
 
@@ -306,21 +322,158 @@ const ReviewBooking = () => {
 
       console.log("🧾 FARE QUOTE RESPONSE:", response);
 
-      const ssr = response?.Results?.SSR || {};
-      const mealSSR = ssr?.Meal || [];
-      const seatSSR = ssr?.Seat || [];
-      const baggageSSR = ssr?.Baggage || [];
+      const newTraceId =
+        response?.TraceId || traceId;
 
-      console.log("SSR MEALS:", mealSSR);
+      const newResultIndex =
+        freshResult?.ResultIndex ||
+        resultIndex;
 
-      const newTraceId = response.TraceId;
-      const newResultIndex = response.Results.ResultIndex;
-      const fareBreakdown = response.Results.FareBreakdown || [];
-      // ✅ Source required for Release PNR
-      const source = response?.Results?.Source;
+      const fareBreakdown =
+        freshResult?.FareBreakdown || [];
+
+      const source =
+        freshResult?.Source;
+
+      const normalizeSsrArray = (value) => {
+        if (!value) return [];
+
+        if (Array.isArray(value)) {
+          return value
+            .flat(Infinity)
+            .filter(Boolean);
+        }
+
+        if (typeof value === "object") {
+          return Object.values(value)
+            .flat(Infinity)
+            .filter(Boolean);
+        }
+
+        return [];
+      };
+      let freshMealSSR = [];
+      let freshSeatSSR = [];
+      let freshBaggageSSR = [];
+
+      if (bookingIsLcc === true) {
+        const ssrRes = await privateApi.post(
+          "/api/airlines/ssr/",
+          {
+            TraceId: newTraceId,
+            ResultIndex: newResultIndex,
+          },
+        );
+
+        const freshSsrResponse =
+          ssrRes?.data?.Response?.Response ||
+          ssrRes?.data?.Response ||
+          ssrRes?.data?.data?.Response ||
+          ssrRes?.data?.data ||
+          ssrRes?.data ||
+          {};
+
+        console.log(
+          "🧳 FRESH SSR RESPONSE:",
+          freshSsrResponse,
+        );
+
+        const ssrErrorCode = Number(
+          freshSsrResponse?.Error?.ErrorCode || 0,
+        );
+
+        if (ssrErrorCode !== 0) {
+          throw new Error(
+            freshSsrResponse?.Error?.ErrorMessage ||
+            "Unable to refresh airline add-ons.",
+          );
+        }
+
+        freshMealSSR = [
+          ...normalizeSsrArray(
+            freshSsrResponse?.MealDynamic,
+          ),
+          ...normalizeSsrArray(
+            freshSsrResponse?.Meal,
+          ),
+          ...normalizeSsrArray(
+            freshSsrResponse?.Meals,
+          ),
+        ];
+
+        freshBaggageSSR = [
+          ...normalizeSsrArray(
+            freshSsrResponse?.Baggage,
+          ),
+          ...normalizeSsrArray(
+            freshSsrResponse?.BaggageDynamic,
+          ),
+        ];
+
+        const seatDynamic =
+          normalizeSsrArray(
+            freshSsrResponse?.SeatDynamic,
+          );
+
+        freshSeatSSR =
+          seatDynamic.flatMap(
+            (seatContainer) =>
+              normalizeSsrArray(
+                seatContainer?.SegmentSeat,
+              ).flatMap(
+                (segmentSeat) =>
+                  normalizeSsrArray(
+                    segmentSeat?.RowSeats,
+                  ).flatMap(
+                    (row) =>
+                      normalizeSsrArray(
+                        row?.Seats,
+                      ),
+                  ),
+              ),
+          );
+      }
 
       const getFareByPaxType = (paxType) =>
         fareBreakdown.find((f) => f.PassengerType === paxType) || {};
+
+
+
+      const matchFreshSSR = (
+        options,
+        selected,
+      ) => {
+        if (!selected) {
+          return null;
+        }
+
+        const matched =
+          options.find((item) => {
+            return (
+              String(item?.Code || "") ===
+              String(selected?.Code || "") &&
+              String(item?.Origin || "") ===
+              String(selected?.Origin || "") &&
+              String(
+                item?.Destination || "",
+              ) ===
+              String(
+                selected?.Destination || "",
+              )
+            );
+          });
+
+        if (!matched) {
+          return null;
+        }
+
+        return {
+          ...selected,
+          ...matched,
+          PassengerIndex:
+            selected?.PassengerIndex,
+        };
+      };
 
       /* ---------- PASSENGERS ---------- */
 
@@ -398,13 +551,29 @@ const ReviewBooking = () => {
 
         /* ---------- MATCH WITH SSR ---------- */
 
-        const meal = mealSSR.find((m) => m.Code === selectedMeal?.Code);
+        const meal =
+          bookingIsLcc === true
+            ? matchFreshSSR(
+              freshMealSSR,
+              selectedMeal,
+            )
+            : selectedMeal || null;
 
-        const seat = seatSSR.find((s) => s.Code === selectedSeat?.Code);
+        const seat =
+          bookingIsLcc === true
+            ? matchFreshSSR(
+              freshSeatSSR,
+              selectedSeat,
+            )
+            : selectedSeat || null;
 
-        const baggage = baggageSSR.find(
-          (b) => b.Code === selectedBaggageItem?.Code,
-        );
+        const baggage =
+          bookingIsLcc === true
+            ? matchFreshSSR(
+              freshBaggageSSR,
+              selectedBaggageItem,
+            )
+            : selectedBaggageItem || null;
         /* ---------- VALIDATIONS ---------- */
 
         const isValidMeal =
@@ -414,12 +583,17 @@ const ReviewBooking = () => {
           meal.Destination &&
           meal.WayType !== undefined;
 
+        const seatWayType =
+          seat?.SeatWayType ??
+          seat?.WayType;
+
         const isValidSeat =
           seat &&
           seat.Code &&
           seat.Origin &&
           seat.Destination &&
-          seat.WayType !== undefined;
+          seatWayType !== undefined &&
+          seatWayType !== null;
 
         const isValidBaggage =
           baggage &&
@@ -437,11 +611,11 @@ const ReviewBooking = () => {
           },
 
           /* ---------- SEAT ---------- */
-          ...(isLcc &&
+          ...(bookingIsLcc &&
             isValidSeat && {
             SeatDynamic: [
               {
-                WayType: seat.WayType,
+                WayType: seatWayType,
                 Code: seat.Code,
                 Origin: seat.Origin,
                 Destination: seat.Destination,
@@ -450,22 +624,33 @@ const ReviewBooking = () => {
           }),
 
           /* ---------- MEAL (FIXED) ---------- */
-          ...(isLcc &&
+          ...(bookingIsLcc &&
             isValidMeal && {
             MealDynamic: [
               {
                 WayType: meal.WayType,
                 Code: meal.Code,
+                Description: meal.Description,
+                AirlineDescription:
+                  meal.AirlineDescription || "",
+                Quantity: meal.Quantity || 1,
+                Price: Number(meal.Price || 0),
+                Currency: meal.Currency || "INR",
                 Origin: meal.Origin,
                 Destination: meal.Destination,
+                Nationality: String(
+                  p?.nationality || "IN",
+                )
+                  .trim()
+                  .toUpperCase(),
               },
             ],
           }),
 
           /* ---------- BAGGAGE ---------- */
-          ...(isLcc &&
+          ...(bookingIsLcc &&
             isValidBaggage && {
-            BaggageDynamic: [
+            Baggage: [
               {
                 WayType: baggage.WayType,
                 Code: baggage.Code,
@@ -480,6 +665,77 @@ const ReviewBooking = () => {
           }),
         };
       });
+
+
+
+      // ======================================================
+      // LCC SSR PAYLOAD SAFETY CHECK
+      // Payment se pehle ensure karo selected SSR payload me hai
+      // ======================================================
+
+      if (bookingIsLcc === true) {
+        console.log(
+          "🧳 SELECTED SSR BEFORE PAYMENT:",
+          {
+            selectedSeats,
+            selectedMeals,
+            selectedBaggage,
+          },
+        );
+
+        console.log(
+          "🎫 FORMATTED PASSENGERS BEFORE PAYMENT:",
+          formattedPassengers,
+        );
+
+        const hasSeatSelection =
+          selectedSeats.length > 0;
+
+        const hasMealSelection =
+          selectedMeals.length > 0;
+
+        const hasBaggageSelection =
+          selectedBaggage.length > 0;
+
+        const hasSeatInPayload =
+          formattedPassengers.some(
+            (passenger) =>
+              Array.isArray(passenger?.SeatDynamic) &&
+              passenger.SeatDynamic.length > 0,
+          );
+
+        const hasMealInPayload =
+          formattedPassengers.some(
+            (passenger) =>
+              Array.isArray(passenger?.MealDynamic) &&
+              passenger.MealDynamic.length > 0,
+          );
+
+        const hasBaggageInPayload =
+          formattedPassengers.some(
+            (passenger) =>
+              Array.isArray(passenger?.Baggage) &&
+              passenger.Baggage.length > 0,
+          );
+
+        const ssrPayloadMismatch =
+          (hasSeatSelection && !hasSeatInPayload) ||
+          (hasMealSelection && !hasMealInPayload) ||
+          (hasBaggageSelection && !hasBaggageInPayload);
+
+        if (ssrPayloadMismatch) {
+          showPopup({
+            title: "Unable To Verify Add-ons",
+            message:
+              "Your selected seat, meal or baggage could not be attached to the airline booking request. No payment has been taken. Please select the add-ons again.",
+            type: "warning",
+            actionLabel: "Review Add-ons",
+            onAction: () => navigate("/ssr"),
+          });
+
+          return;
+        }
+      }
 
 
 
@@ -547,7 +803,7 @@ const ReviewBooking = () => {
         GSTAllowed:
           isGSTAllowed,
 
-        ...(isLcc === true && {
+        ...(bookingIsLcc === true && {
           DisplayItinerary:
             displayItinerary,
         }),
@@ -560,7 +816,7 @@ const ReviewBooking = () => {
     LCC → PAYU → TICKET
  ========================================== */
 
-      if (isLcc === true) {
+      if (bookingIsLcc === true) {
         const leadPassenger =
           formattedPassengers.find(
             (passenger) =>
@@ -694,6 +950,19 @@ const ReviewBooking = () => {
           trace_id:
             newTraceId,
 
+          // Exact pricing snapshot
+          flight_fare:
+            Number(freshPublishedFare || 0),
+
+          seat_amount:
+            Number(seatPrice || 0),
+
+          meal_amount:
+            Number(mealPrice || 0),
+
+          baggage_amount:
+            Number(baggagePrice || 0),
+
           frontend_url:
             window.location.origin,
         };
@@ -723,9 +992,40 @@ const ReviewBooking = () => {
          NO PAYU HERE
       ========================================== */
 
+      const holdPayload = {
+        ...payload,
+
+        Pricing: {
+          FlightFare: Number(
+            freshPublishedFare || 0
+          ),
+
+          SeatAmount: Number(
+            seatPrice || 0
+          ),
+
+          MealAmount: Number(
+            mealPrice || 0
+          ),
+
+          BaggageAmount: Number(
+            baggagePrice || 0
+          ),
+
+          TotalAmount: Number(
+            freshTotalPrice || 0
+          ),
+        },
+      };
+
+      console.log(
+        "✅ NON-LCC HOLD PAYLOAD:",
+        holdPayload,
+      );
+
       const res = await privateApi.post(
         "/api/airlines/book/",
-        payload,
+        holdPayload,
       );
 
       console.log(

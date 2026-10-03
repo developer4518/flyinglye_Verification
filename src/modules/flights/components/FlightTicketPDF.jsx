@@ -94,6 +94,44 @@ const getPassengerName = (passenger) =>
     .replace(/\s+/g, " ")
     .trim();
 
+
+
+
+const getTaxBreakupValue = (
+  fare,
+  keys = [],
+) => {
+  const taxBreakup = toArray(
+    fare?.TaxBreakup ||
+    fare?.TaxBreakUp ||
+    [],
+  );
+
+  const normalizedKeys =
+    keys.map((key) =>
+      String(key).toLowerCase(),
+    );
+
+  const matchedTax =
+    taxBreakup.find((item) => {
+      const taxKey = String(
+        item?.key ??
+        item?.Key ??
+        "",
+      ).toLowerCase();
+
+      return normalizedKeys.includes(
+        taxKey,
+      );
+    });
+
+  return Number(
+    matchedTax?.value ??
+    matchedTax?.Value ??
+    0,
+  );
+};
+
 const styles = StyleSheet.create({
 
 
@@ -355,7 +393,7 @@ const FlightTicketPDF = ({
   const itinerary = normalized?.FlightItinerary || {};
 
   const passengers = toArray(itinerary?.Passenger);
- 
+
   const segments = toArray(itinerary?.Segments);
 
   const pnr =
@@ -383,6 +421,15 @@ const FlightTicketPDF = ({
   const selectedBaggage =
     bookingData?.selectedBaggage || [];
 
+
+  const customerGST =
+    bookingData?.gstDetails || {};
+
+  const customerGSTNumber =
+    String(
+      customerGST?.GSTNumber || ""
+    ).trim();
+
   const getSelected = (list, index) =>
     list.find(
       (item) => item?.PassengerIndex === index,
@@ -404,20 +451,156 @@ const FlightTicketPDF = ({
     pricing?.baggagePrice || 0,
   );
 
-  const convenienceFee = Number(
-    pricing?.convenienceFee || 0,
-  );
-
-  const feeAndSurcharge =
-    seatPrice +
-    mealPrice +
-    baggagePrice +
-    convenienceFee;
-
   const totalFare = Number(
     pricing?.totalPrice ||
-    flightFare + feeAndSurcharge,
+    flightFare +
+    seatPrice +
+    mealPrice +
+    baggagePrice,
   );
+
+
+  // =============================================
+  // FARE BREAKUP FROM PASSENGER DATA
+  // =============================================
+
+  const fareBreakup =
+    passengers.reduce(
+      (total, passenger) => {
+        const fare =
+          passenger?.Fare || {};
+
+        const baseFare = Number(
+          fare?.BaseFare || 0
+        );
+
+        const otherTax = Number(
+          fare?.OtherTaxes ??
+          fare?.OtherTax ??
+          getTaxBreakupValue(
+            fare,
+            [
+              "OtherTaxes",
+              "OtherTax",
+            ],
+          )
+        );
+
+        const k3 = Number(
+          fare?.K3 ??
+          getTaxBreakupValue(
+            fare,
+            ["K3"],
+          )
+        );
+
+        const yq = Number(
+          fare?.YQTax ??
+          getTaxBreakupValue(
+            fare,
+            [
+              "YQTax",
+              "YQ",
+            ],
+          )
+        );
+
+        const yr = Number(
+          fare?.YR ??
+          getTaxBreakupValue(
+            fare,
+            ["YR"],
+          )
+        );
+
+        return {
+          baseFare:
+            total.baseFare +
+            baseFare,
+
+          otherTax:
+            total.otherTax +
+            otherTax,
+
+          k3:
+            total.k3 +
+            k3,
+
+          yq:
+            total.yq +
+            yq,
+
+          yr:
+            total.yr +
+            yr,
+        };
+      },
+
+      {
+        baseFare: 0,
+        otherTax: 0,
+        k3: 0,
+        yq: 0,
+        yr: 0,
+      },
+    );
+
+
+  const baseFareAmount =
+    Number(
+      fareBreakup.baseFare || 0
+    );
+
+  const k3Amount =
+    Number(
+      fareBreakup.k3 || 0
+    );
+
+  const otherTaxAmount =
+    Number(
+      fareBreakup.otherTax || 0
+    );
+
+  const yqAmount =
+    Number(
+      fareBreakup.yq || 0
+    );
+
+  const yrAmount =
+    Number(
+      fareBreakup.yr || 0
+    );
+
+
+  // =============================================
+  // SERVICE CHARGE
+  //
+  // Paid total se actual visible fare breakup +
+  // SSR subtract karke service charge niklega.
+  // =============================================
+
+  const serviceCharge = Math.max(
+    totalFare -
+    (
+      baseFareAmount +
+      k3Amount +
+      otherTaxAmount +
+      yqAmount +
+      yrAmount +
+      seatPrice +
+      mealPrice +
+      baggagePrice
+    ),
+    0,
+  );
+
+
+  // OT + YQ + YR + Service Charge
+  const feeAndSurcharge =
+    otherTaxAmount +
+    yqAmount +
+    yrAmount +
+    serviceCharge;
 
   return (
     <Document>
@@ -522,7 +705,9 @@ const FlightTicketPDF = ({
               </Cell>
 
               <Cell width="18%">
-                {passenger?.GSTNumber || "--"}
+                {index === 0 && customerGSTNumber
+                  ? customerGSTNumber
+                  : "--"}
               </Cell>
             </View>
           ))}
@@ -818,29 +1003,83 @@ const FlightTicketPDF = ({
 
             <View style={styles.paymentRow}>
               <Text>Fare:</Text>
+
               <Text>
-                Rs. {formatMoney(flightFare)}
+                Rs. {formatMoney(
+                  baseFareAmount
+                )}
               </Text>
             </View>
+
 
             <View style={styles.paymentRow}>
               <Text>K3/GST:</Text>
-              <Text>Rs. 0.00</Text>
-            </View>
 
-            <View style={styles.paymentRow}>
-              <Text>Fee & Surcharge:</Text>
               <Text>
-                Rs. {formatMoney(feeAndSurcharge)}
+                Rs. {formatMoney(
+                  k3Amount
+                )}
               </Text>
             </View>
+
+
+            <View style={styles.paymentRow}>
+              <Text>
+                Fee & Surcharge:
+              </Text>
+
+              <Text>
+                Rs. {formatMoney(
+                  feeAndSurcharge
+                )}
+              </Text>
+            </View>
+
+
+            <View style={styles.paymentRow}>
+              <Text>Meal:</Text>
+
+              <Text>
+                Rs. {formatMoney(
+                  mealPrice
+                )}
+              </Text>
+            </View>
+
+
+            <View style={styles.paymentRow}>
+              <Text>Seat:</Text>
+
+              <Text>
+                Rs. {formatMoney(
+                  seatPrice
+                )}
+              </Text>
+            </View>
+
+
+            <View style={styles.paymentRow}>
+              <Text>Baggage:</Text>
+
+              <Text>
+                Rs. {formatMoney(
+                  baggagePrice
+                )}
+              </Text>
+            </View>
+
 
             <View style={styles.totalRow}>
               <Text>Total Amount:</Text>
+
               <Text>
-                Rs. {formatMoney(totalFare)}
+                Rs. {formatMoney(
+                  totalFare
+                )}
               </Text>
             </View>
+
+
           </View>
         </View>
 

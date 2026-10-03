@@ -381,18 +381,128 @@ const FlightInvoicePDF = ({
   const customerGST =
     bookingData?.gstDetails || null;
 
-  const getSelectedPrice = (
+  const getAddonPrice = (
     list,
     index,
+    fallbackTotal,
   ) => {
-    const selected =
-      list.find(
-        (item) =>
-          item?.PassengerIndex === index,
-      ) || list?.[index];
+    // Existing detailed SSR data available hai
+    // to wahi use karo.
+    if (
+      Array.isArray(list) &&
+      list.length > 0
+    ) {
+      const selected =
+        list.find(
+          (item) =>
+            Number(item?.PassengerIndex) ===
+            Number(index),
+        ) || list?.[index];
 
-    return Number(selected?.Price || 0);
+      return Number(
+        selected?.Price || 0
+      );
+    }
+
+    // My Bookings se invoice open karne par
+    // SSR arrays available nahi ho sakti,
+    // but saved total pricing available hai.
+    //
+    // Total ko multiple passengers me duplicate
+    // hone se bachane ke liye first row me show karo.
+    if (index === 0) {
+      return Number(
+        fallbackTotal || 0
+      );
+    }
+
+    return 0;
   };
+
+
+  const grossAmount = passengers.reduce(
+    (total, passenger, index) => {
+      const paxFare =
+        passenger?.Fare || {};
+
+      const baseFare = Number(
+        paxFare?.BaseFare || 0
+      );
+
+      const otherTax = Number(
+        paxFare?.OtherTaxes ??
+        paxFare?.OtherTax ??
+        getTaxBreakupValue(
+          paxFare,
+          ["OtherTaxes", "OtherTax"],
+        )
+      );
+
+      const k3Tax = Number(
+        paxFare?.K3 ??
+        getTaxBreakupValue(
+          paxFare,
+          ["K3"],
+        )
+      );
+
+      const yqTax = Number(
+        paxFare?.YQTax ??
+        getTaxBreakupValue(
+          paxFare,
+          ["YQTax", "YQ"],
+        )
+      );
+
+      const yrTax = Number(
+        paxFare?.YR ??
+        getTaxBreakupValue(
+          paxFare,
+          ["YR"],
+        )
+      );
+
+      const baggageAmount =
+        getAddonPrice(
+          selectedBaggage,
+          index,
+          baggagePrice,
+        );
+
+      const mealAmount =
+        getAddonPrice(
+          selectedMeals,
+          index,
+          mealPrice,
+        );
+
+      const seatAmount =
+        getAddonPrice(
+          selectedSeats,
+          index,
+          seatPrice,
+        );
+
+      return (
+        total +
+        baseFare +
+        otherTax +
+        k3Tax +
+        yqTax +
+        yrTax +
+        baggageAmount +
+        mealAmount +
+        seatAmount
+      );
+    },
+    0,
+  );
+
+  const serviceCharge = Math.max(
+    Number(totalFare || 0) -
+    Number(grossAmount || 0),
+    0,
+  );
 
   const sectors = segments
     .map(
@@ -716,9 +826,10 @@ const FlightInvoicePDF = ({
                     align="right"
                   >
                     {money(
-                      getSelectedPrice(
+                      getAddonPrice(
                         selectedBaggage,
                         index,
+                        baggagePrice,
                       ),
                     )}
                   </Cell>
@@ -728,9 +839,10 @@ const FlightInvoicePDF = ({
                     align="right"
                   >
                     {money(
-                      getSelectedPrice(
+                      getAddonPrice(
                         selectedMeals,
                         index,
+                        mealPrice,
                       ),
                     )}
                   </Cell>
@@ -740,9 +852,10 @@ const FlightInvoicePDF = ({
                     align="right"
                   >
                     {money(
-                      getSelectedPrice(
+                      getAddonPrice(
                         selectedSeats,
                         index,
+                        seatPrice,
                       ),
                     )}
                   </Cell>
@@ -785,35 +898,18 @@ const FlightInvoicePDF = ({
               </Text>
 
               <Text>
-                {money(
-                  flightFare +
-                  seatPrice +
-                  mealPrice +
-                  baggagePrice,
-                )}
+                {money(grossAmount)}
               </Text>
             </View>
 
             <View style={styles.totalRow}>
               <Text>
-                Less Commission Earned
+                Service Charge
               </Text>
-
-              <Text>0.00</Text>
-            </View>
-
-            <View style={styles.totalRow}>
-              <Text>Add Tra Fee</Text>
 
               <Text>
-                {money(convenienceFee)}
+                {money(serviceCharge)}
               </Text>
-            </View>
-
-            <View style={styles.totalRow}>
-              <Text>Add TDS Deducted</Text>
-
-              <Text>0.00</Text>
             </View>
 
             <View style={styles.totalRow}>
